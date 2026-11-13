@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# Launch / stop NFSU2 under the project's Wine prefix.
+#
+#   tools/run_game.sh [--desktop WxH] [--wait]
+#   tools/run_game.sh --kill
+#
+# The game runs from work/profile: a symlink copy of GAME_DIR, so the user's folder is never written to.
+# Every ASI in GAME_DIR/scripts/ is linked in: the user's mod set is REQUIRED to run the game properly
+# (WidescreenFix = no-disc fix, HDContentSupport = HD UI textures in the data). Our probe, when built,
+# is copied next to them.
+#
+# Exit codes: 0 ok, 2 bad args/config, 3 exe hash mismatch, 4 game did not start.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091
+source "$ROOT/.env.local"
+export WINEPREFIX
+WINE="${WINE:-wine}"
+EXPECTED_SHA256="f9dd86c054878ce6276beb07c1fd61874f7a1e4bf1f241b084c65b73e24168a7"
+PROFILE_DIR="$ROOT/work/profile"
+LOG_DIR="$ROOT/work/logs"
+
+desktop=""
+wait_exit=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --desktop) desktop="$2"; shift 2 ;;
+    --wait) wait_exit=1; shift ;;
+    --kill)
+      wineserver -k 2>/dev/null || true
+      exit 0 ;;
+    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
+    *) echo "unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+
+[[ -f "$GAME_DIR/SPEED2.EXE" ]] || { echo "GAME_DIR has no SPEED2.EXE: $GAME_DIR" >&2; exit 2; }
+sha="$(sha256sum "$GAME_DIR/SPEED2.EXE" | cut -d' ' -f1)"
+[[ "$sha" == "$EXPECTED_SHA256" ]] || { echo "SPEED2.EXE hash mismatch: $sha" >&2; exit 3; }
+
+build_profile() {
+  mkdir -p "$PROFILE_DIR/scripts"
+  # refresh links (GAME_DIR contents may change)
+  find "$PROFILE_DIR" -maxdepth 2 -type l -delete
+  local entry name
+  for entry in "$GAME_DIR"/*; do
+    name="$(basename "$entry")"
+    [[ "$name" == scripts ]] && continue
+    ln -s "$entry" "$PROFILE_DIR/$name"
+  done
+  for entry in "$GAME_DIR"/scripts/*; do
+    ln -s "$entry" "$PROFILE_DIR/scripts/$(basename "$entry")"
+  done
+  if [[ -f "$ROOT/out/nfsu2_probe.asi" ]]; then
+    cp -f "$ROOT/out/nfsu2_probe.asi" "$PROFILE_DIR/scripts/"
+  fi
+}
+
+build_profile
+mkdir -p "$LOG_DIR"
+log="$LOG_DIR/game_$(date +%Y%m%d_%H%M%S).log"
+ln -sfn "$log" "$LOG_DIR/game_latest.log"
+
+export WINEDLLOVERRIDES="dinput8=n,b;d3d9=n,b"
+export WINEDEBUG="${WINEDEBUG:-err+all,fixme-all}"
+
+cmd=("$WINE" SPEED2.EXE)
+if [[ -n "$desktop" ]]; then
+  # explorer resolves a bare name against its own cwd, so pass the full Windows path
+  cmd=("$WINE" explorer "/desktop=nfsu2,$desktop" "$(winepath -w "$PROFILE_DIR/SPEED2.EXE" 2>/dev/null)")
+fi
+
+cd "$PROFILE_DIR"
+echo "dir=$PROFILE_DIR log=$log"
+"${cmd[@]}" >"$log" 2>&1 &
+pid=$!
+
+# wait up to 30 s for the game process to appear
+for _ in $(seq 60); do
+  if pgrep -f '\\SPEED2\.EXE' >/dev/null; then break; fi
+  if ! kill -0 "$pid" 2>/dev/null; then echo "wine exited early, see $log" >&2; exit 4; fi
+  sleep 0.5
+done
+pgrep -f '\\SPEED2\.EXE' >/dev/null || { echo "game did not start, see $log" >&2; exit 4; }
+echo "started"
+
+if [[ $wait_exit -eq 1 ]]; then wait "$pid"; fi

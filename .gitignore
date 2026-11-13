@@ -1,0 +1,26 @@
+# Local machine config and scratch
+.env.local
+work/
+out/
+build*/
+cmake-build-*/
+
+# Never commit the game or its data (CLAUDE.md rule 4)
+*.EXE
+*.exe
+*.BUN
+*.bun
+*.lzc
+*.BIN
+*.tpf
+*.sav
+SAVE/
+
+# IDE
+.idea/workspace.xml
+.idea/shelf/
+
+# Python
+__pycache__/
+*.pyc
+.venv/

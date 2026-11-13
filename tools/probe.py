@@ -7,6 +7,8 @@
   tools/probe.py scan "8B 0D ?? ?? ?? ??" [--max N]
   tools/probe.py log [N]
   tools/probe.py shot [SCALE]          -> saves PNG under work/screenshots/, prints the path
+  tools/probe.py press KEY [MS] | hold KEY | release KEY | release_all | input
+                                       -> DirectInput key injection (names from tools/dik.py, e.g. enter, up, esc)
   tools/probe.py wait [TIMEOUT]        -> wait until the probe answers
   tools/probe.py ready [TIMEOUT]       -> wait until the probe answers and frames are being presented
 """
@@ -60,6 +62,13 @@ def main(argv: list[str]) -> int:
                 if time.monotonic() > end:
                     raise pc.ProbeError(f"still black after timeout (mean {mean:.1f}, frame {meta['frame']})")
                 time.sleep(0.5)
+        elif cmd in ("press", "hold", "release"):
+            ms = int(args[1]) if len(args) > 1 else 100
+            print(json.dumps(pc.key(args[0], cmd, ms)))
+        elif cmd == "release_all":
+            print(json.dumps(pc.call("release_all")))
+        elif cmd == "input":
+            print(json.dumps(pc.call("input_state"), indent=2))
         elif cmd == "wait":
             print(json.dumps(pc.wait_ready(float(args[0]) if args else 60.0)))
         elif cmd == "ready":

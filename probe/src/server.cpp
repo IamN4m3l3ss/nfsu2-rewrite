@@ -66,6 +66,9 @@ json dispatch(const std::string& method, const json& p) {
         return log_tail(p.value("n", 50u), p.value("since", uint64_t{0}));
     }
     if (method == "keep_active") return keep_active(p);
+    if (method == "key") return input_key(p);
+    if (method == "release_all") return input_release_all();
+    if (method == "input_state") return input_state();
     if (method == "screenshot") {
         int scale = p.value("scale", 1);
         unsigned timeout = p.value("timeout_ms", 5000u);

@@ -88,6 +88,13 @@ def screenshot_png(scale: int = 2, port: int = DEFAULT_PORT, save: bool = True) 
     return png, r, path
 
 
+def key(name, action: str = "press", ms: int = 100, port: int = DEFAULT_PORT) -> dict:
+    """Inject a DirectInput key. name: DIK name ("enter", "up", "a", ...) or code. action: press|hold|release."""
+    import dik
+
+    return call("key", {"key": dik.code(name), "action": action, "ms": ms}, port=port)
+
+
 def hexdump(addr: int, data: bytes, width: int = 16) -> str:
     lines = []
     for off in range(0, len(data), width):

@@ -11,10 +11,11 @@ add_library(nfsu2_probe SHARED
   src/mem.cpp
   src/d3d.cpp
   src/server.cpp
-  src/patches.cpp)
+  src/patches.cpp
+  src/input.cpp)
 target_include_directories(nfsu2_probe PRIVATE src ${CMAKE_SOURCE_DIR}/third_party/json)
 target_compile_definitions(nfsu2_probe PRIVATE _CRT_SECURE_NO_WARNINGS)
-target_link_libraries(nfsu2_probe PRIVATE minhook ws2_32 bcrypt)
+target_link_libraries(nfsu2_probe PRIVATE minhook ws2_32 bcrypt dxguid)
 set_target_properties(nfsu2_probe PROPERTIES
   SUFFIX ".asi"
   RUNTIME_OUTPUT_DIRECTORY "${OUT_DIR}"

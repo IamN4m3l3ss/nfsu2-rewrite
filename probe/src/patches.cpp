@@ -48,6 +48,8 @@ bool patches_install() {
     return true;
 }
 
+bool keep_active_enabled() { return g_keep_active.load(std::memory_order_relaxed); }
+
 json keep_active(const json& p) {
     if (p.contains("enabled")) {
         g_keep_active = p["enabled"].get<bool>();

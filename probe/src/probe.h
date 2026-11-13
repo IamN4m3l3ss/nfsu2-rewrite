@@ -40,6 +40,13 @@ json screenshot(int scale);  // must be called on the render thread
 // ---- patches.cpp ----
 bool patches_install();
 json keep_active(const json& params);  // {"enabled": bool}? -> state
+bool keep_active_enabled();
+
+// ---- input.cpp ----
+bool input_install_hooks();
+json input_key(const json& params);  // {"key": DIK, "action": "press"|"hold"|"release", "ms": n}
+json input_release_all();
+json input_state();
 
 // ---- server.cpp ----
 void server_start(uint16_t port);

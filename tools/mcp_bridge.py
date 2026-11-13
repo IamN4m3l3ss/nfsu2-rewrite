@@ -76,6 +76,37 @@ def keep_active(enabled: bool | None = None) -> dict:
 
 
 @server.tool()
+def press(key: str, ms: int = 100) -> dict:
+    """Press and release a key (DirectInput name like "enter", "up", "esc", "a", or a DIK code "0x1c").
+    Held for at least `ms` and at least two game reads. Works while the game is unfocused."""
+    return pc.key(key, "press", ms)
+
+
+@server.tool()
+def hold(key: str) -> dict:
+    """Hold a key down until release()/release_all()."""
+    return pc.key(key, "hold")
+
+
+@server.tool()
+def release(key: str) -> dict:
+    """Release a held key."""
+    return pc.key(key, "release")
+
+
+@server.tool()
+def release_all() -> dict:
+    """Release every injected key."""
+    return pc.call("release_all")
+
+
+@server.tool()
+def input_state() -> dict:
+    """DirectInput devices the game uses (kind, read counts, pending injected events) and injected keys down."""
+    return pc.call("input_state")
+
+
+@server.tool()
 def screenshot(scale: int = 2) -> Image:
     """Capture the game's back buffer (downscaled by integer `scale`). Also saved under work/screenshots/."""
     png, _, _ = pc.screenshot_png(scale)

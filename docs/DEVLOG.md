@@ -69,3 +69,33 @@
 - Fullscreen still minimizes visually on focus loss (harmless for automation; screenshots come from the back buffer).
 - Input while unfocused: the game now polls DirectInput, but foreground-cooperative devices won't deliver data → M3.
 - `WM_ACTIVATE` path calls into the object at `[0x82B884]` (0x4810F0 / 0x481210 / 0x483B40) — unknown, maybe a pause.
+
+## 2026-11-13 — M2 + M3: unattended launch loop, DirectInput injection
+
+**Changed**
+- `tools/run_game.sh`: waits for probe + presented frames (exit 5), kills a running game first, `--kill` verifies
+  (exit 6). `tools/probe.py`: `ready`, `shot-wait` (screenshot until not black), `press/hold/release/release_all/input`.
+- `tests/m2_loop.sh`: launch → ready → screenshot of title → kill, N times.
+- `probe/src/input.cpp`: MinHook `DirectInput8Create` → patch `IDirectInput8::CreateDevice` (3) → device vtable
+  `Acquire` 7, `GetDeviceState` 9, `GetDeviceData` 10, `SetDataFormat` 11, `SetCooperativeLevel` 13,
+  `BuildActionMap` 29, `SetActionMap` 30. Devices not seen at creation are classified with `GetCapabilities`.
+  Injected keys: merged into `GetDeviceState`, and as action-tagged events (`uAppData` from the captured action map)
+  through `GetDeviceData`. Under keep_active, failed reads (unfocused) succeed with injected data only.
+- `tools/dik.py` generated from SDK `dinput.h`. MCP tools `press hold release release_all input_state keep_active`.
+- `docs/structs/input.md`: devices, keyboard read function, frontend action map.
+
+**Verified**
+- M2: `tests/m2_loop.sh 5` → 5/5 OK, probe ready ~1.2 s after launch, title drawn by frame 44.
+- M3: `tests/m3_input.py` → 4/4 PASS: injected Enter moves title → "Save/Load: create a new profile?" (mean pixel
+  difference 40.2), with the game unfocused.
+
+**Broke / learned**
+- First injected Enter did nothing: the keyboard is DirectInput 8 *action-mapped*, and the game reads only
+  `dwData` + `uAppData` (action id) from events. Found by disassembling the read site (`0x5C1840`, caller address
+  logged by the hook) and fixed by hooking `SetActionMap` to learn key → action ids.
+- The title screen ignores Enter for a few seconds after it appears; harness retries until the screen changes.
+
+**Open**
+- `axis` (analog/gamepad injection) not done: the game's gamepad path isn't mapped yet (and the WidescreenFix
+  adds XInput). Keyboard covers menus and driving for now.
+- In-game driving action maps (53/19/9 actions) not yet seen in `SetActionMap`; check when driving (M4/M5).

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Launch / stop NFSU2 under the project's Wine prefix.
 #
-#   tools/run_game.sh [--desktop WxH] [--wait] [--no-probe] [--timeout SEC]
+#   tools/run_game.sh [--freeroam] [--desktop WxH] [--wait] [--no-probe] [--timeout SEC]
 #   tools/run_game.sh --kill
 #
 # By default returns once the probe answers and the game has presented frames ("ready").
+# --freeroam then drives the menus into Explore Mode with injected keys (tools/boot_freeroam.py, needs a save).
 #
 # The game runs from work/profile: a symlink copy of GAME_DIR, so the user's folder is never written to.
 # Every ASI in GAME_DIR/scripts/ is linked in: the user's mod set is REQUIRED to run the game properly
@@ -12,7 +13,7 @@
 # is copied next to them.
 #
 # Exit codes: 0 ok, 2 bad args/config, 3 exe hash mismatch, 4 game did not start, 5 probe/frames not ready,
-#             6 game survived --kill. A game that is already running is killed first.
+#             6 game survived --kill, 7 --freeroam failed. A game that is already running is killed first.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -27,6 +28,7 @@ LOG_DIR="$ROOT/work/logs"
 desktop=""
 wait_exit=0
 wait_probe=1
+freeroam=0
 probe_timeout=60
 
 kill_game() {
@@ -45,6 +47,7 @@ while [[ $# -gt 0 ]]; do
     --desktop) desktop="$2"; shift 2 ;;
     --wait) wait_exit=1; shift ;;
     --no-probe) wait_probe=0; shift ;;
+    --freeroam) freeroam=1; shift ;;
     --timeout) probe_timeout="$2"; shift 2 ;;
     --kill)
       kill_game || { echo "game still running after kill" >&2; exit 6; }
@@ -115,6 +118,10 @@ if [[ $wait_probe -eq 1 ]]; then
     exit 5
   fi
   echo "ready"
+fi
+
+if [[ $freeroam -eq 1 ]]; then
+  "$ROOT/.venv/bin/python" "$ROOT/tools/boot_freeroam.py" || exit 7
 fi
 
 if [[ $wait_exit -eq 1 ]]; then wait "$pid"; fi

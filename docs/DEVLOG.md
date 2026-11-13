@@ -99,3 +99,29 @@
 - `axis` (analog/gamepad injection) not done: the game's gamepad path isn't mapped yet (and the WidescreenFix
   adds XInput). Keyboard covers menus and driving for now.
 - In-game driving action maps (53/19/9 actions) not yet seen in `SetActionMap`; check when driving (M4/M5).
+
+## 2026-11-13 — M4 (input-driven): boot to free roam in ~17 s
+
+**Changed**
+- `tools/boot_freeroam.py` + `tools/run_game.sh --freeroam` (exit 7 on failure): the user's key sequence
+  title Enter → Load "Nameless" → Load complete → Main Menu, Left → Career, Enter ×3 → Garage → "Return to Explore
+  Mode?", Left → Yes, Enter → LOADING → free roam. Each Enter waits for the screen to react (diff threshold), the
+  title Enter retries every 1.5 s. Free roam = picture moves away from the LOADING screen (stopgap until M5's
+  car struct). `tests/m4_loop.sh N` keeps per-run step logs, probe log and Wine log in `work/logs/m4/`.
+- Reference screenshots of every step: `work/oracle/m4/`.
+
+**Verified**
+- Saves: `C:\users\<user>\AppData\Local\NFS Underground 2\<profile>` in the prefix (user copied the "Nameless"
+  profile in; the game loads it from the Load screen).
+- `tests/m4_loop.sh 5` twice → 10/10 OK, free roam 16.7–17.5 s after launch (18–19 s incl. process start).
+
+**Broke**
+- First 5-run attempt: 3/5. One step-threshold miss (fixed: per-step thresholds, 6 s timeouts) and **one game
+  crash**: `Unhandled page fault on write access to 0D2B0184 at 0043FE97` (main thread, ~14 s in, menus/loading).
+  0x43FE97 is the game's block allocator filling a new block with 0xAAAAAAAA (free-list tag 0x44443333), i.e. a
+  memory pool overflowed or was corrupted. Not reproduced in the next 10 boots. Unknown whether it also happens in
+  normal play, or comes from boot pace / mods. Open.
+
+**Open**
+- Second half of M4: find the frontend state machine / save-load path and boot directly into free roam without
+  menu input.

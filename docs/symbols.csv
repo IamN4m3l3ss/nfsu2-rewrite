@@ -1,0 +1,8 @@
+addr,name,signature,status,notes
+0x005CCD60,MainWndProc,"LRESULT __stdcall MainWndProc(HWND, UINT, WPARAM, LPARAM)",named,"registered by RegisterClassExA at 0x005D25E4; switch on msg; hooked by probe keep_active"
+0x005BF204,PumpMessages_body,,unknown,"inside message pump: g_AppActive ? PeekMessageA(PM_REMOVE) : GetMessageA (blocks while inactive)"
+0x005CFDAB,PollInputDevices_body,,unknown,"input devices only polled while g_AppActive"
+0x005B7EE0,ResetControllerStates,void(),named,"called on WM_ACTIVATEAPP; resets per-device state blocks at 0x874C48/0x874FB8/0x875328"
+0x00870988,g_AppActive,int,named,"global: WM_ACTIVATEAPP wParam; WM_SIZE !IsIconic(hwnd)"
+0x008709E0,g_WndInactive,bool,named,"global: WM_ACTIVATE LOWORD(wParam)==WA_INACTIVE, gates calls on object at 0x0082B884"
+0x007A0A30,str_TRACKS_BUN,"char[] ""TRACKS\%s.BUN""",named,.rdata string

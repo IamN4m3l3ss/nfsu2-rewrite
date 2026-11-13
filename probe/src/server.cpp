@@ -65,6 +65,7 @@ json dispatch(const std::string& method, const json& p) {
     if (method == "log_tail") {
         return log_tail(p.value("n", 50u), p.value("since", uint64_t{0}));
     }
+    if (method == "keep_active") return keep_active(p);
     if (method == "screenshot") {
         int scale = p.value("scale", 1);
         unsigned timeout = p.value("timeout_ms", 5000u);

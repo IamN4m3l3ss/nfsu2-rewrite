@@ -72,6 +72,7 @@ void init(HMODULE self) {
         logf("ERROR: MH_Initialize: %s", MH_StatusToString(s));
     } else {
         d3d_install_hooks();
+        patches_install();
     }
     server_start(port);
 }

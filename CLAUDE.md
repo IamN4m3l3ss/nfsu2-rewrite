@@ -172,7 +172,8 @@ AI/traffic/cops → audio → rendering last (renderer is the future port bounda
 - ~~Versions~~ done: MinHook v1.3.4 (x86 ok), nlohmann/json v3.12.0, vendored in `third_party/`.
 - ~~MCP SDK~~ done: `mcp` 2.3.0 in `.venv/`; API is `from mcp.server.mcpserver import MCPServer, Image`,
   `@server.tool()`, `server.run()` (stdio). Not the 1.x `FastMCP` import path.
-- Whether the game pauses or stops reading input when unfocused under Wine.
+- ~~Unfocused pause~~ done: it stops (blocking `GetMessageA` while `g_AppActive` 0x870988 is 0); the probe's
+  `keep_active` (default on) keeps it at 60 fps unfocused/minimized. See DEVLOG. Input while unfocused → M3.
 - A Ghidra MCP server usable from Claude Code (which project/version), to sync names between Ghidra and symbols.csv.
 
 ## References (read for knowledge; write our own code)

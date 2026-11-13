@@ -70,6 +70,12 @@ def log_tail(n: int = 50) -> str:
 
 
 @server.tool()
+def keep_active(enabled: bool | None = None) -> dict:
+    """Get/set whether the game keeps running when its window loses focus (probe patch, default on)."""
+    return pc.call("keep_active", {} if enabled is None else {"enabled": enabled})
+
+
+@server.tool()
 def screenshot(scale: int = 2) -> Image:
     """Capture the game's back buffer (downscaled by integer `scale`). Also saved under work/screenshots/."""
     png, _, _ = pc.screenshot_png(scale)

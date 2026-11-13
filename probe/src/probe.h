@@ -37,6 +37,10 @@ json d3d_info();
 json run_on_main(std::function<json()> fn, unsigned timeout_ms);
 json screenshot(int scale);  // must be called on the render thread
 
+// ---- patches.cpp ----
+bool patches_install();
+json keep_active(const json& params);  // {"enabled": bool}? -> state
+
 // ---- server.cpp ----
 void server_start(uint16_t port);
 

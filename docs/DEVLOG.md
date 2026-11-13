@@ -27,4 +27,19 @@
 **Open**
 - Main menu (past "Press Enter") not reached yet — needs input; will come with M3 injection or a user keypress.
 - Focus pause: test virtual desktop, or handle focus loss in the probe.
-- Toolchain choice (clang-cl + xwin vs mingw), not started.
+
+## 2026-11-13 — toolchain decided: clang-cl + xwin
+
+**Changed**
+- xwin 0.10.0 (`cargo install`), x86 CRT + SDK 10.0.26100 splatted to `~/.local/share/xwin` (license accepted by
+  the user). `cmake/clang-cl-x86.cmake`, `CMakePresets.json` (`win32`), top-level `CMakeLists.txt`.
+- Vendored MinHook v1.3.4 and nlohmann/json v3.12.0 in `third_party/`. `.venv/` with `mcp` 2.3.0.
+- Prefix: `HKCU\Software\Wine\WineDbg\ShowCrashDialog=0`, so crashes don't pop up a dialog on the user's screen.
+
+**Verified**
+- `tests/abi/abi_test.exe` (clang-cl, imports only KERNEL32): 14/14 MSVC-ABI checks pass under Wine.
+  Same source with MinGW: 5 fail (two-slot virtual dtors, Itanium RTTI, 12-byte member pointers, long double).
+
+**Broke**
+- First run trapped on `int3`: clang saw a known function called through a mismatched type (UB) and replaced
+  the rest of `main` with traps. Fixed by laundering the pointer; rule noted in CLAUDE.md.

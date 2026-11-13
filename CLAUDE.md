@@ -90,10 +90,12 @@ Rules for the probe:
   LoadLibrary → re-register → re-enable previous switches. Windows locks loaded DLLs, hence the temp copy.
 - The probe must survive a crash in the rewrite where possible (log exceptions with address + stack, then stop).
 
-Toolchain for the 32-bit Windows DLLs, built on Linux — **decide after verifying**:
-(a) clang targeting `i686-pc-windows-msvc` with the MSVC SDK/CRT via `xwin` (MSVC ABI, best for matching game
-classes), or (b) MinGW `i686-w64-mingw32-g++` (simpler, but its C++ ABI differs from MSVC for some features).
-Prefer (a) if it works; check vtable/thiscall compatibility with a small test either way.
+Toolchain for the 32-bit Windows DLLs, built on Linux — **decided 13 Nov 2026: clang-cl + xwin** (MSVC ABI).
+`cmake --preset win32` (toolchain `cmake/clang-cl-x86.cmake`, xwin 0.10.0 splat in `~/.local/share/xwin`, static
+release CRT `/MT`). `tests/abi/abi_test.exe` checks thiscall, vtables, RTTI and layout: 14/14 pass under Wine;
+MinGW fails 5 (two-slot virtual dtors, Itanium RTTI, 12-byte member pointers, 10-byte long double).
+Calling a known function through a mismatched function type is UB that clang turns into `int3`: keep game
+addresses opaque (integers / volatile), never cast our own functions to game signatures.
 
 ## Repository layout
 
@@ -166,9 +168,10 @@ AI/traffic/cops → audio → rendering last (renderer is the future port bounda
 ## Verify before coding (open items)
 
 - Wine vs Proton(-CachyOS) setup for running the game outside Steam; package names on CachyOS.
-- 32-bit Windows DLL toolchain on Linux (clang + xwin vs mingw-w64), and MSVC-ABI compatibility for thiscall/vtables.
-- MinHook current version and x86 support; nlohmann/json version.
-- Official MCP Python SDK (`mcp`) current API for stdio servers.
+- ~~Toolchain~~ done: clang-cl + xwin (see Architecture).
+- ~~Versions~~ done: MinHook v1.3.4 (x86 ok), nlohmann/json v3.12.0, vendored in `third_party/`.
+- ~~MCP SDK~~ done: `mcp` 2.3.0 in `.venv/`; API is `from mcp.server.mcpserver import MCPServer, Image`,
+  `@server.tool()`, `server.run()` (stdio). Not the 1.x `FastMCP` import path.
 - Whether the game pauses or stops reading input when unfocused under Wine.
 - A Ghidra MCP server usable from Claude Code (which project/version), to sync names between Ghidra and symbols.csv.
 

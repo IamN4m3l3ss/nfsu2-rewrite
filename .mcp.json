@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "nfsu2": {
+      "type": "stdio",
+      "command": "/home/nameless/CLionProjects/nfsu2-rewrite/.venv/bin/python",
+      "args": [
+        "/home/nameless/CLionProjects/nfsu2-rewrite/tools/mcp_bridge.py"
+      ],
+      "env": {}
+    }
+  }
+}

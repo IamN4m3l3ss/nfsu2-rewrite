@@ -12,4 +12,5 @@ set(OUT_DIR "${CMAKE_SOURCE_DIR}/out")
 add_compile_options(/EHsc /Z7 /W3 -Wno-unused-command-line-argument)
 add_link_options(/DEBUG:FULL /MANIFEST:NO)
 
+add_subdirectory(probe)
 add_subdirectory(tests/abi)

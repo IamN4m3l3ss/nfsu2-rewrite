@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
 # Launch / stop NFSU2 under the project's Wine prefix.
 #
-#   tools/run_game.sh [--desktop WxH] [--wait]
+#   tools/run_game.sh [--desktop WxH] [--wait] [--no-probe] [--timeout SEC]
 #   tools/run_game.sh --kill
+#
+# By default returns once the probe answers and the game has presented frames ("ready").
 #
 # The game runs from work/profile: a symlink copy of GAME_DIR, so the user's folder is never written to.
 # Every ASI in GAME_DIR/scripts/ is linked in: the user's mod set is REQUIRED to run the game properly
 # (WidescreenFix = no-disc fix, HDContentSupport = HD UI textures in the data). Our probe, when built,
 # is copied next to them.
 #
-# Exit codes: 0 ok, 2 bad args/config, 3 exe hash mismatch, 4 game did not start.
+# Exit codes: 0 ok, 2 bad args/config, 3 exe hash mismatch, 4 game did not start, 5 probe/frames not ready,
+#             6 game survived --kill. A game that is already running is killed first.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -23,15 +26,30 @@ LOG_DIR="$ROOT/work/logs"
 
 desktop=""
 wait_exit=0
+wait_probe=1
+probe_timeout=60
+
+kill_game() {
+  wineserver -k 2>/dev/null || true
+  for _ in $(seq 40); do
+    pgrep -f '\\SPEED2\.EXE' >/dev/null || return 0
+    sleep 0.25
+  done
+  pkill -9 -f '\\SPEED2\.EXE' || true
+  sleep 0.5
+  ! pgrep -f '\\SPEED2\.EXE' >/dev/null
+}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --desktop) desktop="$2"; shift 2 ;;
     --wait) wait_exit=1; shift ;;
+    --no-probe) wait_probe=0; shift ;;
+    --timeout) probe_timeout="$2"; shift 2 ;;
     --kill)
-      wineserver -k 2>/dev/null || true
+      kill_game || { echo "game still running after kill" >&2; exit 6; }
       exit 0 ;;
-    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
@@ -58,6 +76,10 @@ build_profile() {
   fi
 }
 
+if pgrep -f '\\SPEED2\.EXE' >/dev/null; then
+  echo "game already running, killing it first"
+  kill_game || { echo "could not kill running game" >&2; exit 6; }
+fi
 build_profile
 mkdir -p "$LOG_DIR"
 log="$LOG_DIR/game_$(date +%Y%m%d_%H%M%S).log"
@@ -85,5 +107,14 @@ for _ in $(seq 60); do
 done
 pgrep -f '\\SPEED2\.EXE' >/dev/null || { echo "game did not start, see $log" >&2; exit 4; }
 echo "started"
+
+if [[ $wait_probe -eq 1 ]]; then
+  # probe answers and the game has presented frames
+  if ! "$ROOT/.venv/bin/python" "$ROOT/tools/probe.py" ready "$probe_timeout" >/dev/null; then
+    echo "probe/game not ready within ${probe_timeout}s, see $log and work/profile/scripts/nfsu2_probe.log" >&2
+    exit 5
+  fi
+  echo "ready"
+fi
 
 if [[ $wait_exit -eq 1 ]]; then wait "$pid"; fi

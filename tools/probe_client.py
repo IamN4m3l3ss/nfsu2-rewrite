@@ -55,6 +55,21 @@ def wait_ready(timeout: float = 60.0, port: int = DEFAULT_PORT) -> dict:
     raise ProbeError(f"probe not ready after {timeout}s: {last}")
 
 
+def wait_frames(timeout: float = 60.0, min_frames: int = 2, port: int = DEFAULT_PORT) -> dict:
+    """Wait until the probe answers and the game has presented at least `min_frames` frames."""
+    end = time.monotonic() + timeout
+    r = wait_ready(timeout, port)
+    while time.monotonic() < end:
+        if r.get("frames", 0) >= min_frames:
+            return r
+        time.sleep(0.25)
+        try:
+            r = call("ping", port=port, timeout=2.0)
+        except ProbeError:
+            pass
+    raise ProbeError(f"no frames after {timeout}s (last ping: {r})")
+
+
 def screenshot_png(scale: int = 2, port: int = DEFAULT_PORT, save: bool = True) -> tuple[bytes, dict, Path | None]:
     """Returns (png bytes, metadata, saved path)."""
     from PIL import Image

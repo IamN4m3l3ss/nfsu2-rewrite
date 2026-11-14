@@ -64,7 +64,9 @@ on disk). `tools/run_game.sh` runs from a symlink copy in `work/profile/`, so th
 precision, round to nearest, exceptions masked (D3D9 default); MXCSR `0x1FA0`. So x87 `+ - * / fsqrt` round like
 SSE single precision: rewrites in plain `float` match in normal ranges. Transcendentals (`fsin/fcos/fpatan`) ignore
 precision control → use the same x87 instructions; float→int conversions must copy the original's method. Always
-diff-test.
+diff-test. **NaN contract:** bit-exact for every non-NaN result; where the original yields NaN ours must yield NaN,
+but sign/payload may differ (x87 and SSE propagate NaN operands differently; emulating that on every op isn't worth
+it). Compare floats with `game::same_float`. `tools/re/x87lift.py` lifts straight-line x87 code to C++ (game/src/lift.h).
 
 **Register contract (learned 14 Nov 2026):** the exe was built with whole-program optimisation; callers rely on
 registers a small function doesn't touch (ECX live across bSin) and on pointers left in EAX by "void" functions

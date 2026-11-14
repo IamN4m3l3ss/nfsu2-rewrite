@@ -60,3 +60,4 @@ addr,name,signature,status,notes
 0x0043C570,bATan2,"uint32 __cdecl(float a, float b) -> angle",verified,"octant fold + byte table 0x7EACB0 indexed backwards; equal case keeps caller's EAX upper half (stub passes entry EAX)"
 0x007EA628,g_ASinTable,"struct{uint16 angle; uint16 pad; float slope}[]",named,"bASin table"
 0x007EACB0,g_ATanTable,uint8_t[],named,"bATan2 table, indexed 0x7EACB0 - ftol(-256*ratio)"
+0x0043C7C0,bInvertMatrix,"bMatrix4* __cdecl(bMatrix4* out, const bMatrix4* in)",verified,"affine inverse (cofactors/det, -(R^-1 t)); lifted by tools/re/x87lift.py; NaN contract for singular input"

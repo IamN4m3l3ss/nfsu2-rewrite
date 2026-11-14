@@ -405,3 +405,19 @@ return values.
   the timestamp in the commit; 41 rewrites.
 
 **Coverage:** 41 verified of ~23,278, all live.
+
+## 2026-11-14 — x87 lifter; NaN contract; bInvertMatrix
+
+- User turned all rewrites off (17:39:36) to compare, saw no difference, all 41 back on at 17:40:56.
+- `tools/re/x87lift.py`: lifts straight-line x87 code to C++ — symbolic x87 stack + integer registers, stack frame
+  relative to entry esp, args/pointers, constants read from .rdata — emitting the same loads, single-precision ops
+  and stores in the original order (`game/src/lift.h` helpers). Fixed on the way: one-operand pop forms
+  (`fsubp st(i)` = st(i) op st0, pop).
+- First lifted function: bInvertMatrix 0x43C7C0 (~130 x87 instructions).
+- Learned: LLVM may fold `-(a*b)` into `a*(-b)`, flipping a NaN's sign → `lift::fchs`/`fabs_` use an asm barrier.
+  Remaining differences were only NaN payload/sign in singular matrices: x87 and SSE pick different NaN operands.
+  **Contract adopted (CLAUDE.md):** bit-exact for non-NaN; NaN where the original gives NaN (sign/payload free).
+  `game::same_float`.
+- bInvertMatrix: 3 seeds × 20,000 (incl. near-singular, singular, in place) + register test pass; live.
+
+**Coverage:** 42 verified of ~23,278, all live.

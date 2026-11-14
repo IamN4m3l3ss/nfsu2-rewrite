@@ -73,6 +73,15 @@ template <class A, class B> Case Mismatch(const std::string& inputs, const A& or
 }
 inline Case MismatchText(const std::string& text) { return {false, text}; }
 
+// Float comparison contract: bit-exact for every non-NaN value; where the original gives NaN, ours must give NaN
+// (sign/payload may differ: x87 and SSE propagate NaN operands differently — see CLAUDE.md "Floating point").
+inline bool same_float(float a, float b) {
+    uint32_t ua, ub;
+    memcpy(&ua, &a, 4);
+    memcpy(&ub, &b, 4);
+    return ua == ub || (a != a && b != b);
+}
+
 struct DiffResult {
     std::string name;
     uint32_t iterations = 0, mismatches = 0;

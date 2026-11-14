@@ -66,6 +66,11 @@ SSE single precision: rewrites in plain `float` match in normal ranges. Transcen
 precision control → use the same x87 instructions; float→int conversions must copy the original's method. Always
 diff-test.
 
+**Register contract (learned 14 Nov 2026):** the exe was built with whole-program optimisation; callers rely on
+registers a small function doesn't touch (ECX live across bSin) and on pointers left in EAX by "void" functions
+(bScaleAdd's out). Rewrites go through `NFSU2_REWRITE_N` entry stubs (save ECX/EDX), return what the original leaves
+in EAX, and every diff test file includes a register test (`game/src/regs.h`, `tools/re/regcontract.py`).
+
 **Data:** EA chunk bundles (`u32 id, u32 size`; high bit `0x80000000` = container). `GLOBAL/GlobalB.lzc` and
 `FRONTEND/FrontB.lzc` are JDLZ-compressed (magic `JDLZ`); uncompressed `GLOBAL/GLOBALB.BUN` also exists.
 Tracks: `TRACKS/L4Rx.BUN` + `TRACKS/STREAML4Rx.BUN` (x = A,B,C,D,F,G,H,R; STREAML4RA is 118 MB = most of Bayview),

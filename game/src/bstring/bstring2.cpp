@@ -8,6 +8,7 @@
 #include <string>
 
 #include "../diff.h"
+#include "../regs.h"
 #include "../rewrite.h"
 
 namespace {
@@ -218,16 +219,16 @@ int rand_n(game::Rng& r) { return r.below(10) == 0 ? -static_cast<int>(r.below(5
 
 }  // namespace
 
-NFSU2_REWRITE(0x0043DC00, bStrNCpy, "char* __cdecl(char* dst, const char* src, int n)", o_bStrNCpy);
-NFSU2_REWRITE(0x0043DC60, bStrNCmp, "int __cdecl(const char*, const char*, int n)", o_bStrNCmp);
-NFSU2_REWRITE(0x0043DD10, bStrNICmp, "int __cdecl(const char*, const char*, int n)", o_bStrNICmp);
-NFSU2_REWRITE(0x0043DDA0, bStrCat, "char* __cdecl(char* dst, const char* a, const char* b)", o_bStrCat);
-NFSU2_REWRITE(0x0043DDF0, bStrChr, "const char* __cdecl(const char*, int c)", o_bStrChr);
-NFSU2_REWRITE(0x0043DE20, bStrUpr, "char* __cdecl(char*) -> end", o_bStrUpr);
-NFSU2_REWRITE(0x0043DE50, bStrToInt, "int __cdecl(const char*)", o_bStrToInt);
-NFSU2_REWRITE(0x0043DFE0, bWStrLen, "int __cdecl(const uint16_t*)", o_bWStrLen);
-NFSU2_REWRITE(0x0043E000, bStrToWStr, "uint16_t* __cdecl(uint16_t* dst, const char*)", o_bStrToWStr);
-NFSU2_REWRITE(0x0043E030, bStrNToWStr, "uint16_t* __cdecl(uint16_t* dst, const char*, int n)", o_bStrNToWStr);
+NFSU2_REWRITE_N(0x0043DC00, bStrNCpy, 3, "char* __cdecl(char* dst, const char* src, int n)", o_bStrNCpy);
+NFSU2_REWRITE_N(0x0043DC60, bStrNCmp, 3, "int __cdecl(const char*, const char*, int n)", o_bStrNCmp);
+NFSU2_REWRITE_N(0x0043DD10, bStrNICmp, 3, "int __cdecl(const char*, const char*, int n)", o_bStrNICmp);
+NFSU2_REWRITE_N(0x0043DDA0, bStrCat, 3, "char* __cdecl(char* dst, const char* a, const char* b)", o_bStrCat);
+NFSU2_REWRITE_N(0x0043DDF0, bStrChr, 2, "const char* __cdecl(const char*, int c)", o_bStrChr);
+NFSU2_REWRITE_N(0x0043DE20, bStrUpr, 1, "char* __cdecl(char*) -> end", o_bStrUpr);
+NFSU2_REWRITE_N(0x0043DE50, bStrToInt, 1, "int __cdecl(const char*)", o_bStrToInt);
+NFSU2_REWRITE_N(0x0043DFE0, bWStrLen, 1, "int __cdecl(const uint16_t*)", o_bWStrLen);
+NFSU2_REWRITE_N(0x0043E000, bStrToWStr, 2, "uint16_t* __cdecl(uint16_t* dst, const char*)", o_bStrToWStr);
+NFSU2_REWRITE_N(0x0043E030, bStrNToWStr, 3, "uint16_t* __cdecl(uint16_t* dst, const char*, int n)", o_bStrNToWStr);
 
 NFSU2_DIFF_TEST(bStrNCpy) {
     return game::run_diff(ctx, "bStrNCpy", o_bStrNCpy, [](game::Rng& r) {
@@ -369,6 +370,33 @@ NFSU2_DIFF_TEST(bStrNToWStr) {
         u16* rb = bStrNToWStr(db, s.c_str(), n);
         if (memcmp(da, db, sizeof da) || (ra - da) != (rb - db))
             return game::MismatchText("s=" + game::show(s) + " n=" + std::to_string(n) + " buffers/return differ");
+        return game::Ok();
+    });
+}
+
+NFSU2_DIFF_TEST(regs_bstring2) {
+    using game::arg;
+    return game::run_diff(ctx, "regs_bstring2", o_bStrNCpy, [](game::Rng& r) {
+        std::string s = r.str(40), t = r.str(40), num = number_str(r);
+        Arena A(r, s), B(r, t);
+        char dst[96], up1[64];
+        u16 w[64], ws[64];
+        memset(up1, 0, sizeof up1);
+        memcpy(up1, s.c_str(), s.size() + 1);
+        for (size_t i = 0; i < s.size(); ++i) ws[i] = static_cast<u16>(1 + (r.next() & 0x7FFF));
+        ws[s.size()] = 0;
+        const int n = static_cast<int>(r.below(40));
+        for (auto c : {game::check_regs("bStrNCpy", (void*)o_bStrNCpy, NFSU2_ENTRY(bStrNCpy), {arg(dst), arg(s.c_str()), arg(n)}, false),
+                       game::check_regs("bStrNCmp", (void*)o_bStrNCmp, NFSU2_ENTRY(bStrNCmp), {arg(A.p), arg(B.p), arg(n)}, false),
+                       game::check_regs("bStrNICmp", (void*)o_bStrNICmp, NFSU2_ENTRY(bStrNICmp), {arg(A.p), arg(B.p), arg(n)}, false),
+                       game::check_regs("bStrCat", (void*)o_bStrCat, NFSU2_ENTRY(bStrCat), {arg(dst), arg(s.c_str()), arg(t.c_str())}, false),
+                       game::check_regs("bStrChr", (void*)o_bStrChr, NFSU2_ENTRY(bStrChr), {arg(s.c_str()), arg(static_cast<int>(r.below(128)))}, false),
+                       game::check_regs("bStrUpr", (void*)o_bStrUpr, NFSU2_ENTRY(bStrUpr), {arg(up1)}, false),
+                       game::check_regs("bStrToInt", (void*)o_bStrToInt, NFSU2_ENTRY(bStrToInt), {arg(num.c_str())}, false),
+                       game::check_regs("bWStrLen", (void*)o_bWStrLen, NFSU2_ENTRY(bWStrLen), {arg(ws)}, false),
+                       game::check_regs("bStrToWStr", (void*)o_bStrToWStr, NFSU2_ENTRY(bStrToWStr), {arg(w), arg(s.c_str())}, false),
+                       game::check_regs("bStrNToWStr", (void*)o_bStrNToWStr, NFSU2_ENTRY(bStrNToWStr), {arg(w), arg(s.c_str()), arg(n)}, false)})
+            if (!c.ok) return c;
         return game::Ok();
     });
 }

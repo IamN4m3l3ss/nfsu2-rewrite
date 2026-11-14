@@ -3,6 +3,7 @@
 #include <string>
 
 #include "diff.h"
+#include "regs.h"
 #include "rewrite.h"
 
 namespace game {
@@ -15,6 +16,38 @@ std::vector<probe::GameRewrite>& registry() {
 std::vector<DiffTestReg>& diff_registry() {
     static std::vector<DiffTestReg> r;
     return r;
+}
+
+RegOut call_regs(const void* fn, const uint32_t* args, int nargs, bool returns_float) {
+    uint32_t ra = 0, rc = 0, rd = 0;
+    float f = 0.0f;
+    const uint8_t rf = returns_float ? 1 : 0;
+    __asm {
+        mov ebx, fn
+        mov esi, args
+        mov edi, nargs
+        mov ecx, edi
+    push_loop:
+        test ecx, ecx
+        jz do_call
+        dec ecx
+        push dword ptr [esi + ecx*4]
+        jmp push_loop
+    do_call:
+        mov eax, 0xA0A0A0A0
+        mov ecx, 0xC0C0C0C0
+        mov edx, 0xD0D0D0D0
+        call ebx
+        lea esp, [esp + edi*4]
+        mov ra, eax
+        mov rc, ecx
+        mov rd, edx
+        cmp rf, 0
+        je no_float
+        fstp f
+    no_float:
+    }
+    return {ra, rc, rd, f};
 }
 
 namespace {

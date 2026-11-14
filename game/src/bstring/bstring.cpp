@@ -8,6 +8,7 @@
 #include <string>
 
 #include "../diff.h"
+#include "../regs.h"
 #include "../rewrite.h"
 
 namespace {
@@ -107,12 +108,12 @@ std::pair<std::string, std::string> str_pair(game::Rng& r) {
 
 }  // namespace
 
-NFSU2_REWRITE(0x0043DB50, bStringHash, "uint32_t __cdecl(const char*)", o_bStringHash);
-NFSU2_REWRITE(0x0043DB80, bStringHash2, "uint32_t __cdecl(const char*, uint32_t prefix)", o_bStringHash2);
-NFSU2_REWRITE(0x0043DBB0, bStrLen, "int __cdecl(const char*)", o_bStrLen);
-NFSU2_REWRITE(0x0043DBD0, bStrCpy, "char* __cdecl(char* dst, const char* src)", o_bStrCpy);
-NFSU2_REWRITE(0x0043DC30, bStrCmp, "int __cdecl(const char*, const char*)", o_bStrCmp);
-NFSU2_REWRITE(0x0043DCC0, bStrICmp, "int __cdecl(const char*, const char*)", o_bStrICmp);
+NFSU2_REWRITE_N(0x0043DB50, bStringHash, 1, "uint32_t __cdecl(const char*)", o_bStringHash);
+NFSU2_REWRITE_N(0x0043DB80, bStringHash2, 2, "uint32_t __cdecl(const char*, uint32_t prefix)", o_bStringHash2);
+NFSU2_REWRITE_N(0x0043DBB0, bStrLen, 1, "int __cdecl(const char*)", o_bStrLen);
+NFSU2_REWRITE_N(0x0043DBD0, bStrCpy, 2, "char* __cdecl(char* dst, const char* src)", o_bStrCpy);
+NFSU2_REWRITE_N(0x0043DC30, bStrCmp, 2, "int __cdecl(const char*, const char*)", o_bStrCmp);
+NFSU2_REWRITE_N(0x0043DCC0, bStrICmp, 2, "int __cdecl(const char*, const char*)", o_bStrICmp);
 
 NFSU2_DIFF_TEST(bStringHash) {
     return game::run_diff(ctx, "bStringHash", o_bStringHash, [](game::Rng& r) {
@@ -181,5 +182,23 @@ NFSU2_DIFF_TEST(bStringHash_BROKEN) {
         std::string s = r.str();
         uint32_t a = o_bStringHash(s.c_str()), b = bStringHash_BROKEN(s.c_str());
         return a == b ? game::Ok() : game::Mismatch("s=" + game::show(s), a, b);
+    });
+}
+
+// Register contract for every function in this file: original (trampoline) vs our installed entry stub.
+NFSU2_DIFF_TEST(regs_bstring) {
+    using game::arg;
+    return game::run_diff(ctx, "regs_bstring", o_bStrLen, [](game::Rng& r) {
+        std::string s = r.str(), t = r.str();
+        char dst[80];
+        const uint32_t prefix = r.next();
+        for (auto c : {game::check_regs("bStringHash", (void*)o_bStringHash, NFSU2_ENTRY(bStringHash), {arg(s.c_str())}, false),
+                       game::check_regs("bStringHash2", (void*)o_bStringHash2, NFSU2_ENTRY(bStringHash2), {arg(s.c_str()), prefix}, false),
+                       game::check_regs("bStrLen", (void*)o_bStrLen, NFSU2_ENTRY(bStrLen), {arg(s.c_str())}, false),
+                       game::check_regs("bStrCpy", (void*)o_bStrCpy, NFSU2_ENTRY(bStrCpy), {arg(dst), arg(s.c_str())}, false),
+                       game::check_regs("bStrCmp", (void*)o_bStrCmp, NFSU2_ENTRY(bStrCmp), {arg(s.c_str()), arg(t.c_str())}, false),
+                       game::check_regs("bStrICmp", (void*)o_bStrICmp, NFSU2_ENTRY(bStrICmp), {arg(s.c_str()), arg(t.c_str())}, false)})
+            if (!c.ok) return c;
+        return game::Ok();
     });
 }

@@ -335,3 +335,33 @@ rewrites enabled in game: 601 frames / 10 s, no errors.
 magnitudes, not tested.
 
 **Coverage:** 25 verified of ~23,278.
+
+## 2026-11-14 — collision bug from the vector rewrites: the register contract
+
+**Broke**
+- User: "handling changed… car hitting the ground… more floaty on a jump", then "driving feels fine but collision
+  was messed up", ~1 min after the 9 bMath rewrites were enabled. Disabled them (17:12). Re-enabling the vector
+  ones in a passthrough mode (to measure the FPU) **crashed the game**: page fault at `0x5963BC` reading
+  `0x63F6F327` right after a call to bScaleAdd.
+- Cause: the caller does `fld [eax+4]` after `call bScaleAdd` — the original leaves its `out` pointer in EAX and
+  the game (MSVC whole-program optimisation) relies on it. My rewrites were `void`. Also: a caller keeps ECX live
+  across bSin (the original never writes ECX), and several vector originals never write EDX.
+- The FPU-precision theory was wrong: 3.24 M live calls during driving, all at 24-bit precision, round-nearest.
+
+**Changed**
+- `tools/re/regcontract.py` (which of EAX/ECX/EDX callers read after a call; zeroing idioms excluded) and
+  `tools/re/regwrites.py` (which registers an original writes; unwritten ones are effectively preserved).
+- `game/src/regs.h`: every rewrite is installed through a naked entry stub that saves/restores ECX and EDX
+  (`NFSU2_REWRITE_N(addr, fn, nargs, ...)`); vector functions return their out pointer explicitly. `call_regs()`
+  calls with sentinel EAX/ECX/EDX; `check_regs()` requires: EAX equal (non-float), registers the original preserves
+  preserved, st0 bit-equal for float returns. Per-file register tests `regs_bstring/regs_bstring2/regs_bmath/
+  regs_btrig`, and `regs_BROKEN` (bScaleAdd as `void`) which is caught 1000/1000.
+- Fixed the persisted enabled list before restarting so the broken versions didn't come back.
+
+**Verified**
+- All value tests + all register tests pass for 30 rewrites (2 seeds); self-checks caught.
+- Vector rewrites re-enabled with real maths at 17:21:49 while the user drives: 601 frames / 10 s, no exceptions.
+  Waiting on the user's feel for collisions (races / roaming racers encouraged — more code paths).
+
+**Rule (in regs.h):** a rewrite must leave EAX/ECX/EDX as the original does; diff tests check registers, not just
+return values.

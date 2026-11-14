@@ -7,6 +7,7 @@
 // driving, so it is not the simulation's step; what reads it is unknown. Don't call it "the" delta time.
 //
 // Status: M6 hot-reload demonstrator — calls the original, then applies kTimeScale (1.0 = no change).
+#include "../regs.h"
 #include "../rewrite.h"
 
 namespace {
@@ -24,4 +25,4 @@ void __cdecl UpdateFrameTime(float real_dt) {
 
 }  // namespace
 
-NFSU2_REWRITE(0x0057EAD0, UpdateFrameTime, "void __cdecl(float real_dt)", o_UpdateFrameTime);
+NFSU2_REWRITE_N(0x0057EAD0, UpdateFrameTime, 1, "void __cdecl(float real_dt)", o_UpdateFrameTime);

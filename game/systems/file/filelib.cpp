@@ -179,7 +179,7 @@ uint32_t __cdecl Result(int32_t handle) {
     Request* r = game_fn<ListFind_t>(0x006F734A)(&ch->done, handle, 1);
     unlock(ch->lock);
     using Get_t = uint64_t(__thiscall*)(Request*);
-    const uint64_t v = (*reinterpret_cast<Get_t* const*>(r->vtable))[2](r);
+    const uint64_t v = reinterpret_cast<const Get_t*>(r->vtable)[2](r);  // vtable slot 2 (+8)
     r->handle = 0;
     uint8_t* fs = game_var<uint8_t*>(0x008AD610);
     lock(fs + 0xC);
@@ -348,20 +348,26 @@ struct CbRecord {
 CbRecord g_cb{};
 void __cdecl record_cb(int32_t h, int32_t st, uint32_t user) { g_cb = {h, st, user, g_cb.calls + 1}; }
 
-std::vector<int64_t> round_trip(const char* name, Wait_t wait, Result_t result, Release_t release) {
+std::vector<int64_t> round_trip(const char* name, Wait_t wait, Result_t result, Release_t release, bool ours) {
+    auto step = [ours](const char* a, const char* b) { game::g_test_step = ours ? b : a; };
     using Open_t = int32_t(__cdecl*)(const char*, int32_t, int32_t, int32_t);
     using Req3_t = int32_t(__cdecl*)(int32_t, int32_t, int32_t);
     std::vector<int64_t> v;
+    step("orig: open", "ours: open");
     const int32_t ro = game_fn<Open_t>(0x006F7C1B)(name, 1, 0x64, 0);
     v.push_back(ro != 0);
     if (!ro) return v;  // no request (e.g. missing file): Result(0) would grab whatever request has handle 0
+    step("orig: wait(open)", "ours: wait(open)");
     const int32_t st = wait(ro);
     v.push_back(st);
+    step("orig: result(open)", "ours: result(open)");
     const int32_t h = static_cast<int32_t>(result(ro));  // (always taken: frees the request)
     if (st != 1) return v;  // like the game: a result is only meaningful with status 1 (a missing file's "handle"
                             // closed anyway raised STATUS_INVALID_HANDLE mid-library and took the game down)
     v.push_back(h != 0);
+    step("orig: size req", "ours: size req");
     const int32_t rs = game_fn<Req3_t>(0x006F7861)(h, 0x64, 0);
+    step("orig: wait(size)", "ours: wait(size)");
     const int32_t ss = wait(rs);
     v.push_back(ss);
     if (ss != 1) {
@@ -370,19 +376,21 @@ std::vector<int64_t> round_trip(const char* name, Wait_t wait, Result_t result, 
         return v;
     }
     g_cb = {};
+    step("orig: release(size, record)", "ours: release(size, record)");
     release(rs, &record_cb);  // done -> called now; the callback args are compared, then the request is freed
     v.push_back(g_cb.calls);
     v.push_back(g_cb.status);
     v.push_back(g_cb.user);
     v.push_back(g_cb.handle == rs);
-    result(rs);
+    step("orig: result(size)", "ours: result(size)");
+    v.push_back(result(rs));  // the file size
     const int32_t rc = game_fn<Req3_t>(0x006F7790)(h, 0x64, 0);
+    step("orig: release(close)", "ours: release(close)");
     release(rc, reinterpret_cast<Cb_t>(0x005755D0));
     return v;
 }
 }  // namespace
 
-#if 0  // DISABLED 2026-11-14: crashed the library in 3 attempts (see docs/DEVLOG.md "async file library round trip")
 NFSU2_DIFF_TEST(FileLibRoundTrip) {
     static const char* const kNames[] = {"GLOBAL\\GLOBALB.BUN", "FRONTEND\\FrontB.lzc", "CARS\\TEXTURES.BIN", "SPEED2.EXE",
                                          "NOPE\\missing.bin", "TRACKS\\L4RA.BUN"};
@@ -390,8 +398,9 @@ NFSU2_DIFF_TEST(FileLibRoundTrip) {
     few.iterations = ctx.iterations > 200 ? 200 : ctx.iterations;  // real I/O: keep the frame short
     return game::run_diff(few, "FileLibRoundTrip", o_Wait, [](game::Rng& r) {
         const char* n = kNames[r.below(6)];
-        const auto a = round_trip(n, o_Wait, o_Result, o_ReleaseWithCallback);
-        const auto b = round_trip(n, &Wait, &Result, &ReleaseWithCallback);
+        const auto a = round_trip(n, o_Wait, o_Result, o_ReleaseWithCallback, false);
+        const auto b = round_trip(n, &Wait, &Result, &ReleaseWithCallback, true);
+        game::g_test_step = "";
         if (a == b) return game::Ok();
         std::string s = n;
         for (size_t i = 0; i < a.size() || i < b.size(); ++i)
@@ -399,4 +408,3 @@ NFSU2_DIFF_TEST(FileLibRoundTrip) {
         return game::MismatchText(s);
     });
 }
-#endif

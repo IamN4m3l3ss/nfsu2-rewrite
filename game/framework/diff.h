@@ -157,3 +157,8 @@ inline int run_pending_undos() {
     return n;
 }
 }  // namespace game
+
+namespace game {
+// Tests may set this to describe what they are doing; a crash report includes it.
+inline const char* g_test_step = "";
+}  // namespace game

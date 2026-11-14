@@ -122,6 +122,6 @@ addr,name,signature,status,notes
 0x006F7473,FileLib_FindRequest,"Request* (ESI Channel*, EBX int* state, int handle)",verified,register args; state -1 current / 1 queued / 0 done; custom entry stub
 0x006F7542,FileLib_GetStatus,int __cdecl(int handle),verified,"0 pending, -1 done-but-running, status, -3 unknown"
 0x008AD610,g_FileSys,FileSys*,named,"EA async file library state; channels 0,2,5,6 active (others: uninitialised locks!)"
-0x006F75DD,FileLib_Wait_rw,,rewritten,"game/systems/file/filelib.cpp: transcribed, NOT verified/enabled (see DEVLOG)"
-0x006F767C,FileLib_Result_rw,,rewritten,"transcribed, NOT verified/enabled"
-0x006F76F2,FileLib_ReleaseWithCallback_rw,,rewritten,"transcribed, NOT verified/enabled"
+0x006F75DD,FileLib_Wait,int __cdecl(int handle),verified,"pumps timers+sleeps on the library thread (the game main thread), else waits on channel event; then GetStatus. round trip 200 x 0 mismatches; 53 calls/boot"
+0x006F767C,FileLib_Result,u32 __cdecl(int handle),verified,"done list remove, vtable slot 2 (+8) result, handle=0, FreeRequest 0x6F7F14 under FileSys lock; ~1100 calls/boot. thunk 0x6F76E9"
+0x006F76F2,FileLib_ReleaseWithCallback,"void __cdecl(int handle, cb)",verified,"pending: store cb at +0x1C; done: cb(handle, status, user) now; ~1060 calls/boot"

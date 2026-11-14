@@ -577,3 +577,13 @@ garbage (the original or ours), whether driving the library from inside Present 
 Options: (a) verify these three live only (enable + 3 boots + play; boots call them hundreds of times), reverting
 on any problem; (b) debug the round trip offline with the game paused / under a debugger (x64dbg MCP), not in the
 user's session; (c) move on to another system and come back later. The test is #if 0'd.
+
+## 2026-11-14 — Round trip debugged offline: the bug was in our Result
+
+User chose "debug offline first" (no play session). Added to crash reports: probable return addresses on the stack
+(SPEED2.EXE code / dll+offset) and a `game::g_test_step` marker. The next crash said: step "ours: result(open)",
+top frame `Result` filelib.cpp:182 -> the virtual call dereferenced the vtable pointer once too often (read the
+first function's code bytes as the table). So attempts 2 and 3 were our bug, caught by the test as intended;
+attempt 1 was the test misusing a failed open. Fixed: round trip 200/200 (now also compares the size value);
+mutation (Result returning the high half) caught. Enabled; 3 boots: Result ~1120, ReleaseWithCallback ~1060,
+Wait 53 calls per boot, heap clean, no errors. 87 verified.

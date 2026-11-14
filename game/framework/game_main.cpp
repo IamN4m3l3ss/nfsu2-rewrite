@@ -110,9 +110,25 @@ struct SehJob {
     DiffResult* out;
 };
 void seh_thunk(SehJob* j) { *j->out = j->fn(*j->ctx); }
+char g_crash_stack[400];
 int seh_filter(EXCEPTION_POINTERS* ep, uint32_t* code, uintptr_t* where) {
     *code = ep->ExceptionRecord->ExceptionCode;
     *where = reinterpret_cast<uintptr_t>(ep->ExceptionRecord->ExceptionAddress);
+    // probable return addresses on the stack: dwords pointing into SPEED2.EXE code or into this DLL
+    HMODULE self = nullptr;
+    GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                       reinterpret_cast<LPCSTR>(&seh_filter), &self);
+    const uintptr_t lo = reinterpret_cast<uintptr_t>(self), hi = lo + 0x200000;
+    const uint32_t* sp = reinterpret_cast<const uint32_t*>(ep->ContextRecord->Esp);
+    int len = snprintf(g_crash_stack, sizeof g_crash_stack, " esp=%08lX stack:", ep->ContextRecord->Esp);
+    int found = 0;
+    for (int i = 0; i < 256 && found < 14 && len < static_cast<int>(sizeof g_crash_stack) - 24; ++i) {
+        const uint32_t v = sp[i];
+        if (v >= 0x401000 && v < 0x784000)
+            len += snprintf(g_crash_stack + len, sizeof g_crash_stack - len, " %08X", v), ++found;
+        else if (v >= lo && v < hi)
+            len += snprintf(g_crash_stack + len, sizeof g_crash_stack - len, " dll+%X", static_cast<unsigned>(v - lo)), ++found;
+    }
     return EXCEPTION_EXECUTE_HANDLER;
 }
 bool seh_run(SehJob* j, uint32_t* code, uintptr_t* where) {
@@ -133,9 +149,11 @@ json run_one(const DiffTestReg& t, const DiffCtx& ctx) {
     HMODULE self = nullptr;
     GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
                        reinterpret_cast<LPCSTR>(&run_one), &self);
-    char buf[160];
-    snprintf(buf, sizeof buf, "exception %08X at %08X (nfsu2_game.dll+0x%X: llvm-symbolizer --relative-address), %d fixture(s) undone",
-             code, static_cast<unsigned>(where), static_cast<unsigned>(where - reinterpret_cast<uintptr_t>(self)), undone);
+    char buf[700];
+    snprintf(buf, sizeof buf, "exception %08X at %08X (nfsu2_game.dll+0x%X: llvm-symbolizer --relative-address), %d fixture(s) undone; step '%s';%s",
+             code, static_cast<unsigned>(where), static_cast<unsigned>(where - reinterpret_cast<uintptr_t>(self)), undone,
+             game::g_test_step, g_crash_stack);
+    game::g_test_step = "";
     return json{{"name", t.name}, {"iterations", 0}, {"mismatches", 1}, {"examples", json::array({std::string(buf)})},
                 {"error", std::string(buf)}};
 }

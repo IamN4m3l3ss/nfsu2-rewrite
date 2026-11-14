@@ -39,12 +39,14 @@ inline uint32_t arg(float f) { return bits(f); }
 
 // The original (trampoline) and our installed entry stub get identical arguments. Registers the original leaves
 // at their sentinel (= preserved) must be preserved by ours; EAX must match unless the function returns a float.
+// compare_eax=false only for functions whose EAX is garbage AND no call site reads it (tools/re/regcontract.py
+// shows "none") — e.g. bSinCos leaves the x87 status word there.
 inline Case check_regs(const char* what, const void* orig, const void* mine, std::initializer_list<uint32_t> args,
-                       bool returns_float) {
+                       bool returns_float, bool compare_eax = true) {
     const RegOut a = call_regs(orig, args.begin(), static_cast<int>(args.size()), returns_float);
     const RegOut b = call_regs(mine, args.begin(), static_cast<int>(args.size()), returns_float);
     std::string bad;
-    if (!returns_float && a.eax != b.eax) bad += " eax " + std::to_string(a.eax) + "/" + std::to_string(b.eax);
+    if (!returns_float && compare_eax && a.eax != b.eax) bad += " eax " + std::to_string(a.eax) + "/" + std::to_string(b.eax);
     if (a.ecx == kSentECX && b.ecx != kSentECX) bad += " ecx not preserved";
     if (a.edx == kSentEDX && b.edx != kSentEDX) bad += " edx not preserved";
     if (returns_float && bits(a.st0) != bits(b.st0)) bad += " st0 differs";

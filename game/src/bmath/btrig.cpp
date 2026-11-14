@@ -167,3 +167,67 @@ NFSU2_DIFF_TEST(regs_btrig) {
     seed = saved;
     return res;
 }
+
+// ---------------------------------------------------------------- bSinCos 0x0043C390 (16 callers)
+// Same folding + sine series as bSin; cosine 1 - x2/2 + x4/4! - x6/6! + x8/8! - x10/10!, each even power formed as
+// in the x87 code (x4 = x2*x2, x6 = x4*x2, x8 = x6*x2, x10 = x8*x2), both results times the same sign.
+namespace {
+constexpr float kHalf = 0.5f;                              // 0x784260
+constexpr float kC4 = 0.0416666679084301f;                 // 0x786DB0  1/4!
+constexpr float kC6 = 0.0013888889225199819f;              // 0x786DAC  1/6!
+constexpr float kC8 = 2.4801587642286904e-05f;             // 0x786DA8  1/8!
+constexpr float kC10 = 2.755731998149713e-07f;             // 0x786DA4  1/10!
+
+using SinCos_t = void(__cdecl*)(float*, float*, uint32_t);
+SinCos_t o_bSinCos = nullptr;
+void __cdecl bSinCos(float* sin_out, float* cos_out, uint32_t angle) {
+    float x = static_cast<float>(static_cast<uint16_t>(angle)) * kAngleToRad;
+    float s = 1.0f;
+    if (!(x < k3PiOver2)) {
+        x = x - k2Pi;
+    } else if (!(x < kPiOver2)) {
+        x = x - kPi;
+        s = -1.0f;
+    }
+    const float x2 = x * x, x3 = x2 * x, x4 = x2 * x2, x5 = x3 * x2, x6 = x4 * x2, x7 = x5 * x2, x8 = x6 * x2;
+    float sn = x - x3 * kC3;
+    sn = sn + x5 * kC5;
+    sn = sn - x7 * kC7;
+    const float x9 = x7 * x2;
+    sn = sn + x9 * kC9;
+    *sin_out = sn * s;
+    float cs = 1.0f - kHalf * x2;
+    cs = cs + x4 * kC4;
+    cs = cs - x6 * kC6;
+    cs = cs + x8 * kC8;
+    const float x10 = x8 * x2;
+    cs = cs - x10 * kC10;
+    *cos_out = cs * s;
+}
+}  // namespace
+
+NFSU2_REWRITE_N(0x0043C390, bSinCos, 3, "void __cdecl(float* sin, float* cos, uint16 angle)", o_bSinCos);
+
+NFSU2_DIFF_TEST(bSinCos) {
+    game::DiffCtx all{65536, ctx.seed};
+    uint32_t i = 0;
+    return game::run_diff(all, "bSinCos", o_bSinCos, [&i](game::Rng& r) {
+        const uint32_t a = (i++) | (r.below(4) == 0 ? (r.next() & 0xFFFF0000u) : 0);
+        float s1 = 9, c1 = 9, s2 = 9, c2 = 9;
+        o_bSinCos(&s1, &c1, a);
+        bSinCos(&s2, &c2, a);
+        if (!same(s1, s2) || !same(c1, c2))
+            return game::MismatchText("angle=" + std::to_string(a) + " sin " + fs(s1) + "/" + fs(s2) + " cos " + fs(c1) + "/" + fs(c2));
+        return game::Ok();
+    });
+}
+
+NFSU2_DIFF_TEST(regs_bsincos) {
+    using game::arg;
+    return game::run_diff(ctx, "regs_bsincos", o_bSinCos, [](game::Rng& r) {
+        float s = 0, c = 0;
+        // void; leaves the FPU status word in EAX; regcontract: no caller reads EAX -> don't compare it
+        return game::check_regs("bSinCos", (void*)o_bSinCos, NFSU2_ENTRY(bSinCos), {arg(&s), arg(&c), r.next()}, false,
+                                /*compare_eax=*/false);
+    });
+}

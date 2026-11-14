@@ -170,3 +170,58 @@ NFSU2_DIFF_TEST(regs_bmatrix) {
         return game::Ok();
     });
 }
+
+// ---------------------------------------------------------------- bTransposeMatrix 0x0043C9D0 (19 callers)
+// Reads everything first (in-place safe), out in EAX. Elements in[1] and in[2] go through fld/fstp, which turns a
+// signalling NaN into a quiet one (sets mantissa bit 22); the other 14 are integer moves (bit-exact).
+namespace {
+uint32_t x87_copy(uint32_t u) {
+    const bool nan = (u & 0x7F800000u) == 0x7F800000u && (u & 0x007FFFFFu) != 0;
+    return nan ? (u | 0x00400000u) : u;
+}
+using Transp_t = M4*(__cdecl*)(M4*, const M4*);
+Transp_t o_bTransposeMatrix = nullptr;
+M4* __cdecl bTransposeMatrix(M4* out, const M4* in) {
+    uint32_t t[16];
+    memcpy(t, in->m, sizeof t);
+    t[1] = x87_copy(t[1]);
+    t[2] = x87_copy(t[2]);
+    uint32_t o[16];
+    for (int r = 0; r < 4; ++r)
+        for (int c = 0; c < 4; ++c) o[c * 4 + r] = t[r * 4 + c];
+    memcpy(out->m, o, sizeof o);
+    return out;
+}
+}  // namespace
+
+NFSU2_REWRITE_N(0x0043C9D0, bTransposeMatrix, 2, "bMatrix4* __cdecl(bMatrix4* out, const bMatrix4* in) -> out in EAX", o_bTransposeMatrix);
+
+NFSU2_DIFF_TEST(bTransposeMatrix) {
+    return game::run_diff(ctx, "bTransposeMatrix", o_bTransposeMatrix, [](game::Rng& r) {
+        M4 in, a, b;
+        for (float& f : in.m) f = rf(r);
+        if (r.below(4) == 0) {  // signalling / quiet NaNs anywhere
+            uint32_t u = 0x7F800001u | (r.next() & 0x003FFFFFu) | (r.below(2) ? 0x00400000u : 0) | (r.below(2) ? 0x80000000u : 0);
+            memcpy(&in.m[r.below(16)], &u, 4);
+            memcpy(&in.m[1 + r.below(2)], &u, 4);
+        }
+        if (r.below(4) == 0) {
+            a = b = in;
+            o_bTransposeMatrix(&a, &a);
+            bTransposeMatrix(&b, &b);
+        } else {
+            o_bTransposeMatrix(&a, &in);
+            bTransposeMatrix(&b, &in);
+        }
+        return same(a, b) ? game::Ok() : game::MismatchText("matrices differ");
+    });
+}
+
+NFSU2_DIFF_TEST(regs_btranspose) {
+    using game::arg;
+    return game::run_diff(ctx, "regs_btranspose", o_bTransposeMatrix, [](game::Rng& r) {
+        M4 in, out;
+        for (float& f : in.m) f = rf(r);
+        return game::check_regs("bTransposeMatrix", (void*)o_bTransposeMatrix, NFSU2_ENTRY(bTransposeMatrix), {arg(&out), arg(&in)}, false);
+    });
+}

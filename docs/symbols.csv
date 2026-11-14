@@ -54,3 +54,5 @@ addr,name,signature,status,notes
 0x0043C140,bRandomSeeded,"uint32_t __cdecl(uint32_t range, uint32_t* seed)",verified,"bRandom with caller's seed"
 0x0043C280,bMod,"int __cdecl(int a, int b)",verified,"positive modulo; quirk: negative multiples of b return |b|"
 0x0043C240,bFMod,"float __cdecl(float a, float b)",verified,"(t - floor(t))*|b|, t=a/|b|; valid |t| < 2^31; preserves ECX/EDX only when |t|<1 (_ftol2 path)"
+0x0043C390,bSinCos,"void __cdecl(float* sin, float* cos, uint16 angle)",verified,"all 65536 angles; cos series to x^10; EAX = FPU status word (unused by callers)"
+0x0043C9D0,bTransposeMatrix,"bMatrix4* __cdecl(bMatrix4* out, const bMatrix4* in)",verified,"in-place safe; in[1],in[2] copied via x87 (SNaN -> QNaN)"

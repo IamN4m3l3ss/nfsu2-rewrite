@@ -385,3 +385,12 @@ return values.
   harmlessly.
 
 **Coverage:** 37 verified of ~23,278, all live.
+
+## 2026-11-14 — bSinCos, bTransposeMatrix; EAX comparison made explicit
+
+- bSinCos 0x43C390 (all 65,536 angles bit-exact) and bTransposeMatrix 0x43C9D0 (in-place, SNaN quieting of the two
+  elements copied through x87). Live since 17:34:14, 39 rewrites.
+- `check_regs(..., compare_eax)`: EAX is compared by default; `false` only where the function's EAX is garbage and
+  `regcontract.py` shows no caller reads it (bSinCos leaves the x87 status word there).
+
+**Coverage:** 39 verified of ~23,278, all live.

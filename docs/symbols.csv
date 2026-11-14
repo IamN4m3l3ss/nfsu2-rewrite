@@ -45,3 +45,7 @@ addr,name,signature,status,notes
 0x0043C370,bCos,"float __cdecl(uint16 angle)",verified,"bSin(angle + 0x4000) via tail jump; all 65536 angles"
 0x0043C350,bSinRad,"float __cdecl(float radians)",verified,"_ftol2(rad*65536/2pi) then bSin"
 0x0043C1F0,bRandomFloat,"float __cdecl(float scale)",verified,"(seed % 0x7FFFFFFF) * 2^-31 * scale; advances g_RandomSeed"
+0x0043CF90,bNormalizeTo,"bVector3* __cdecl(bVector3* out, const bVector3* in, float len)",verified,"out = in * 1/(|in|/len); zero -> (len,0,0); never writes EDX"
+0x0043CEB0,bNormalizeTo2,"bVector2* __cdecl(bVector2* out, const bVector2* in, float len)",verified,"2D; zero -> (1,0) (unlike 3D); length rounded to float before inverting"
+0x0043D190,bEqualEps,"int __cdecl(const bVector3*, const bVector3*, float eps)",verified,"!(|d|>eps) per axis: NaN counts as equal"
+0x0043D410,bInBox2,"int __cdecl(const bVector2* lo, const bVector2* hi, const bVector2* p, float margin)",verified,"lo-m <= p <= m+hi on x,y"

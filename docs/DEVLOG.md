@@ -365,3 +365,12 @@ magnitudes, not tested.
 
 **Rule (in regs.h):** a rewrite must leave EAX/ECX/EDX as the original does; diff tests check registers, not just
 return values.
+
+## 2026-11-14 — all verified rewrites live; bMath batch 2
+
+- User confirmed collisions normal with the fixed vector rewrites. Enabled the rest (bRandom, bIdentity,
+  bInitBounds2, bSin, bCos, bSinRad, bRandomFloat at 17:24; bStrUpr, bWStrLen with stubs).
+- `game/src/bmath/bmath2.cpp`: bNormalizeTo (zero → (len,0,0)), bNormalizeTo2 (zero → (1,0)), bEqualEps (NaN counts
+  as equal), bInBox2. 3 seeds × 20,000 value cases + register tests, 0 mismatches; enabled in game, 60 fps.
+
+**Coverage:** 33 verified of ~23,278, all running in the user's game.

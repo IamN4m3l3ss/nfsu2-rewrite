@@ -505,3 +505,19 @@ return values.
 - **Live**: enabled step by step in the user's session (pool internals, then bMalloc/bFree), then 3 boots to free
   roam with all 58 on: 13 s each, no errors; per boot ~3100 bMalloc, ~2700 bMalloc2, ~2000 bFree, and our
   PoolInit/bInitMemoryPool created the game's pools. Suite: 207/207.
+
+## 2026-11-14 — Resource files + decompression front end
+
+- **New system `game/systems/resource/`** (12 verified): IsCompressed, Decompress (dispatch), RawwDecompress,
+  ResourceFile::SetAllocParams / AllocateBuffer / SetOwnsBuffer / FreeBuffer / Load / Unload, DecPending,
+  LoadChunksAligned, FindResourceFile. ResourceFile layout in resource_file.cpp / symbols.csv.
+- **Finding**: LoadChunksAligned's re-align branch is dead code: it is only taken if CopyChunksAligned in mode 1
+  returns a moved offset, and mode 1 never moves it. Explains ClearChunks never being called. Transcribed anyway.
+- **Test infra** (shared headers): `bchunk/fake_loader.h` (fake leaf + container loader recording load/unload
+  calls), `memory/test_heap.h` (private bMemoryPool in slot 7, offsets for pointer comparison, shared slot-7
+  ownership). Tests run Load/Unload/LoadChunksAligned on random objects with fake bundles (some RAWW-packed) in two
+  identical heaps and compare object, loader calls, heap stats and buffer bytes. 10k each, 0 mismatches; mutation
+  checks (Load flag 4→2: 3736, Unload ignoring ownership: 3125). FindResourceFile against all 25 live files.
+- **Live**: all 70 on; the user entered a shop, browsed, left: "all normal". During it: Unload 23,
+  LoadChunksAligned 74, DecPending 23, SetAllocParams 13, IsCompressed 2, ~3000 bMalloc/bFree; no errors.
+- Next: the constructor needs the file layer (0x57CA10 open/size, async reads) → file system is the next system.

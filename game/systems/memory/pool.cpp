@@ -22,6 +22,7 @@
 #include "diff.h"
 #include "regs.h"
 #include "rewrite.h"
+#include "test_heap.h"
 
 namespace {
 
@@ -74,15 +75,9 @@ inline void cs_leave(Pool* p) { game_fn<CsFn>(0x006F55E8)(reinterpret_cast<uint8
 inline void* crt_new(uint32_t n) { return game_fn<void*(__cdecl*)(uint32_t)>(0x0075C6C8)(n); }
 inline void crt_free(void* p) { game_fn<void(__cdecl*)(void*)>(0x0075C6DA)(p); }
 inline Pool*& pool_slot(uint32_t i) { return game_var<Pool*>(kPoolTable + i * 4); }
-bool g_slot7_ours = false;  // a diff test installed its own pool in slot 7 (unused by the game)
-inline void slot7_set(Pool* p) {
-    pool_slot(7) = p;
-    g_slot7_ours = p != nullptr;
-}
-inline bool slot7_free() {  // also reclaims slot 7 if a crashed test of ours left it set
-    if (pool_slot(7) && g_slot7_ours) slot7_set(nullptr);
-    return pool_slot(7) == nullptr && game_var<void*>(kExtTable + 28) == nullptr;
-}
+using game::testing::g_slot7_ours;  // shared with every test that uses slot 7 (test_heap.h)
+inline void slot7_set(Pool* p) { game::testing::slot7_set(p); }
+inline bool slot7_free() { return game::testing::slot7_free(); }
 inline void bbreak() { game_fn<void(__cdecl*)()>(0x0043BD50)(); }
 
 inline void fill(uint8_t* d, uint32_t value, uint32_t n) {  // rep stosd + rep stosb

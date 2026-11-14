@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "diff.h"
+#include "fake_loader.h"
 #include "regs.h"
 #include "rewrite.h"
 
@@ -146,23 +147,8 @@ NFSU2_DIFF_TEST(regs_chunks) {
 // same call sequence, the same debug-name ring and the same ring index. Bundles of up to 300 chunks (> 64 exercises
 // the ring), some with id 0 (skipped).
 namespace {
-constexpr uint32_t kTestId = 0x7EAD0001;
-std::vector<uintptr_t> g_seen;
-int __cdecl fake_cb(bChunk* c) {
-    g_seen.push_back(reinterpret_cast<uintptr_t>(c));
-    return 1;
-}
-struct FakeLoader {
-    bChunkLoader node{nullptr, kTestId, &fake_cb, &fake_cb};
-    bChunkLoader** head;
-    FakeLoader() {
-        const uint32_t bucket = ((kTestId >> 6) + (kTestId + (kTestId >> 12))) & 0x3F;
-        head = reinterpret_cast<bChunkLoader**>(kLoaderTable + bucket * 4);
-        node.next = *head;
-        *head = &node;
-    }
-    ~FakeLoader() { *head = node.next; }
-};
+using game::testing::FakeChunkLoader;
+constexpr uint32_t kTestId = game::testing::kFakeLeafId;
 std::vector<uint8_t> fake_bundle(game::Rng& r) {
     std::vector<uint8_t> b;
     const uint32_t n = r.below(4) == 0 ? 60 + r.below(240) : 1 + r.below(10);
@@ -176,22 +162,23 @@ std::vector<uint8_t> fake_bundle(game::Rng& r) {
     return b;
 }
 game::Case run_chunks_case(game::Rng& r, LoadChunks_t orig, LoadChunks_t mine, const char* what) {
-    FakeLoader fake;
+    FakeChunkLoader fake;
     std::vector<uint8_t> bundle = fake_bundle(r);
     std::vector<uint8_t> ring0(84), ringA(84);
     std::memcpy(ring0.data(), reinterpret_cast<void*>(kNameRing), 84);  // 4 x 20 names + the index (0x866610)
     bChunk* start = reinterpret_cast<bChunk*>(bundle.data());
     const int size = static_cast<int>(bundle.size());
-    g_seen.clear();
+    FakeChunkLoader::calls.clear();
     orig(start, size);
-    std::vector<uintptr_t> a = g_seen;
+    const auto a = FakeChunkLoader::calls;
     std::memcpy(ringA.data(), reinterpret_cast<void*>(kNameRing), 84);
     std::memcpy(reinterpret_cast<void*>(kNameRing), ring0.data(), 84);
-    g_seen.clear();
+    FakeChunkLoader::calls.clear();
     mine(start, size);
     const bool ring_ok = std::memcmp(ringA.data(), reinterpret_cast<void*>(kNameRing), 84) == 0;
     const std::string info = std::string(what) + " chunks=" + std::to_string(bundle.size());
-    if (a != g_seen) return game::MismatchText(info + " calls " + std::to_string(a.size()) + "/" + std::to_string(g_seen.size()));
+    if (a != FakeChunkLoader::calls)
+        return game::MismatchText(info + " calls " + std::to_string(a.size()) + "/" + std::to_string(FakeChunkLoader::calls.size()));
     if (!ring_ok) return game::MismatchText(info + " name ring");
     return game::Ok();
 }

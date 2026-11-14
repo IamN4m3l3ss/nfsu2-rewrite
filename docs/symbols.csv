@@ -56,3 +56,7 @@ addr,name,signature,status,notes
 0x0043C240,bFMod,"float __cdecl(float a, float b)",verified,"(t - floor(t))*|b|, t=a/|b|; valid |t| < 2^31; preserves ECX/EDX only when |t|<1 (_ftol2 path)"
 0x0043C390,bSinCos,"void __cdecl(float* sin, float* cos, uint16 angle)",verified,"all 65536 angles; cos series to x^10; EAX = FPU status word (unused by callers)"
 0x0043C9D0,bTransposeMatrix,"bMatrix4* __cdecl(bMatrix4* out, const bMatrix4* in)",verified,"in-place safe; in[1],in[2] copied via x87 (SNaN -> QNaN)"
+0x0043C490,bASin,"uint32 __cdecl(float x) -> angle",verified,"binary search + linear interp over table 0x7EA628 {u16 angle, float slope}; result upper bits from _ftol2 (callers use full EAX)"
+0x0043C570,bATan2,"uint32 __cdecl(float a, float b) -> angle",verified,"octant fold + byte table 0x7EACB0 indexed backwards; equal case keeps caller's EAX upper half (stub passes entry EAX)"
+0x007EA628,g_ASinTable,"struct{uint16 angle; uint16 pad; float slope}[]",named,"bASin table"
+0x007EACB0,g_ATanTable,uint8_t[],named,"bATan2 table, indexed 0x7EACB0 - ftol(-256*ratio)"

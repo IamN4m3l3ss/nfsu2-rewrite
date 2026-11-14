@@ -394,3 +394,14 @@ return values.
   `regcontract.py` shows no caller reads it (bSinCos leaves the x87 status word there).
 
 **Coverage:** 39 verified of ~23,278, all live.
+
+## 2026-11-14 — inverse trig: exact down to leftover register bits
+
+- bASin 0x43C490 and bATan2 0x43C570 return angles built with 16-bit moves, so EAX's upper half is leftover: from
+  `_ftol2`'s result (bASin) or from the caller's own EAX (bATan2's equal case, where only `fnstsw ax` wrote EAX).
+  Callers use the full EAX in places (`sub ecx, eax`, `mov ebx, eax`), so the leftovers are reproduced.
+- New stub `NFSU2_REWRITE_N_EAX` passes the caller's entry EAX as a hidden last argument.
+- Tests compare full EAX/ECX/EDX through `call_regs` (sentinel EAX), 3 seeds × 20,000, 0 mismatches. Live since
+  the timestamp in the commit; 41 rewrites.
+
+**Coverage:** 41 verified of ~23,278, all live.

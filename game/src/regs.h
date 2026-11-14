@@ -76,3 +76,18 @@ inline Case check_regs(const char* what, const void* orig, const void* mine, std
                                         reinterpret_cast<void**>(&original))
 
 #define NFSU2_ENTRY(fn) reinterpret_cast<const void*>(&nfsu2_entry_##fn)
+
+// ---- entry stub that also hands the caller's EAX to our function as an extra LAST argument, for originals whose
+// result keeps garbage bits from the entry EAX (e.g. `mov ax, cx` on a path where only `fnstsw ax` touched EAX).
+// After push ecx/edx/eax, arg i of N is at [esp + 16 + 4*i]; pushed last-to-first the offset is 12 + 4*N.
+#define NFSU2_PUSH_ARGS_E1 __asm push dword ptr [esp + 16]
+#define NFSU2_PUSH_ARGS_E2 __asm push dword ptr [esp + 20] __asm push dword ptr [esp + 20]
+#define NFSU2_REWRITE_N_EAX(addr, fn, nargs, sig, original)                                          \
+    static void* const g_impl_##fn = reinterpret_cast<void*>(&fn);                                   \
+    extern "C" __declspec(naked) void nfsu2_entry_##fn() {                                           \
+        __asm push ecx __asm push edx __asm push eax NFSU2_PUSH_ARGS_E##nargs                         \
+            __asm call dword ptr [g_impl_##fn] __asm add esp, 4 * (nargs + 1) __asm pop edx __asm pop ecx \
+                __asm ret                                                                             \
+    }                                                                                                \
+    static ::game::Registrar g_reg_##fn(addr, #fn, sig, reinterpret_cast<void*>(&nfsu2_entry_##fn),  \
+                                        reinterpret_cast<void**>(&original))

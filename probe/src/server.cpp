@@ -77,6 +77,21 @@ json dispatch(const std::string& method, const json& p) {
     if (method == "release_all") return input_release_all();
     if (method == "input_state") return input_state();
     if (method == "car_state") return car_state();
+    if (method == "fpu_state") {  // x87 control word + MXCSR as seen by game code on the render thread
+        return run_on_main(
+            [] {
+                unsigned short cw = 0;
+                unsigned int mxcsr = 0;
+                __asm { fnstcw cw }
+                __asm { stmxcsr mxcsr }
+                const int pc = (cw >> 8) & 3, rc = (cw >> 10) & 3;
+                static const char* pcs[] = {"24-bit (single)", "reserved", "53-bit (double)", "64-bit (extended)"};
+                static const char* rcs[] = {"nearest", "down", "up", "toward zero"};
+                return json{{"x87_cw", hex_addr(cw)}, {"precision", pcs[pc]}, {"rounding", rcs[rc]},
+                            {"mxcsr", hex_addr(mxcsr)}, {"thread", GetCurrentThreadId()}};
+            },
+            5000);
+    }
     if (method == "rewrite_list") return rewrite_list();
     if (method == "rewrite_enable") return rewrite_enable(p);
     if (method == "rewrite_reload") return rewrite_reload();

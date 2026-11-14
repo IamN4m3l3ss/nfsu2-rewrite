@@ -60,6 +60,12 @@ HDContentSupport (without it, menu text is garbled). Always run with the full `s
 They patch game code, so when mapping a function, check whether one of them hooks it (compare bytes against the exe
 on disk). `tools/run_game.sh` runs from a symlink copy in `work/profile/`, so the user's folder is never written to.
 
+**Floating point (measured 14 Nov 2026):** on the game thread the x87 control word is `0x007F` — 24-bit (single)
+precision, round to nearest, exceptions masked (D3D9 default); MXCSR `0x1FA0`. So x87 `+ - * / fsqrt` round like
+SSE single precision: rewrites in plain `float` match in normal ranges. Transcendentals (`fsin/fcos/fpatan`) ignore
+precision control → use the same x87 instructions; float→int conversions must copy the original's method. Always
+diff-test.
+
 **Data:** EA chunk bundles (`u32 id, u32 size`; high bit `0x80000000` = container). `GLOBAL/GlobalB.lzc` and
 `FRONTEND/FrontB.lzc` are JDLZ-compressed (magic `JDLZ`); uncompressed `GLOBAL/GLOBALB.BUN` also exists.
 Tracks: `TRACKS/L4Rx.BUN` + `TRACKS/STREAML4Rx.BUN` (x = A,B,C,D,F,G,H,R; STREAML4RA is 118 MB = most of Bayview),

@@ -316,3 +316,22 @@ itself and picked it up)
   precision, so float rewrites need a deliberate exact-x87 strategy before they can be bit-identical. Next topic.
 
 **Coverage:** 16 verified of ~23,278.
+
+## 2026-11-14 — FPU measured; first bit-exact float rewrites (bMath)
+
+**Measured:** game-thread x87 control word `0x007F` (24-bit precision, round-nearest, masked), MXCSR `0x1FA0`
+(new core RPC `fpu_state`). Consequence (now in CLAUDE.md): x87 `+ - * / fsqrt` round like SSE single precision.
+
+**Changed:** `game/src/bmath/bmath.cpp`: bRandom (the game RNG, seed `0x7EA624`), bIdentity, bDistBetween,
+bNormalize2, bNormalize, bScaleAdd2, bScaleAdd, bCross, bInitBounds2 — operation order copied from the x87 code.
+Plus `bDistBetween_BROKEN` (same formula, summation reordered) as a float self-check. bRandom's diff test saves and
+restores the game's seed, so testing doesn't change the session's randomness.
+
+**Verified** (user driving): 9 × 3 seeds × 20,000 cases, bit-exact (raw float bits), inputs 0 / ±1e-3..±1e5 incl.
+-0, zero vectors, aliased outputs. The reordered variant differs in 793/20,000 cases (1 ulp) — caught. All 25
+rewrites enabled in game: 601 frames / 10 s, no errors.
+
+**Note:** inputs beyond float range in intermediates (x87 keeps a wider exponent) would differ; not seen in game
+magnitudes, not tested.
+
+**Coverage:** 25 verified of ~23,278.

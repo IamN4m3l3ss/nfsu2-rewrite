@@ -297,3 +297,22 @@ itself and picked it up)
 - Interface version guard: the old core refused the v2 game DLL during the reload; the new core loaded it.
 
 **Coverage:** 6 functions verified (+1 rewritten passthrough) of ~23,278 (0.03 %).
+
+## 2026-11-14 — M8 start: rest of the bString block; enabled set persists
+
+**Changed**
+- Enabled rewrites persist across game restarts: `out/rewrites_enabled.json` (written on every switch, read on a
+  fresh start; core reloads still hand the set over directly).
+- `game/src/bstring/bstring2.cpp`: bStrNCpy, bStrNCmp, bStrNICmp, bStrCat (3-arg), bStrChr, bStrUpr, bStrToInt,
+  bWStrLen, bStrToWStr, bStrNToWStr. Diff inputs place strings at random offsets in arenas with random leading bytes,
+  because the bounded compares end by reading `a[-1]` / `b[-1]`.
+
+**Verified** (user driving the whole time; nothing injected)
+- `tests/m7_diff.py`: 16 rewrites × 3 seeds × 10,000 cases, 0 mismatches; broken hash still caught.
+- All 16 enabled in the running game: 601 frames / 10 s, no errors.
+
+**Learned**
+- bStrToFloat (0x43DEF0) is x87 code. Our compiler uses SSE by default and D3D9 normally drops the x87 FPU to 24-bit
+  precision, so float rewrites need a deliberate exact-x87 strategy before they can be bit-identical. Next topic.
+
+**Coverage:** 16 verified of ~23,278.

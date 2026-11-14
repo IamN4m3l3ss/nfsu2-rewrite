@@ -32,6 +32,35 @@ const GameApi* g_game = nullptr;
 uint32_t g_seq = 0, g_reloads = 0;
 std::vector<Entry> g_entries;
 
+// Enabled set persisted across game restarts: <game dll dir>/rewrites_enabled.json (out/, gitignored).
+std::wstring state_file() { return g_path.substr(0, g_path.find_last_of(L"\\/") + 1) + L"rewrites_enabled.json"; }
+
+void save_enabled_file() {
+    json names = json::array();
+    for (const Entry& e : g_entries)
+        if (e.enabled) names.push_back(e.name);
+    if (FILE* f = _wfopen(state_file().c_str(), L"w")) {
+        fputs(names.dump(1).c_str(), f);
+        fclose(f);
+    }
+}
+
+std::set<std::string> load_enabled_file() {
+    std::set<std::string> out;
+    if (FILE* f = _wfopen(state_file().c_str(), L"r")) {
+        std::string text;
+        char buf[4096];
+        size_t n;
+        while ((n = fread(buf, 1, sizeof buf, f)) > 0) text.append(buf, n);
+        fclose(f);
+        try {
+            for (const json& v : json::parse(text)) out.insert(v.get<std::string>());
+        } catch (...) {
+        }
+    }
+    return out;
+}
+
 bool file_mtime(const std::wstring& p, FILETIME& out) {
     WIN32_FILE_ATTRIBUTE_DATA a;
     if (!GetFileAttributesExW(p.c_str(), GetFileExInfoStandard, &a) || a.nFileSizeLow == 0) return false;
@@ -170,8 +199,12 @@ void rewrite_init(const json& state) {
         return;
     }
     std::set<std::string> enable;
-    if (state.contains("rewrite"))
+    if (state.contains("rewrite")) {
         for (const json& n : state["rewrite"]["enabled"]) enable.insert(n.get<std::string>());
+    } else {
+        enable = load_enabled_file();  // fresh game start: bring back what was enabled last time
+        if (!enable.empty()) logf("rewrite: re-enabling %zu rewrites from rewrites_enabled.json", enable.size());
+    }
     load(enable);
 }
 
@@ -218,6 +251,7 @@ json rewrite_enable(const json& p) {
             if (s != MH_OK && s != MH_ERROR_ENABLED && s != MH_ERROR_DISABLED)
                 throw std::runtime_error(MH_StatusToString(s));
             e->enabled = want;
+            save_enabled_file();
             logf("rewrite: %s %s", e->name.c_str(), want ? "ENABLED (rewrite)" : "disabled (original)");
             return entry_json(*e);
         },

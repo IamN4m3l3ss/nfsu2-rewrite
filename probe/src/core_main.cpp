@@ -36,15 +36,18 @@ bool core_init(const LoaderApi* a, const char* state_json) {
         } else {
             g_hooks = true;
             input_install_hooks();  // DirectInput8Create: only matters on first load (game start)
+            json st = json::object();
             if (reload) {
                 try {
-                    input_restore_state(json::parse(state_json));
+                    st = json::parse(state_json);
+                    input_restore_state(st);
                 } catch (const std::exception& e) {
                     logf("ERROR: restoring state: %s", e.what());
                 }
             } else {
                 no_traffic_apply_env();
             }
+            rewrite_init(st);
         }
     }
     server_start(port);
@@ -52,6 +55,7 @@ bool core_init(const LoaderApi* a, const char* state_json) {
 }
 
 void core_on_frame(uint64_t frame) {
+    if (g_hooks) rewrite_on_frame(frame);
     input_frame_tick(frame);
     run_tasks();
 }
@@ -63,6 +67,8 @@ const char* core_shutdown() {
     json state = json::object();
     if (g_hooks) {
         state["input"] = input_save_state();
+        state["rewrite"] = rewrite_save_state();
+        rewrite_shutdown();
         input_shutdown();
         MH_DisableHook(MH_ALL_HOOKS);
         MH_Uninitialize();

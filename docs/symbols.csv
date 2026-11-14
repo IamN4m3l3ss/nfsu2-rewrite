@@ -10,3 +10,6 @@ addr,name,signature,status,notes
 0x0086E5C0,g_pKeyboardDevice,IDirectInputDevice8A*,named,"action-mapped keyboard device"
 0x00870768,g_TextEntryMode,bool,named,"keyboard events use dwOfs (typing) when set"
 0x0075D8E0,_allshl,"u64 _allshl(u64 edx:eax, cl)",named,"MSVC CRT 64-bit shift helper"
+0x0057EAD0,UpdateFrameTime,"void __cdecl(float real_dt)",rewritten,"only caller 0x5812ED passes QPC delta; writes 0x865198 (not the sim step: halving it had no visible effect). game/src/time/frame_time.cpp (passthrough demo)"
+0x00865198,g_FrameTime,float,named,"1/60 at 60 fps; NOT the simulation step (see UpdateFrameTime)"
+0x0089CE58,g_AIRoster,"Controller*[14]",named,"player, 3 RaceCarControllers, 10 TrafficControllers; docs/structs/traffic.md"

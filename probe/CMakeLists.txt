@@ -24,7 +24,8 @@ add_library(nfsu2_core SHARED
   src/server.cpp
   src/patches.cpp
   src/input.cpp
-  src/car.cpp)
+  src/car.cpp
+  src/rewrite.cpp)
 target_include_directories(nfsu2_core PRIVATE src common ${CMAKE_SOURCE_DIR}/third_party/json)
 target_compile_definitions(nfsu2_core PRIVATE _CRT_SECURE_NO_WARNINGS)
 target_link_libraries(nfsu2_core PRIVATE minhook ws2_32 dxguid)

@@ -256,3 +256,26 @@ With the user parked next to a traffic car: scanned memory for RigidBodies (vtab
 6 found, the traffic car 2.9 m away), walked back to its MellowMover (`'Melo'`) and PsychoDriver, found the AI roster
 of 14 controllers at `0x89CE58` (player, 3 RaceCarControllers, 10 TrafficControllers), and named every class through
 its vtable slot-2 name method. Details: `docs/structs/traffic.md`.
+
+## 2026-11-14 — M6: rewrite DLL, hook table, hot reload
+
+**Changed**
+- `game/` → `out/nfsu2_game.dll` (the rewrite). Replacements register with `NFSU2_REWRITE(addr, fn, signature, orig)`
+  (`game/src/rewrite.h`); exported table `nfsu2_game_api()` (`probe/common/game_api.h`).
+- Core `rewrite.cpp`: loads the game DLL from a temp copy (path `NFSU2_GAME`, else next to `NFSU2_CORE`), MinHook per
+  entry (created disabled), compares the target's first 8 bytes with the exe on disk (flags functions another mod
+  already patched), switches at the render thread, hot-reloads when the file changes (new DLL loaded before the old
+  one is dropped; enabled set kept), hands the enabled set to the next core on a core reload.
+- Tools: `tools/probe.py rewrites | enable | disable | reload-game`, MCP `rewrite_list/enable/disable/reload`.
+- First entry: `UpdateFrameTime` 0x57EAD0 (`void __cdecl(float real_dt)`), passthrough + scale.
+
+**Verified** (running game, no restart; the game had been started before the game DLL existed — the core reloaded
+itself and picked it up)
+- Hooked, bytes match disk (no other mod). Off: 0x865198 = 0.016667. On (scale 1.0): 0.016667. Edited to 0.5 +
+  rebuilt → game DLL hot-reloaded (#1), still enabled, 0x865198 = 0.008333. Reverted + rebuilt → #2, 0.016667; off.
+
+**Broke / learned**
+- No visible slow motion while 0x865198 was halved (user was driving): it is not the simulation step. M6's
+  "see the new behaviour" is met by measurement only; a visible demo needs a function with a visible effect.
+- My throttle comparison ran while the user was driving (car at 218 km/h) — invalid, and it drove the user's car.
+  Don't inject driving into a session the user is playing without asking.

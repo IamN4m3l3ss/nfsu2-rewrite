@@ -70,6 +70,31 @@ def log_tail(n: int = 50) -> str:
 
 
 @server.tool()
+def rewrite_list() -> dict:
+    """Functions replaced by our rewrite (nfsu2_game.dll): address, name, signature, enabled, and whether another
+    mod had already patched the original."""
+    return pc.call("rewrite_list")
+
+
+@server.tool()
+def rewrite_enable(name: str) -> dict:
+    """Switch a function to our rewrite."""
+    return pc.call("rewrite_enable", {"name": name, "enabled": True})
+
+
+@server.tool()
+def rewrite_disable(name: str) -> dict:
+    """Switch a function back to the original game code."""
+    return pc.call("rewrite_enable", {"name": name, "enabled": False})
+
+
+@server.tool()
+def rewrite_reload() -> dict:
+    """Reload nfsu2_game.dll now (rebuilding it also reloads it automatically); enabled rewrites stay enabled."""
+    return pc.call("rewrite_reload", timeout=20)
+
+
+@server.tool()
 def reload_core() -> dict:
     """Reload the probe core (out/nfsu2_core.dll) inside the running game. Rebuilding the core also triggers this
     automatically within ~0.5 s. Returns the new core's ping (build stamp, reload_count)."""

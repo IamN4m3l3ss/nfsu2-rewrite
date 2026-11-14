@@ -77,6 +77,9 @@ json dispatch(const std::string& method, const json& p) {
     if (method == "release_all") return input_release_all();
     if (method == "input_state") return input_state();
     if (method == "car_state") return car_state();
+    if (method == "rewrite_list") return rewrite_list();
+    if (method == "rewrite_enable") return rewrite_enable(p);
+    if (method == "rewrite_reload") return rewrite_reload();
     if (method == "schedule") return input_schedule(p);
     if (method == "schedule_status") return input_schedule_status();
     if (method == "record_start") return record_start(p);

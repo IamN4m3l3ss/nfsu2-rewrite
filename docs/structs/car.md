@@ -22,8 +22,9 @@ assembly = *(void**)(player + 0x34)                 // owns the physics parts ('
 
 The notes' `drivetrain+0x58` (negated RPM) did not track the engine here; `engine+0x14` does.
 
-Globals: game state `0x008654A4` (3 frontend, 4/5 loading, 6 in game), frame time `0x00865198` (1/60 at the
-WidescreenFix 60 fps limit), time scale `0x007A5730` (1.0).
+Globals: game state `0x008654A4` (3 frontend, 4/5 loading, 6 in game), a frame time `0x00865198` (1/60 at the
+WidescreenFix 60 fps limit; written by UpdateFrameTime 0x57EAD0 — halving it did not slow the game, so it is not the
+sim step), time scale `0x007A5730` (1.0).
 
 Spawn after `run_game.sh --freeroam` (Nameless save): (-1258.42, -618.66, 19.54), facing (0.776, -0.629, -0.042),
 gear 2. Same every boot.

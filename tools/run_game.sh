@@ -97,6 +97,10 @@ if [[ -f "$ROOT/out/nfsu2_core.dll" ]]; then
   NFSU2_CORE="$(winepath -w "$ROOT/out/nfsu2_core.dll" 2>/dev/null)"
   export NFSU2_CORE
 fi
+if [[ -f "$ROOT/out/nfsu2_game.dll" ]]; then  # the rewrite; the core hot-reloads it when rebuilt
+  NFSU2_GAME="$(winepath -w "$ROOT/out/nfsu2_game.dll" 2>/dev/null)"
+  export NFSU2_GAME
+fi
 export WINEDEBUG="${WINEDEBUG:-err+all,fixme-all}"
 
 cmd=("$WINE" SPEED2.EXE)

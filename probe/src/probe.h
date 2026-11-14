@@ -84,6 +84,15 @@ json record_stop();
 json trace_start(const json& params);     // {"every": n frames}
 json trace_stop();
 
+// ---- rewrite.cpp (nfsu2_game.dll hook table) ----
+void rewrite_init(const json& state);  // after MH_Initialize; state from the previous core (may be empty)
+void rewrite_on_frame(uint64_t frame); // render thread: hot-reload the game DLL when its file changed
+json rewrite_save_state();
+void rewrite_shutdown();               // render thread: remove all rewrite hooks, unload the game DLL
+json rewrite_list();
+json rewrite_enable(const json& params);  // {"name"|"addr", "enabled": bool}
+json rewrite_reload();
+
 // ---- server.cpp ----
 void server_start(uint16_t port);
 void server_stop();

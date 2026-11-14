@@ -544,3 +544,16 @@ return values.
 - **Live**: 80 on; the user did a shop and a race (the save changed: start position differs from M5's recording).
   bOpen/ctor 1342, Close 489, bFileExists 38, FlushOpenFileCache 11 (the save was written through our code);
   heap clean, no errors. Suite 261/261.
+
+## 2026-11-14 — EA async file library (first 4) + a hang
+
+- `game/systems/file/filelib.cpp`: ChannelFromHandle, RequestList::Find, FindRequest (ESI/EBX register arguments,
+  hand-written entry stub + `call_find` helper for tests), GetStatus. Layout of FileSys/Channel/Request in the file.
+  Tests on fake channels/lists (the real ones are shared with the library's I/O thread); GetStatus read-only on the
+  real channels. Mutation (queued state 1→2): 1640. Live: 84 on, game calls them (FindRequest, list find); no errors.
+- **Hang (user: "game seems to be frozen")**: my GetStatus test used random channel indices 0-7; channels 1,3,4,7
+  are inactive and their locks were never initialised (all zeros); taking one blocks forever under Wine, on the
+  game's main thread (tests run in its frame). Restarted; tests now only use active channels. Lesson: never let a
+  test take a game lock the game itself would never take.
+- Next: Wait / Result / ReleaseWithCallback (19+14+7 callers; threading - transcription + live), then the I/O
+  thread and the platform layer (CreateFileA/ReadFile wrappers at 0x6F9xxx).

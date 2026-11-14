@@ -11,6 +11,7 @@
 
 #include <dinput.h>
 
+#include <algorithm>
 #include <atomic>
 #include <deque>
 #include <map>
@@ -74,6 +75,33 @@ struct KeyInject {
 KeyInject g_keys[256];
 std::atomic<unsigned> g_injected_down{0};
 
+// Frame-scheduled input (drive scripts, replays). Applied at Present of frame base+f; the game reads the keyboard
+// during the next frame. Guarded by g_mu.
+struct SchedEvent {
+    uint64_t f;
+    bool is_action;  // false: DIK key, true: raw game action id (uAppData)
+    uint32_t code;
+    bool down;
+};
+std::vector<SchedEvent> g_sched;
+size_t g_sched_next = 0;
+uint64_t g_sched_base = 0;
+
+// Recording of the real keyboard's action events (relative frame, uAppData, dwData).
+struct RecEvent {
+    uint64_t f;
+    uint32_t action;
+    uint32_t data;
+};
+bool g_rec_active = false;
+uint64_t g_rec_base = 0;
+std::vector<RecEvent> g_rec;
+
+// Telemetry trace: car samples every N frames (relative to trace start).
+bool g_trace_active = false;
+uint64_t g_trace_base = 0, g_trace_every = 30;
+std::vector<CarSample> g_trace;
+
 const char* kind_name(Kind k) { return k == Kind::Keyboard ? "keyboard" : k == Kind::Mouse ? "mouse" : "other"; }
 
 bool keep_active_on() { return keep_active_enabled(); }
@@ -119,6 +147,35 @@ void push_key_event_locked(uint8_t dik, bool down) {
             ev.uAppData = action;
             info.pending.push_back(ev);
         }
+    }
+}
+
+// push a raw action event (uAppData) to every keyboard (called with g_mu held); dwOfs = a key bound to it, if any
+void push_action_event_locked(uint32_t action, bool down) {
+    for (auto& [dev, info] : g_devs) {
+        if (info.kind != Kind::Keyboard) continue;
+        DIDEVICEOBJECTDATA ev{};
+        for (auto& [dik, acts] : info.key_actions)
+            for (UINT_PTR a : acts)
+                if (a == action && !ev.dwOfs) ev.dwOfs = dik;
+        ev.dwData = down ? 0x80 : 0;
+        ev.dwTimeStamp = GetTickCount();
+        ev.dwSequence = ++info.seq;
+        ev.uAppData = action;
+        info.pending.push_back(ev);
+    }
+}
+
+void set_key_locked(uint8_t dik, bool down) {
+    KeyInject& k = g_keys[dik];
+    if (down && !k.down) {
+        k = {true, 0, 0};
+        ++g_injected_down;
+        push_key_event_locked(dik, true);
+    } else if (!down && k.down) {
+        k = {};
+        --g_injected_down;
+        push_key_event_locked(dik, false);
     }
 }
 
@@ -178,6 +235,14 @@ HRESULT STDMETHODCALLTYPE hk_GetDeviceData(void* dev, DWORD cbObj, LPDIDEVICEOBJ
         logf("GetDeviceData dev=%p (%s) cbObj=%lu cap=%lu got=%lu flags=%lx hr=%08lx caller=%p", dev,
              kind_name(info.kind), cbObj, cap, inout ? *inout : 0, flags, hr, _ReturnAddress());
     if (info.kind != Kind::Keyboard || !inout) return hr;
+    if (SUCCEEDED(hr) && g_rec_active && rgdod && !(flags & DIGDD_PEEK)) {
+        const uint64_t f = current_frame() - g_rec_base;
+        for (DWORD i = 0; i < *inout; ++i) {
+            auto* e = reinterpret_cast<const DIDEVICEOBJECTDATA*>(reinterpret_cast<const uint8_t*>(rgdod) +
+                                                                  static_cast<size_t>(i) * cbObj);
+            g_rec.push_back({f, static_cast<uint32_t>(e->uAppData), e->dwData});
+        }
+    }
     if (FAILED(hr)) {
         if (!keep_active_on()) return hr;
         *inout = 0;
@@ -201,12 +266,16 @@ HRESULT STDMETHODCALLTYPE hk_GetDeviceData(void* dev, DWORD cbObj, LPDIDEVICEOBJ
         auto* dst = reinterpret_cast<uint8_t*>(rgdod) + static_cast<size_t>(n) * cbObj;
         memset(dst, 0, cbObj);
         memcpy(dst, &info.pending[take], std::min<size_t>(cbObj, sizeof(DIDEVICEOBJECTDATA)));
+        if (g_rec_active && !peek)  // the recording holds everything the game read: real and injected events
+            g_rec.push_back({current_frame() - g_rec_base, static_cast<uint32_t>(info.pending[take].uAppData),
+                             info.pending[take].dwData});
         ++n;
         ++take;
     }
     if (!peek) info.pending.erase(info.pending.begin(), info.pending.begin() + static_cast<ptrdiff_t>(take));
     *inout = n;
-    if (take) logf("GetDeviceData delivered %zu injected event(s) (first ofs=%lx data=%lx) hr=%08lx peek=%d caller=%p",
+    static unsigned delivered_logs = 0;
+    if (take && ++delivered_logs <= 40) logf("GetDeviceData delivered %zu injected event(s) (first ofs=%lx data=%lx) hr=%08lx peek=%d caller=%p",
                    take, rgdod[0].dwOfs, rgdod[0].dwData, hr, peek, _ReturnAddress());
     return hr;
 }
@@ -408,6 +477,95 @@ json input_state() {
     for (int k = 0; k < 256; ++k)
         if (g_keys[k].down) down.push_back(k);
     return {{"devices", devs}, {"keys_down", down}};
+}
+
+void input_frame_tick(uint64_t frame) {
+    std::lock_guard lk(g_mu);
+    while (g_sched_next < g_sched.size() && g_sched_base + g_sched[g_sched_next].f <= frame) {
+        const SchedEvent& e = g_sched[g_sched_next++];
+        if (e.is_action)
+            push_action_event_locked(e.code, e.down);
+        else
+            set_key_locked(static_cast<uint8_t>(e.code), e.down);
+    }
+    if (g_trace_active && (frame - g_trace_base) % g_trace_every == 0) {
+        CarSample cs;
+        cs.frame = frame - g_trace_base;
+        if (car_read(cs)) g_trace.push_back(cs);
+    }
+}
+
+json input_schedule(const json& p) {
+    std::vector<SchedEvent> evs;
+    for (const json& e : p.at("events")) {
+        SchedEvent s{e.at("f").get<uint64_t>(), e.contains("action"), 0, e.at("down").get<bool>()};
+        s.code = s.is_action ? e["action"].get<uint32_t>() : e.at("key").get<uint32_t>();
+        if (!s.is_action && (s.code == 0 || s.code > 255)) throw std::runtime_error("key must be a DIK code 1..255");
+        evs.push_back(s);
+    }
+    std::stable_sort(evs.begin(), evs.end(), [](const SchedEvent& a, const SchedEvent& b) { return a.f < b.f; });
+    std::lock_guard lk(g_mu);
+    g_sched = std::move(evs);
+    g_sched_next = 0;
+    g_sched_base = current_frame() + 1;
+    if (p.contains("trace_every")) {  // start a trace on the same base frame, so samples line up with the script
+        g_trace.clear();
+        g_trace_every = std::max<uint64_t>(1, p["trace_every"].get<uint64_t>());
+        g_trace_base = g_sched_base;
+        g_trace_active = true;
+    }
+    logf("schedule: %zu events from frame %llu", g_sched.size(), static_cast<unsigned long long>(g_sched_base));
+    return {{"events", g_sched.size()}, {"base_frame", g_sched_base}};
+}
+
+json input_schedule_status() {
+    std::lock_guard lk(g_mu);
+    const uint64_t now = current_frame();
+    return {{"events", g_sched.size()}, {"applied", g_sched_next}, {"done", g_sched_next >= g_sched.size()},
+            {"base_frame", g_sched_base}, {"frame", now}, {"rel_frame", now >= g_sched_base ? now - g_sched_base : 0},
+            {"last_f", g_sched.empty() ? 0 : g_sched.back().f}};
+}
+
+json trace_start(const json& p) {
+    std::lock_guard lk(g_mu);
+    g_trace.clear();
+    g_trace_every = std::max<uint64_t>(1, p.value("every", uint64_t{30}));
+    g_trace_base = current_frame() + 1;
+    g_trace_active = true;
+    return {{"base_frame", g_trace_base}, {"every", g_trace_every}};
+}
+
+json trace_stop() {
+    std::lock_guard lk(g_mu);
+    g_trace_active = false;
+    json arr = json::array();
+    for (const CarSample& cs : g_trace) arr.push_back(car_sample_json(cs));
+    return {{"samples", arr}, {"every", g_trace_every}};
+}
+
+json record_start(const json& p) {
+    json t = trace_start(p);
+    std::lock_guard lk(g_mu);
+    g_rec.clear();
+    g_rec_base = g_trace_base;
+    g_rec_active = true;
+    logf("recording real keyboard from frame %llu", static_cast<unsigned long long>(g_rec_base));
+    return t;
+}
+
+json record_stop() {
+    json events = json::array();
+    uint64_t frames = 0;
+    {
+        std::lock_guard lk(g_mu);
+        g_rec_active = false;
+        for (const RecEvent& e : g_rec) events.push_back({{"f", e.f}, {"action", e.action}, {"down", e.data != 0}});
+        frames = current_frame() - g_rec_base;
+    }
+    json t = trace_stop();
+    t["events"] = events;
+    t["frames"] = frames;
+    return t;
 }
 
 }  // namespace probe

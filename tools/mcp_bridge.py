@@ -107,6 +107,53 @@ def input_state() -> dict:
 
 
 @server.tool()
+def car_state() -> dict:
+    """Player car telemetry: position, forward/up/side axes, velocity, speed (m/s, km/h), gear (1=N, 2=1st), rpm,
+    game state (3 frontend, 6 in game), frame time. Errors when not in game."""
+    return pc.call("car_state")
+
+
+@server.tool()
+def drive_script(steps: list[dict], every: int = 30, fps: int = 60) -> dict:
+    """Run a frame-locked drive script and return car checkpoints every `every` frames.
+    steps: [{"key": "w", "from": 0.5, "to": 2.5}, {"key": "lshift", "at": 1.5}, ...] (seconds; keys by DIK name).
+    Driving map: w/up throttle, s/down brake+reverse, a/d or left/right steer, space handbrake, lmenu nitrous,
+    lshift shift up, lcontrol shift down (manual gearbox in the test save)."""
+    import drive
+    return drive.run_events(drive.script_events({"fps": fps, "steps": steps}), every)
+
+
+@server.tool()
+def record_inputs(name: str, seconds: float, every: int = 30) -> dict:
+    """Record everything the game reads from the keyboard (real + injected, as game actions) plus car checkpoints
+    for `seconds`, saved to tests/drives/NAME.json."""
+    import json
+    import time
+    import drive
+    pc.call("record_start", {"every": every})
+    time.sleep(seconds)
+    rec = pc.call("record_stop")
+    drive.DRIVES.mkdir(parents=True, exist_ok=True)
+    (drive.DRIVES / f"{name}.json").write_text(json.dumps(rec, indent=1))
+    return {"saved": str(drive.DRIVES / f"{name}.json"), "events": len(rec["events"]), "frames": rec["frames"]}
+
+
+@server.tool()
+def replay_inputs(name: str) -> dict:
+    """Replay tests/drives/NAME.json frame-locked and compare against its checkpoints (position error per checkpoint).
+    Start from the same place as the recording (e.g. a fresh tools/run_game.sh --freeroam)."""
+    import json
+    import drive
+    rec = json.loads((drive.DRIVES / f"{name}.json").read_text())
+    last = max((e["f"] for e in rec["events"]), default=0)
+    res = drive.run_events(rec["events"], rec["every"], tail=max(0, rec["frames"] - last))
+    errs = drive.compare(rec["samples"], res["samples"])
+    return {"checkpoint_errors_m": [{"frame": f, "error": round(e, 3)} for f, e in errs],
+            "end_recorded": rec["samples"][-1] if rec["samples"] else None,
+            "end_replayed": res["samples"][-1] if res["samples"] else None}
+
+
+@server.tool()
 def screenshot(scale: int = 2) -> Image:
     """Capture the game's back buffer (downscaled by integer `scale`). Also saved under work/screenshots/."""
     png, _, _ = pc.screenshot_png(scale)

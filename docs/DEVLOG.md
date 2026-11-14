@@ -168,3 +168,23 @@
 
 **Verified**
 - `tests/m4_loop.sh 5` → 5/5, free roam 12.1–13.4 s.
+
+## 2026-11-14 — M5: telemetry, frame-locked scripts, record/replay
+
+**Changed**
+- Probe: `car_state` (`car.cpp`, validated pointer chain), frame scheduler (`schedule`, applied at Present),
+  `record_start/stop` (every event the game reads from the keyboard — real and injected — as game actions, plus car
+  checkpoints), `trace_start/stop`. `tools/drive.py` (state / script / record / replay), MCP tools `car_state`,
+  `drive_script`, `record_inputs`, `replay_inputs`. `docs/structs/car.md`.
+- In-game keyboard map (53 actions): 1 throttle W/Up, 2 brake S/Down, 3/4 steer A/D, 5 handbrake Space,
+  6 nitrous Alt, 7 shift up LShift, 8 shift down LCtrl (manual gearbox in the save).
+
+**Verified**
+- Gear `vehicle+0x1E4` (1 N, 2 = 1st …) and RPM `engine+0x14` (rad/s) live; the notes' drivetrain RPM field did not
+  hold. Real keyboard passthrough confirmed by the user.
+- `tests/m5_drive.py` PASS: record a scripted straight-line drive (throttle 2 s, brake 2 s) in boot A, replay the
+  recording in boot B (end error 0.014 m, worst 0.019 m over 12 checkpoints), rerun the key script in boot C (0.000 m).
+  With frame-locked input the game is deterministic across reboots (same spawn every boot).
+
+**Open**
+- The test road is a 30 m straight; a longer route with steering/shifting/traffic is the real stress test.

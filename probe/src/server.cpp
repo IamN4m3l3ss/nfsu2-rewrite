@@ -69,6 +69,13 @@ json dispatch(const std::string& method, const json& p) {
     if (method == "key") return input_key(p);
     if (method == "release_all") return input_release_all();
     if (method == "input_state") return input_state();
+    if (method == "car_state") return car_state();
+    if (method == "schedule") return input_schedule(p);
+    if (method == "schedule_status") return input_schedule_status();
+    if (method == "record_start") return record_start(p);
+    if (method == "record_stop") return record_stop();
+    if (method == "trace_start") return trace_start(p);
+    if (method == "trace_stop") return trace_stop();
     if (method == "screenshot") {
         int scale = p.value("scale", 1);
         unsigned timeout = p.value("timeout_ms", 5000u);

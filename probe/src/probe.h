@@ -36,6 +36,7 @@ json d3d_info();
 // Throws std::runtime_error on timeout.
 json run_on_main(std::function<json()> fn, unsigned timeout_ms);
 json screenshot(int scale);  // must be called on the render thread
+uint64_t current_frame();
 
 // ---- patches.cpp ----
 bool patches_install();
@@ -47,6 +48,28 @@ bool input_install_hooks();
 json input_key(const json& params);  // {"key": DIK, "action": "press"|"hold"|"release", "ms": n}
 json input_release_all();
 json input_state();
+
+// ---- car.cpp ----
+struct CarSample {
+    uint64_t frame = 0;
+    int game_state = 0;
+    float dt = 0;
+    float pos[3]{}, forward[3]{}, up[3]{}, side[3]{}, vel[3]{}, angvel[3]{};
+    int gear = 0;
+    float engine_rad_s = 0;
+};
+bool car_read(CarSample& s);  // false if not in game / chain invalid
+json car_sample_json(const CarSample& s);
+json car_state();
+
+// ---- input.cpp: frame-scheduled input, recording, trace ----
+void input_frame_tick(uint64_t frame);  // called at Present (render thread), before queued tasks
+json input_schedule(const json& params);  // {"events":[{"f":n,"key":dik|"action":id,"down":bool}]}
+json input_schedule_status();
+json record_start(const json& params);    // record real keyboard actions (+ trace)
+json record_stop();
+json trace_start(const json& params);     // {"every": n frames}
+json trace_stop();
 
 // ---- server.cpp ----
 void server_start(uint16_t port);

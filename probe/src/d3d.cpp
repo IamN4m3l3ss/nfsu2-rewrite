@@ -75,7 +75,10 @@ HRESULT STDMETHODCALLTYPE hk_Present(IDirect3DDevice9* dev, const RECT* src, con
         logf("first Present: device=%p thread=%lx (CreateDevice thread=%lx)", dev, GetCurrentThreadId(),
              g_create_thread.load());
     }
-    if (dev == g_device.load()) run_tasks();
+    if (dev == g_device.load()) {
+        input_frame_tick(f);
+        run_tasks();
+    }
     return o_Present(dev, src, dst, wnd, dirty);
 }
 
@@ -124,6 +127,8 @@ bool d3d_install_hooks() {
     logf("Direct3DCreate9 hooked");
     return true;
 }
+
+uint64_t current_frame() { return g_frames.load(); }
 
 json d3d_info() {
     return {{"device", hex_addr(reinterpret_cast<uintptr_t>(g_device.load()))},

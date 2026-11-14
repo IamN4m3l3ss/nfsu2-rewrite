@@ -28,22 +28,27 @@ MILESTONES = [
     ("M8", "System-by-system rewrite", "in progress"),
 ]
 
-# Planned systems in order (CLAUDE.md M8+). Folder names under game/systems map onto these.
+# Planned systems in order (CLAUDE.md M8+). Each groups one or more folders under game/systems/.
 SYSTEMS = [
-    ("Leaf utilities", ["bstring", "bmath", "time"], "Strings, maths, hashing, RNG"),
-    ("File & chunk loading", ["bchunk"], "Bundles, chunks, decompression"),
-    ("Frontend / menus", ["frontend"], ""),
-    ("Camera", ["camera"], ""),
-    ("Car physics / handling", ["car", "physics"], ""),
-    ("World streaming", ["world"], ""),
-    ("AI racers / traffic", ["ai"], ""),
-    ("Audio", ["audio"], ""),
-    ("Rendering", ["render"], "Last: the future port boundary"),
+    ("Core utilities", ["bstring", "bmath", "memory", "time"], "strings, maths, memory allocator"),
+    ("Files & data loading", ["file", "resource", "bchunk"], "file layer, resource files, chunk bundles"),
+    ("Frontend / menus", ["frontend"], "menus, shops, career screens"),
+    ("Camera", ["camera"], "chase / bumper / photo cameras"),
+    ("Car physics & handling", ["car", "physics"], "engine, tyres, suspension, collisions"),
+    ("World streaming", ["world"], "loading Bayview around the player"),
+    ("AI racers & traffic", ["ai"], "opponents, traffic cars"),
+    ("Audio", ["audio"], "engine sounds, music, effects"),
+    ("Rendering", ["render"], "last: the future port boundary"),
 ]
-FOLDER_LABEL = {"bstring": "Strings (bString)", "bmath": "Maths (bMath)", "time": "Frame time",
-                "bchunk": "Chunks & JDLZ"}
+FOLDER_LABEL = {"bstring": "Strings", "bmath": "Maths", "time": "Frame time", "memory": "Memory",
+                "bchunk": "Chunks", "resource": "Resource files", "file": "File layer"}
 
 STATUS_ORDER = {"verified": 0, "rewritten": 1, "named": 2, "unknown": 3}
+
+# colours
+BG, PANEL, LINE = "#0d1117", "#161b22", "#30363d"
+TXT, DIM, FAINT = "#e6edf3", "#8b949e", "#484f58"
+GREEN, AMBER, BLUE = "#3fb950", "#d29922", "#58a6ff"
 
 
 def load_symbols():
@@ -55,62 +60,118 @@ def load_symbols():
 
 
 def rewrite_folders():
-    """function name -> game/systems folder, from NFSU2_REWRITE[_N[_EAX]] registrations."""
+    """address -> game/systems folder, from every rewrite registration (NFSU2_REWRITE*, Registrar)."""
     out = {}
+    pat = re.compile(r'(?:NFSU2_REWRITE(?:_N(?:_EAX)?|_THIS)?|Registrar\s+\w+)\(\s*(0x[0-9A-Fa-f]+)')
     for p in (ROOT / "game" / "systems").rglob("*.cpp"):
         folder = p.parent.name if p.parent.name != "systems" else "misc"
-        for m in re.finditer(r"NFSU2_REWRITE(?:_N(?:_EAX)?)?\(\s*0x[0-9A-Fa-f]+\s*,\s*(\w+)", p.read_text()):
-            out[m.group(1)] = folder
+        for m in pat.finditer(p.read_text()):
+            out[int(m.group(1), 16)] = folder
     return out
 
 
-def bar_svg(x, y, w, h, frac, fg, bg="#1f2937"):
-    fw = max(0.0, min(1.0, frac)) * w
-    minw = 3 if frac > 0 else 0
-    return (f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{h/2}" fill="{bg}"/>'
-            f'<rect x="{x}" y="{y}" width="{max(fw, minw):.1f}" height="{h}" rx="{h/2}" fill="{fg}"/>')
+def esc(s):
+    return html.escape(s)
 
 
-def make_svg(verified, rewritten, per_system, milestones_done):
-    W = 760
+def bar(x, y, w, h, segs, bg=LINE):
+    """segs: [(fraction, colour)] stacked left to right; tiny non-zero segments get a visible sliver."""
+    t = [f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{h/2}" fill="{bg}"/>']
+    cx = x
+    for frac, col in segs:
+        sw = max(frac * w, 4 if frac > 0 else 0)
+        if sw <= 0:
+            continue
+        t.append(f'<rect x="{cx:.1f}" y="{y}" width="{sw:.1f}" height="{h}" rx="{min(h/2, sw/2):.1f}" fill="{col}"/>')
+        cx += sw
+    return "".join(t)
+
+
+def check(x, y, done, current=False):
+    if done:
+        return (f'<circle cx="{x}" cy="{y}" r="8" fill="{GREEN}"/>'
+                f'<path d="M{x-4} {y} l3 3 l5 -6" stroke="{BG}" stroke-width="2" fill="none" stroke-linecap="round"/>')
+    if current:
+        return f'<circle cx="{x}" cy="{y}" r="8" fill="none" stroke="{AMBER}" stroke-width="2"/><circle cx="{x}" cy="{y}" r="3.5" fill="{AMBER}"/>'
+    return f'<circle cx="{x}" cy="{y}" r="8" fill="none" stroke="{FAINT}" stroke-width="2"/>'
+
+
+def pill(x, y, text, col):
+    w = 9 + 6.6 * len(text)
+    return (f'<rect x="{x - w:.1f}" y="{y - 13}" width="{w:.1f}" height="18" rx="9" fill="{col}" fill-opacity="0.15" '
+            f'stroke="{col}" stroke-opacity="0.6"/><text x="{x - w/2:.1f}" y="{y}" font-size="11" font-weight="600" '
+            f'fill="{col}" text-anchor="middle">{esc(text)}</text>')
+
+
+def make_svg(verified, mapped, per_system, per_folder_counts):
+    W, M = 840, 28
+    goal = round(TOTAL_FUNCTIONS * 0.01)  # first goal: 1 % of the exe
     rows = len(per_system)
-    H = 250 + rows * 34
-    pct = 100.0 * verified / TOTAL_FUNCTIONS
-    t = []
-    t.append(f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" '
-             f'font-family="Segoe UI, Helvetica, Arial, sans-serif">')
-    t.append(f'<rect width="{W}" height="{H}" rx="14" fill="#0b1220"/>')
-    t.append(f'<text x="28" y="44" font-size="22" font-weight="700" fill="#f9fafb">NFSU2 rewrite progress</text>')
-    t.append(f'<text x="{W-28}" y="44" font-size="13" fill="#9ca3af" text-anchor="end">'
-             f'updated {datetime.date.today().isoformat()}</text>')
-    # overall
-    t.append(f'<text x="28" y="84" font-size="15" fill="#e5e7eb">Functions rewritten and verified</text>')
-    t.append(f'<text x="{W-28}" y="84" font-size="15" font-weight="700" fill="#34d399" text-anchor="end">'
-             f'{verified:,} / {TOTAL_FUNCTIONS:,} ({pct:.2f}%)</text>')
-    t.append(bar_svg(28, 96, W - 56, 22, verified / TOTAL_FUNCTIONS, "#34d399"))
-    # milestones
-    md = milestones_done
-    t.append(f'<text x="28" y="152" font-size="15" fill="#e5e7eb">Milestones (tooling M0–M7, then the rewrite)</text>')
-    t.append(f'<text x="{W-28}" y="152" font-size="15" font-weight="700" fill="#60a5fa" text-anchor="end">'
-             f'{md} / {len(MILESTONES)} done</text>')
-    seg_w = (W - 56 - (len(MILESTONES) - 1) * 6) / len(MILESTONES)
-    for i, (mid, _, st) in enumerate(MILESTONES):
-        x = 28 + i * (seg_w + 6)
-        col = {"done": "#60a5fa", "in progress": "#fbbf24"}.get(st, "#1f2937")
-        t.append(f'<rect x="{x:.1f}" y="164" width="{seg_w:.1f}" height="22" rx="6" fill="{col}"/>')
-        t.append(f'<text x="{x + seg_w/2:.1f}" y="180" font-size="12" font-weight="700" '
-                 f'fill="{"#0b1220" if st != "todo" else "#6b7280"}" text-anchor="middle">{mid}</text>')
-    # systems
-    t.append(f'<text x="28" y="222" font-size="15" fill="#e5e7eb">Verified functions per system</text>')
-    maxn = max([n for _, n, _ in per_system] + [1])
-    y = 240
-    for name, n, note in per_system:
-        col = "#34d399" if n else "#374151"
-        t.append(f'<text x="28" y="{y+14}" font-size="13" fill="{"#e5e7eb" if n else "#6b7280"}">{html.escape(name)}</text>')
-        t.append(bar_svg(250, y + 3, W - 250 - 90, 14, n / maxn, col))
-        t.append(f'<text x="{W-28}" y="{y+14}" font-size="13" font-weight="700" fill="{"#e5e7eb" if n else "#6b7280"}" '
-                 f'text-anchor="end">{n if n else "—"}</text>')
-        y += 34
+    H = 470 + rows * 46
+    t = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" '
+         f'font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif">',
+         f'<rect width="{W}" height="{H}" rx="12" fill="{BG}" stroke="{LINE}"/>',
+         f'<text x="{M}" y="42" font-size="21" font-weight="700" fill="{TXT}">Need for Speed: Underground 2 rewrite</text>',
+         f'<text x="{W-M}" y="42" font-size="12" fill="{DIM}" text-anchor="end">updated {datetime.date.today().isoformat()}</text>',
+         f'<text x="{M}" y="64" font-size="13" fill="{DIM}">Our own C++ replacing the game one function at a time, each proven identical to the original before it counts.</text>']
+
+    # --- hero: big number + next goal
+    y0 = 88
+    t.append(f'<rect x="{M}" y="{y0}" width="{W-2*M}" height="118" rx="10" fill="{PANEL}" stroke="{LINE}"/>')
+    t.append(f'<text x="{M+22}" y="{y0+62}" font-size="52" font-weight="800" fill="{GREEN}">{verified}</text>')
+    nx = M + 22 + 31 * len(str(verified)) + 14
+    t.append(f'<text x="{nx}" y="{y0+44}" font-size="16" font-weight="600" fill="{TXT}">functions rewritten &amp; verified</text>')
+    t.append(f'<text x="{nx}" y="{y0+64}" font-size="13" fill="{DIM}">running in the game right now, switchable back to the original</text>')
+    gx, gw = M + 22, W - 2 * M - 44
+    t.append(f'<text x="{gx}" y="{y0+92}" font-size="12" fill="{TXT}">Next goal: 1% of the game ({goal} functions)</text>')
+    t.append(f'<text x="{gx+gw}" y="{y0+92}" font-size="12" font-weight="700" fill="{GREEN}" text-anchor="end">'
+             f'{verified} / {goal} · {100*verified/goal:.0f}%</text>')
+    t.append(bar(gx, y0 + 100, gw, 8, [(min(1, verified / goal), GREEN)]))
+
+    # --- whole game
+    y1 = y0 + 146
+    pct_v = 100.0 * verified / TOTAL_FUNCTIONS
+    t.append(f'<text x="{M}" y="{y1}" font-size="14" font-weight="600" fill="{TXT}">Whole game</text>')
+    t.append(f'<text x="{W-M}" y="{y1}" font-size="12" fill="{DIM}" text-anchor="end">~{TOTAL_FUNCTIONS:,} functions in SPEED2.EXE</text>')
+    t.append(bar(M, y1 + 10, W - 2 * M, 14, [(verified / TOTAL_FUNCTIONS, GREEN), (mapped / TOTAL_FUNCTIONS, AMBER)]))
+    ly = y1 + 44
+    t.append(f'<rect x="{M}" y="{ly-10}" width="10" height="10" rx="2" fill="{GREEN}"/>'
+             f'<text x="{M+16}" y="{ly}" font-size="12" fill="{TXT}">verified {verified} ({pct_v:.2f}%)</text>')
+    t.append(f'<rect x="{M+190}" y="{ly-10}" width="10" height="10" rx="2" fill="{AMBER}"/>'
+             f'<text x="{M+206}" y="{ly}" font-size="12" fill="{TXT}">found &amp; named, not rewritten yet: {mapped}</text>')
+    t.append(f'<rect x="{M+500}" y="{ly-10}" width="10" height="10" rx="2" fill="{LINE}"/>'
+             f'<text x="{M+516}" y="{ly}" font-size="12" fill="{DIM}">still unexplored</text>')
+
+    # --- milestones (3 columns)
+    y2 = ly + 40
+    done = sum(1 for m in MILESTONES if m[2] == "done")
+    t.append(f'<text x="{M}" y="{y2}" font-size="14" font-weight="600" fill="{TXT}">Milestones</text>')
+    t.append(f'<text x="{W-M}" y="{y2}" font-size="12" fill="{DIM}" text-anchor="end">{done} of {len(MILESTONES)} done · tools first (M0–M7), then the rewrite itself</text>')
+    colw = (W - 2 * M) / 3
+    for i, (mid, name, st) in enumerate(MILESTONES):
+        cx = M + (i % 3) * colw
+        cy = y2 + 28 + (i // 3) * 28
+        t.append(check(cx + 9, cy - 4, st == "done", st == "in progress"))
+        col = TXT if st != "todo" else DIM
+        t.append(f'<text x="{cx+26}" y="{cy}" font-size="12.5" fill="{col}"><tspan font-weight="700">{mid}</tspan> {esc(name)}</text>')
+
+    # --- systems
+    y3 = y2 + 28 + ((len(MILESTONES) + 2) // 3) * 28 + 18
+    t.append(f'<text x="{M}" y="{y3}" font-size="14" font-weight="600" fill="{TXT}">Systems</text>')
+    t.append(f'<text x="{W-M}" y="{y3}" font-size="12" fill="{DIM}" text-anchor="end">verified functions per system, in planned order</text>')
+    y = y3 + 14
+    maxn = max([n for _, n, _, _ in per_system] + [1])
+    for sname, n, note, flds in per_system:
+        t.append(f'<rect x="{M}" y="{y}" width="{W-2*M}" height="38" rx="8" fill="{PANEL}" stroke="{LINE}"/>')
+        started = n > 0
+        t.append(f'<text x="{M+14}" y="{y+17}" font-size="13" font-weight="600" fill="{TXT if started else DIM}">{esc(sname)}</text>')
+        parts = " · ".join(f"{FOLDER_LABEL.get(f, f)} {per_folder_counts.get(f, 0)}" for f in flds if per_folder_counts.get(f, 0))
+        t.append(f'<text x="{M+14}" y="{y+31}" font-size="11" fill="{DIM}">{esc(parts if parts else note)}</text>')
+        bx, bw = M + 300, W - 2 * M - 300 - 150
+        t.append(bar(bx, y + 15, bw, 8, [(n / maxn, GREEN if started else LINE)]))
+        t.append(f'<text x="{bx+bw+34}" y="{y+23}" font-size="14" font-weight="700" fill="{TXT if started else FAINT}" text-anchor="end">{n if started else "–"}</text>')
+        t.append(pill(W - M - 12, y + 24, "in progress" if started else "not started", AMBER if started else FAINT))
+        y += 46
     t.append("</svg>")
     return "\n".join(t)
 
@@ -124,14 +185,16 @@ def main():
 
     per_folder = {}
     for r in verified:
-        per_folder.setdefault(folders.get(r["name"], "misc"), []).append(r)
+        per_folder.setdefault(folders.get(int(r["addr"], 16), "misc"), []).append(r)
+    counts = {f: len(v) for f, v in per_folder.items()}
     per_system = []
     for sname, flds, note in SYSTEMS:
-        n = sum(len(per_folder.get(f, [])) for f in flds)
-        per_system.append((sname, n, note))
-    milestones_done = sum(1 for m in MILESTONES if m[2] == "done")
+        per_system.append((sname, sum(counts.get(f, 0) for f in flds), note, flds))
+    unassigned = [r["name"] for r in verified if folders.get(int(r["addr"], 16)) is None]
+    if unassigned:
+        print("warning: verified but no rewrite registration found:", ", ".join(unassigned))
 
-    (ROOT / "docs" / "progress.svg").write_text(make_svg(len(verified), len(rewritten), per_system, milestones_done))
+    (ROOT / "docs" / "progress.svg").write_text(make_svg(len(verified), len(rewritten) + len(named), per_system, counts))
 
     pct = 100.0 * len(verified) / TOTAL_FUNCTIONS
     blocks = round(pct / 5)  # 20-char text bar (every block = 5 %), at least one sliver when > 0
@@ -159,9 +222,10 @@ def main():
     for mid, name, st in MILESTONES:
         md.append(f"| {mid} | {name} | {icon.get(st, '⬜')} {st} |")
     md += ["", "## Systems", "", "| System | Verified | Status |", "|---|---:|---|"]
-    for sname, n, note in per_system:
-        st = "🟡 started" if n else "⬜ not started"
-        md.append(f"| {sname}{' — ' + note if note else ''} | {n} | {st} |")
+    for sname, n, note, flds in per_system:
+        st = "🟡 in progress" if n else "⬜ not started"
+        parts = ", ".join(f"{FOLDER_LABEL.get(f, f)} {counts.get(f, 0)}" for f in flds if counts.get(f, 0))
+        md.append(f"| **{sname}** — {parts if parts else note} | {n} | {st} |")
     md += ["", "## Done (verified)", ""]
     by_folder = sorted(per_folder.items(), key=lambda kv: kv[0])
     for fld, rows in by_folder:

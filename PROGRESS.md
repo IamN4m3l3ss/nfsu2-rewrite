@@ -27,19 +27,19 @@ A function counts as **verified** only when our C++ replaces the original inside
 
 | System | Verified | Status |
 |---|---:|---|
-| Leaf utilities — Strings, maths, hashing, RNG | 42 | 🟡 started |
-| File & chunk loading — Bundles, chunks, decompression | 7 | 🟡 started |
-| Frontend / menus | 0 | ⬜ not started |
-| Camera | 0 | ⬜ not started |
-| Car physics / handling | 0 | ⬜ not started |
-| World streaming | 0 | ⬜ not started |
-| AI racers / traffic | 0 | ⬜ not started |
-| Audio | 0 | ⬜ not started |
-| Rendering — Last: the future port boundary | 0 | ⬜ not started |
+| **Core utilities** — Strings 16, Maths 26, Memory 9 | 51 | 🟡 in progress |
+| **Files & data loading** — File layer 14, Resource files 12, Chunks 7 | 33 | 🟡 in progress |
+| **Frontend / menus** — menus, shops, career screens | 0 | ⬜ not started |
+| **Camera** — chase / bumper / photo cameras | 0 | ⬜ not started |
+| **Car physics & handling** — engine, tyres, suspension, collisions | 0 | ⬜ not started |
+| **World streaming** — loading Bayview around the player | 0 | ⬜ not started |
+| **AI racers & traffic** — opponents, traffic cars | 0 | ⬜ not started |
+| **Audio** — engine sounds, music, effects | 0 | ⬜ not started |
+| **Rendering** — last: the future port boundary | 0 | ⬜ not started |
 
 ## Done (verified)
 
-### Chunks & JDLZ — 7
+### Chunks — 7
 
 | Address | Function | Signature |
 |---|---|---|
@@ -51,7 +51,7 @@ A function counts as **verified** only when our C++ replaces the original inside
 | `0x00577AB0` | **LoadChunks** | `void __cdecl(bChunk* start, int size)` |
 | `0x00577B10` | **UnloadChunks** | `void __cdecl(bChunk* start, int size)` |
 
-### Maths (bMath) — 26
+### Maths — 26
 
 | Address | Function | Signature |
 |---|---|---|
@@ -82,7 +82,7 @@ A function counts as **verified** only when our C++ replaces the original inside
 | `0x0043D410` | **bInBox2** | `int __cdecl(const bVector2* lo, const bVector2* hi, const bVector2* p, float margin)` |
 | `0x00441000` | **bMulMatrix** | `bVector3* __cdecl(bVector3* out, const bMatrix4*, const bVector3*)` |
 
-### Strings (bString) — 16
+### Strings — 16
 
 | Address | Function | Signature |
 |---|---|---|
@@ -103,59 +103,54 @@ A function counts as **verified** only when our C++ replaces the original inside
 | `0x0043E000` | **bStrToWStr** | `uint16_t* __cdecl(uint16_t* dst, const char*)` |
 | `0x0043E030` | **bStrNToWStr** | `uint16_t* __cdecl(uint16_t* dst, const char*, int n)` |
 
-### file — 7
+### File layer — 14
 
 | Address | Function | Signature |
 |---|---|---|
 | `0x00575330` | **bFileNameHash** | `u32 __cdecl(const char* name)` |
 | `0x00579870` | **FindFileIndexEntry** | `IndexEntry* __cdecl(const char* name)` |
+| `0x005798C0` | **OpenFileEntry::Close** | `void __thiscall()` |
 | `0x005798F0` | **FindOpenFile** | `OpenFileEntry* __cdecl(const char* name)` |
+| `0x00579B90` | **bFile::Close** | `bFile* __thiscall(int flags)` |
 | `0x0057B5D0` | **FlushOpenFileCache** | `void __cdecl(int)` |
 | `0x0057C4A0` | **AddOpenFile** | `OpenFileEntry* __cdecl(const char* name, int handle, int size)` |
+| `0x0057C5B0` | **bFile::bFile** | `bFile* __thiscall(const char* name, int mode)` |
 | `0x0057CA10` | **bOpen** | `bFile* __cdecl(const char* name, int mode, int)` |
 | `0x0057CAC0` | **bFileExists** | `int __cdecl(const char* name)` |
-
-### memory — 5
-
-| Address | Function | Signature |
-|---|---|---|
-| `0x0043FB80` | **bCloseMemoryPool** | `void __cdecl(int idx)` |
-| `0x00440330` | **bInitMemoryPool** | `void __cdecl(int idx, u8* mem, int size, const char* name)` |
-| `0x00440390` | **bMalloc** | `void* __cdecl(int size, const char* name, int line, int flags)` |
-| `0x00440540` | **bFree** | `void __cdecl(void* p)` |
-| `0x00440820` | **bMalloc2** | `void* __cdecl(int size, int flags)` |
-
-### misc — 18
-
-| Address | Function | Signature |
-|---|---|---|
-| `0x0043F9A0` | **bMemoryPool::Destroy** | `void __thiscall()` |
-| `0x0043FA50` | **bMemoryPool::AddFreeMemory** | `void __thiscall(u8* mem, u32 size)` |
-| `0x0043FC80` | **bMemoryPool::Allocate** | `u8* __thiscall(int size, int align, int align_off, int from_bottom, int best_fit, int* out_size)` |
-| `0x004402C0` | **bMemoryPool::Init** | `void __thiscall(u8* mem, int size, const char* name)` |
-| `0x00570FA0` | **ResourceFile::SetAllocParams** | `void __thiscall(int alloc_flags, const char* name)` |
-| `0x00570FD0` | **ResourceFile::AllocateBuffer** | `void __thiscall(bool bottom)` |
-| `0x00571010` | **ResourceFile::SetOwnsBuffer** | `void __thiscall(bool)` |
-| `0x00571020` | **ResourceFile::FreeBuffer** | `void __thiscall()` |
-| `0x00571050` | **ResourceFile_DecPending** | `void __cdecl(ResourceFile*)` |
-| `0x00577D80` | **ResourceFile::Unload** | `void __thiscall()` |
-| `0x00577DE0` | **ResourceFile::Load** | `void __thiscall()` |
-| `0x005798C0` | **OpenFileEntry::Close** | `void __thiscall()` |
-| `0x00579B90` | **bFile::Close** | `bFile* __thiscall(int flags)` |
-| `0x0057C5B0` | **bFile::bFile** | `bFile* __thiscall(const char* name, int mode)` |
 | `0x006F6C47` | **FileLib_ChannelFromHandle** | `Channel* __cdecl(int handle)` |
 | `0x006F734A` | **RequestList::Find** | `Request* __thiscall(int handle, bool remove)` |
 | `0x006F7473` | **FileLib_FindRequest** | `Request* (ESI Channel*, EBX int* state, int handle)` |
 | `0x006F7542` | **FileLib_GetStatus** | `int __cdecl(int handle)` |
 
-### resource — 5
+### Memory — 9
 
 | Address | Function | Signature |
 |---|---|---|
+| `0x0043F9A0` | **bMemoryPool::Destroy** | `void __thiscall()` |
+| `0x0043FA50` | **bMemoryPool::AddFreeMemory** | `void __thiscall(u8* mem, u32 size)` |
+| `0x0043FB80` | **bCloseMemoryPool** | `void __cdecl(int idx)` |
+| `0x0043FC80` | **bMemoryPool::Allocate** | `u8* __thiscall(int size, int align, int align_off, int from_bottom, int best_fit, int* out_size)` |
+| `0x004402C0` | **bMemoryPool::Init** | `void __thiscall(u8* mem, int size, const char* name)` |
+| `0x00440330` | **bInitMemoryPool** | `void __cdecl(int idx, u8* mem, int size, const char* name)` |
+| `0x00440390` | **bMalloc** | `void* __cdecl(int size, const char* name, int line, int flags)` |
+| `0x00440540` | **bFree** | `void __cdecl(void* p)` |
+| `0x00440820` | **bMalloc2** | `void* __cdecl(int size, int flags)` |
+
+### Resource files — 12
+
+| Address | Function | Signature |
+|---|---|---|
+| `0x00570FA0` | **ResourceFile::SetAllocParams** | `void __thiscall(int alloc_flags, const char* name)` |
+| `0x00570FD0` | **ResourceFile::AllocateBuffer** | `void __thiscall(bool bottom)` |
+| `0x00571010` | **ResourceFile::SetOwnsBuffer** | `void __thiscall(bool)` |
+| `0x00571020` | **ResourceFile::FreeBuffer** | `void __thiscall()` |
+| `0x00571050` | **ResourceFile_DecPending** | `void __cdecl(ResourceFile*)` |
 | `0x005744F0` | **RawwDecompress** | `u32 __cdecl(const u8* src, u8* dst)` |
 | `0x00574630` | **IsCompressed** | `int __cdecl(const u8* header)` |
 | `0x00574670` | **Decompress** | `u32 __cdecl(const u8* src, u8* dst)` |
 | `0x00577C70` | **LoadChunksAligned** | `int __cdecl(u8** chunks, u32* size, int alloc_flags, const char* name)` |
+| `0x00577D80` | **ResourceFile::Unload** | `void __thiscall()` |
+| `0x00577DE0` | **ResourceFile::Load** | `void __thiscall()` |
 | `0x00577EB0` | **FindResourceFile** | `ResourceFile* __cdecl(const char* name)` |
 
 ## Not done yet

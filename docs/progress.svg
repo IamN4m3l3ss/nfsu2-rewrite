@@ -1,56 +1,95 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="760" height="556" viewBox="0 0 760 556" font-family="Segoe UI, Helvetica, Arial, sans-serif">
-<rect width="760" height="556" rx="14" fill="#0b1220"/>
-<text x="28" y="44" font-size="22" font-weight="700" fill="#f9fafb">NFSU2 rewrite progress</text>
-<text x="732" y="44" font-size="13" fill="#9ca3af" text-anchor="end">updated 2026-11-14</text>
-<text x="28" y="84" font-size="15" fill="#e5e7eb">Functions rewritten and verified</text>
-<text x="732" y="84" font-size="15" font-weight="700" fill="#34d399" text-anchor="end">84 / 23,278 (0.36%)</text>
-<rect x="28" y="96" width="704" height="22" rx="11.0" fill="#1f2937"/><rect x="28" y="96" width="3.0" height="22" rx="11.0" fill="#34d399"/>
-<text x="28" y="152" font-size="15" fill="#e5e7eb">Milestones (tooling M0–M7, then the rewrite)</text>
-<text x="732" y="152" font-size="15" font-weight="700" fill="#60a5fa" text-anchor="end">8 / 9 done</text>
-<rect x="28.0" y="164" width="72.9" height="22" rx="6" fill="#60a5fa"/>
-<text x="64.4" y="180" font-size="12" font-weight="700" fill="#0b1220" text-anchor="middle">M0</text>
-<rect x="106.9" y="164" width="72.9" height="22" rx="6" fill="#60a5fa"/>
-<text x="143.3" y="180" font-size="12" font-weight="700" fill="#0b1220" text-anchor="middle">M1</text>
-<rect x="185.8" y="164" width="72.9" height="22" rx="6" fill="#60a5fa"/>
-<text x="222.2" y="180" font-size="12" font-weight="700" fill="#0b1220" text-anchor="middle">M2</text>
-<rect x="264.7" y="164" width="72.9" height="22" rx="6" fill="#60a5fa"/>
-<text x="301.1" y="180" font-size="12" font-weight="700" fill="#0b1220" text-anchor="middle">M3</text>
-<rect x="343.6" y="164" width="72.9" height="22" rx="6" fill="#60a5fa"/>
-<text x="380.0" y="180" font-size="12" font-weight="700" fill="#0b1220" text-anchor="middle">M4</text>
-<rect x="422.4" y="164" width="72.9" height="22" rx="6" fill="#60a5fa"/>
-<text x="458.9" y="180" font-size="12" font-weight="700" fill="#0b1220" text-anchor="middle">M5</text>
-<rect x="501.3" y="164" width="72.9" height="22" rx="6" fill="#60a5fa"/>
-<text x="537.8" y="180" font-size="12" font-weight="700" fill="#0b1220" text-anchor="middle">M6</text>
-<rect x="580.2" y="164" width="72.9" height="22" rx="6" fill="#60a5fa"/>
-<text x="616.7" y="180" font-size="12" font-weight="700" fill="#0b1220" text-anchor="middle">M7</text>
-<rect x="659.1" y="164" width="72.9" height="22" rx="6" fill="#fbbf24"/>
-<text x="695.6" y="180" font-size="12" font-weight="700" fill="#0b1220" text-anchor="middle">M8</text>
-<text x="28" y="222" font-size="15" fill="#e5e7eb">Verified functions per system</text>
-<text x="28" y="254" font-size="13" fill="#e5e7eb">Leaf utilities</text>
-<rect x="250" y="243" width="420" height="14" rx="7.0" fill="#1f2937"/><rect x="250" y="243" width="420.0" height="14" rx="7.0" fill="#34d399"/>
-<text x="732" y="254" font-size="13" font-weight="700" fill="#e5e7eb" text-anchor="end">42</text>
-<text x="28" y="288" font-size="13" fill="#e5e7eb">File &amp; chunk loading</text>
-<rect x="250" y="277" width="420" height="14" rx="7.0" fill="#1f2937"/><rect x="250" y="277" width="70.0" height="14" rx="7.0" fill="#34d399"/>
-<text x="732" y="288" font-size="13" font-weight="700" fill="#e5e7eb" text-anchor="end">7</text>
-<text x="28" y="322" font-size="13" fill="#6b7280">Frontend / menus</text>
-<rect x="250" y="311" width="420" height="14" rx="7.0" fill="#1f2937"/><rect x="250" y="311" width="0.0" height="14" rx="7.0" fill="#374151"/>
-<text x="732" y="322" font-size="13" font-weight="700" fill="#6b7280" text-anchor="end">—</text>
-<text x="28" y="356" font-size="13" fill="#6b7280">Camera</text>
-<rect x="250" y="345" width="420" height="14" rx="7.0" fill="#1f2937"/><rect x="250" y="345" width="0.0" height="14" rx="7.0" fill="#374151"/>
-<text x="732" y="356" font-size="13" font-weight="700" fill="#6b7280" text-anchor="end">—</text>
-<text x="28" y="390" font-size="13" fill="#6b7280">Car physics / handling</text>
-<rect x="250" y="379" width="420" height="14" rx="7.0" fill="#1f2937"/><rect x="250" y="379" width="0.0" height="14" rx="7.0" fill="#374151"/>
-<text x="732" y="390" font-size="13" font-weight="700" fill="#6b7280" text-anchor="end">—</text>
-<text x="28" y="424" font-size="13" fill="#6b7280">World streaming</text>
-<rect x="250" y="413" width="420" height="14" rx="7.0" fill="#1f2937"/><rect x="250" y="413" width="0.0" height="14" rx="7.0" fill="#374151"/>
-<text x="732" y="424" font-size="13" font-weight="700" fill="#6b7280" text-anchor="end">—</text>
-<text x="28" y="458" font-size="13" fill="#6b7280">AI racers / traffic</text>
-<rect x="250" y="447" width="420" height="14" rx="7.0" fill="#1f2937"/><rect x="250" y="447" width="0.0" height="14" rx="7.0" fill="#374151"/>
-<text x="732" y="458" font-size="13" font-weight="700" fill="#6b7280" text-anchor="end">—</text>
-<text x="28" y="492" font-size="13" fill="#6b7280">Audio</text>
-<rect x="250" y="481" width="420" height="14" rx="7.0" fill="#1f2937"/><rect x="250" y="481" width="0.0" height="14" rx="7.0" fill="#374151"/>
-<text x="732" y="492" font-size="13" font-weight="700" fill="#6b7280" text-anchor="end">—</text>
-<text x="28" y="526" font-size="13" fill="#6b7280">Rendering</text>
-<rect x="250" y="515" width="420" height="14" rx="7.0" fill="#1f2937"/><rect x="250" y="515" width="0.0" height="14" rx="7.0" fill="#374151"/>
-<text x="732" y="526" font-size="13" font-weight="700" fill="#6b7280" text-anchor="end">—</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="840" height="884" viewBox="0 0 840 884" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+<rect width="840" height="884" rx="12" fill="#0d1117" stroke="#30363d"/>
+<text x="28" y="42" font-size="21" font-weight="700" fill="#e6edf3">Need for Speed: Underground 2 rewrite</text>
+<text x="812" y="42" font-size="12" fill="#8b949e" text-anchor="end">updated 2026-11-14</text>
+<text x="28" y="64" font-size="13" fill="#8b949e">Our own C++ replacing the game one function at a time, each proven identical to the original before it counts.</text>
+<rect x="28" y="88" width="784" height="118" rx="10" fill="#161b22" stroke="#30363d"/>
+<text x="50" y="150" font-size="52" font-weight="800" fill="#3fb950">84</text>
+<text x="126" y="132" font-size="16" font-weight="600" fill="#e6edf3">functions rewritten &amp; verified</text>
+<text x="126" y="152" font-size="13" fill="#8b949e">running in the game right now, switchable back to the original</text>
+<text x="50" y="180" font-size="12" fill="#e6edf3">Next goal: 1% of the game (233 functions)</text>
+<text x="790" y="180" font-size="12" font-weight="700" fill="#3fb950" text-anchor="end">84 / 233 · 36%</text>
+<rect x="50" y="188" width="740" height="8" rx="4.0" fill="#30363d"/><rect x="50.0" y="188" width="266.8" height="8" rx="4.0" fill="#3fb950"/>
+<text x="28" y="234" font-size="14" font-weight="600" fill="#e6edf3">Whole game</text>
+<text x="812" y="234" font-size="12" fill="#8b949e" text-anchor="end">~23,278 functions in SPEED2.EXE</text>
+<rect x="28" y="244" width="784" height="14" rx="7.0" fill="#30363d"/><rect x="28.0" y="244" width="4.0" height="14" rx="2.0" fill="#3fb950"/><rect x="32.0" y="244" width="4.0" height="14" rx="2.0" fill="#d29922"/>
+<rect x="28" y="268" width="10" height="10" rx="2" fill="#3fb950"/><text x="44" y="278" font-size="12" fill="#e6edf3">verified 84 (0.36%)</text>
+<rect x="218" y="268" width="10" height="10" rx="2" fill="#d29922"/><text x="234" y="278" font-size="12" fill="#e6edf3">found &amp; named, not rewritten yet: 40</text>
+<rect x="528" y="268" width="10" height="10" rx="2" fill="#30363d"/><text x="544" y="278" font-size="12" fill="#8b949e">still unexplored</text>
+<text x="28" y="318" font-size="14" font-weight="600" fill="#e6edf3">Milestones</text>
+<text x="812" y="318" font-size="12" fill="#8b949e" text-anchor="end">8 of 9 done · tools first (M0–M7), then the rewrite itself</text>
+<circle cx="37.0" cy="342" r="8" fill="#3fb950"/><path d="M33.0 342 l3 3 l5 -6" stroke="#0d1117" stroke-width="2" fill="none" stroke-linecap="round"/>
+<text x="54.0" y="346" font-size="12.5" fill="#e6edf3"><tspan font-weight="700">M0</tspan> Game runs under Wine</text>
+<circle cx="298.3333333333333" cy="342" r="8" fill="#3fb950"/><path d="M294.3333333333333 342 l3 3 l5 -6" stroke="#0d1117" stroke-width="2" fill="none" stroke-linecap="round"/>
+<text x="315.3333333333333" y="346" font-size="12.5" fill="#e6edf3"><tspan font-weight="700">M1</tspan> Probe + MCP bridge</text>
+<circle cx="559.6666666666666" cy="342" r="8" fill="#3fb950"/><path d="M555.6666666666666 342 l3 3 l5 -6" stroke="#0d1117" stroke-width="2" fill="none" stroke-linecap="round"/>
+<text x="576.6666666666666" y="346" font-size="12.5" fill="#e6edf3"><tspan font-weight="700">M2</tspan> Unattended launcher</text>
+<circle cx="37.0" cy="370" r="8" fill="#3fb950"/><path d="M33.0 370 l3 3 l5 -6" stroke="#0d1117" stroke-width="2" fill="none" stroke-linecap="round"/>
+<text x="54.0" y="374" font-size="12.5" fill="#e6edf3"><tspan font-weight="700">M3</tspan> Input injection</text>
+<circle cx="298.3333333333333" cy="370" r="8" fill="#3fb950"/><path d="M294.3333333333333 370 l3 3 l5 -6" stroke="#0d1117" stroke-width="2" fill="none" stroke-linecap="round"/>
+<text x="315.3333333333333" y="374" font-size="12.5" fill="#e6edf3"><tspan font-weight="700">M4</tspan> Boot straight to free roam</text>
+<circle cx="559.6666666666666" cy="370" r="8" fill="#3fb950"/><path d="M555.6666666666666 370 l3 3 l5 -6" stroke="#0d1117" stroke-width="2" fill="none" stroke-linecap="round"/>
+<text x="576.6666666666666" y="374" font-size="12.5" fill="#e6edf3"><tspan font-weight="700">M5</tspan> Telemetry + scripted driving</text>
+<circle cx="37.0" cy="398" r="8" fill="#3fb950"/><path d="M33.0 398 l3 3 l5 -6" stroke="#0d1117" stroke-width="2" fill="none" stroke-linecap="round"/>
+<text x="54.0" y="402" font-size="12.5" fill="#e6edf3"><tspan font-weight="700">M6</tspan> Rewrite DLL + hot reload</text>
+<circle cx="298.3333333333333" cy="398" r="8" fill="#3fb950"/><path d="M294.3333333333333 398 l3 3 l5 -6" stroke="#0d1117" stroke-width="2" fill="none" stroke-linecap="round"/>
+<text x="315.3333333333333" y="402" font-size="12.5" fill="#e6edf3"><tspan font-weight="700">M7</tspan> Diff harness</text>
+<circle cx="559.6666666666666" cy="398" r="8" fill="none" stroke="#d29922" stroke-width="2"/><circle cx="559.6666666666666" cy="398" r="3.5" fill="#d29922"/>
+<text x="576.6666666666666" y="402" font-size="12.5" fill="#e6edf3"><tspan font-weight="700">M8</tspan> System-by-system rewrite</text>
+<text x="28" y="448" font-size="14" font-weight="600" fill="#e6edf3">Systems</text>
+<text x="812" y="448" font-size="12" fill="#8b949e" text-anchor="end">verified functions per system, in planned order</text>
+<rect x="28" y="462" width="784" height="38" rx="8" fill="#161b22" stroke="#30363d"/>
+<text x="42" y="479" font-size="13" font-weight="600" fill="#e6edf3">Core utilities</text>
+<text x="42" y="493" font-size="11" fill="#8b949e">Strings 16 · Maths 26 · Memory 9</text>
+<rect x="328" y="477" width="334" height="8" rx="4.0" fill="#30363d"/><rect x="328.0" y="477" width="334.0" height="8" rx="4.0" fill="#3fb950"/>
+<text x="696" y="485" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="end">51</text>
+<rect x="718.4" y="473" width="81.6" height="18" rx="9" fill="#d29922" fill-opacity="0.15" stroke="#d29922" stroke-opacity="0.6"/><text x="759.2" y="486" font-size="11" font-weight="600" fill="#d29922" text-anchor="middle">in progress</text>
+<rect x="28" y="508" width="784" height="38" rx="8" fill="#161b22" stroke="#30363d"/>
+<text x="42" y="525" font-size="13" font-weight="600" fill="#e6edf3">Files &amp; data loading</text>
+<text x="42" y="539" font-size="11" fill="#8b949e">File layer 14 · Resource files 12 · Chunks 7</text>
+<rect x="328" y="523" width="334" height="8" rx="4.0" fill="#30363d"/><rect x="328.0" y="523" width="216.1" height="8" rx="4.0" fill="#3fb950"/>
+<text x="696" y="531" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="end">33</text>
+<rect x="718.4" y="519" width="81.6" height="18" rx="9" fill="#d29922" fill-opacity="0.15" stroke="#d29922" stroke-opacity="0.6"/><text x="759.2" y="532" font-size="11" font-weight="600" fill="#d29922" text-anchor="middle">in progress</text>
+<rect x="28" y="554" width="784" height="38" rx="8" fill="#161b22" stroke="#30363d"/>
+<text x="42" y="571" font-size="13" font-weight="600" fill="#8b949e">Frontend / menus</text>
+<text x="42" y="585" font-size="11" fill="#8b949e">menus, shops, career screens</text>
+<rect x="328" y="569" width="334" height="8" rx="4.0" fill="#30363d"/>
+<text x="696" y="577" font-size="14" font-weight="700" fill="#484f58" text-anchor="end">–</text>
+<rect x="718.4" y="565" width="81.6" height="18" rx="9" fill="#484f58" fill-opacity="0.15" stroke="#484f58" stroke-opacity="0.6"/><text x="759.2" y="578" font-size="11" font-weight="600" fill="#484f58" text-anchor="middle">not started</text>
+<rect x="28" y="600" width="784" height="38" rx="8" fill="#161b22" stroke="#30363d"/>
+<text x="42" y="617" font-size="13" font-weight="600" fill="#8b949e">Camera</text>
+<text x="42" y="631" font-size="11" fill="#8b949e">chase / bumper / photo cameras</text>
+<rect x="328" y="615" width="334" height="8" rx="4.0" fill="#30363d"/>
+<text x="696" y="623" font-size="14" font-weight="700" fill="#484f58" text-anchor="end">–</text>
+<rect x="718.4" y="611" width="81.6" height="18" rx="9" fill="#484f58" fill-opacity="0.15" stroke="#484f58" stroke-opacity="0.6"/><text x="759.2" y="624" font-size="11" font-weight="600" fill="#484f58" text-anchor="middle">not started</text>
+<rect x="28" y="646" width="784" height="38" rx="8" fill="#161b22" stroke="#30363d"/>
+<text x="42" y="663" font-size="13" font-weight="600" fill="#8b949e">Car physics &amp; handling</text>
+<text x="42" y="677" font-size="11" fill="#8b949e">engine, tyres, suspension, collisions</text>
+<rect x="328" y="661" width="334" height="8" rx="4.0" fill="#30363d"/>
+<text x="696" y="669" font-size="14" font-weight="700" fill="#484f58" text-anchor="end">–</text>
+<rect x="718.4" y="657" width="81.6" height="18" rx="9" fill="#484f58" fill-opacity="0.15" stroke="#484f58" stroke-opacity="0.6"/><text x="759.2" y="670" font-size="11" font-weight="600" fill="#484f58" text-anchor="middle">not started</text>
+<rect x="28" y="692" width="784" height="38" rx="8" fill="#161b22" stroke="#30363d"/>
+<text x="42" y="709" font-size="13" font-weight="600" fill="#8b949e">World streaming</text>
+<text x="42" y="723" font-size="11" fill="#8b949e">loading Bayview around the player</text>
+<rect x="328" y="707" width="334" height="8" rx="4.0" fill="#30363d"/>
+<text x="696" y="715" font-size="14" font-weight="700" fill="#484f58" text-anchor="end">–</text>
+<rect x="718.4" y="703" width="81.6" height="18" rx="9" fill="#484f58" fill-opacity="0.15" stroke="#484f58" stroke-opacity="0.6"/><text x="759.2" y="716" font-size="11" font-weight="600" fill="#484f58" text-anchor="middle">not started</text>
+<rect x="28" y="738" width="784" height="38" rx="8" fill="#161b22" stroke="#30363d"/>
+<text x="42" y="755" font-size="13" font-weight="600" fill="#8b949e">AI racers &amp; traffic</text>
+<text x="42" y="769" font-size="11" fill="#8b949e">opponents, traffic cars</text>
+<rect x="328" y="753" width="334" height="8" rx="4.0" fill="#30363d"/>
+<text x="696" y="761" font-size="14" font-weight="700" fill="#484f58" text-anchor="end">–</text>
+<rect x="718.4" y="749" width="81.6" height="18" rx="9" fill="#484f58" fill-opacity="0.15" stroke="#484f58" stroke-opacity="0.6"/><text x="759.2" y="762" font-size="11" font-weight="600" fill="#484f58" text-anchor="middle">not started</text>
+<rect x="28" y="784" width="784" height="38" rx="8" fill="#161b22" stroke="#30363d"/>
+<text x="42" y="801" font-size="13" font-weight="600" fill="#8b949e">Audio</text>
+<text x="42" y="815" font-size="11" fill="#8b949e">engine sounds, music, effects</text>
+<rect x="328" y="799" width="334" height="8" rx="4.0" fill="#30363d"/>
+<text x="696" y="807" font-size="14" font-weight="700" fill="#484f58" text-anchor="end">–</text>
+<rect x="718.4" y="795" width="81.6" height="18" rx="9" fill="#484f58" fill-opacity="0.15" stroke="#484f58" stroke-opacity="0.6"/><text x="759.2" y="808" font-size="11" font-weight="600" fill="#484f58" text-anchor="middle">not started</text>
+<rect x="28" y="830" width="784" height="38" rx="8" fill="#161b22" stroke="#30363d"/>
+<text x="42" y="847" font-size="13" font-weight="600" fill="#8b949e">Rendering</text>
+<text x="42" y="861" font-size="11" fill="#8b949e">last: the future port boundary</text>
+<rect x="328" y="845" width="334" height="8" rx="4.0" fill="#30363d"/>
+<text x="696" y="853" font-size="14" font-weight="700" fill="#484f58" text-anchor="end">–</text>
+<rect x="718.4" y="841" width="81.6" height="18" rx="9" fill="#484f58" fill-opacity="0.15" stroke="#484f58" stroke-opacity="0.6"/><text x="759.2" y="854" font-size="11" font-weight="600" fill="#484f58" text-anchor="middle">not started</text>
 </svg>

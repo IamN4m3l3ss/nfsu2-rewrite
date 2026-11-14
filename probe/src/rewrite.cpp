@@ -28,6 +28,7 @@ HMODULE g_mod = nullptr;
 std::wstring g_temp;
 FILETIME g_mtime{}, g_pending{};
 std::string g_build;
+const GameApi* g_game = nullptr;
 uint32_t g_seq = 0, g_reloads = 0;
 std::vector<Entry> g_entries;
 
@@ -78,6 +79,7 @@ void unload_locked() {
         }
     }
     g_entries.clear();
+    g_game = nullptr;
     if (g_mod) {
         FreeLibrary(g_mod);
         g_mod = nullptr;
@@ -108,6 +110,7 @@ bool load(const std::set<std::string>& enable) {
     g_temp = temp;
     g_mtime = g_pending = mt;
     g_build = api->build;
+    g_game = api;
     for (uint32_t i = 0; i < api->count; ++i) {
         const GameRewrite& r = api->rewrites[i];
         Entry e{r.addr, r.name, r.signature, r.replacement, r.original};
@@ -229,6 +232,19 @@ json rewrite_reload() {
             return json{{"build", g_build}, {"reloads", g_reloads}};
         },
         10000);
+}
+
+json diff_test(const json& p) {
+    const std::string name = p.value("name", std::string("*"));
+    const uint32_t iterations = p.value("iterations", 10000u);
+    const uint32_t seed = p.value("seed", 12345u);
+    return run_on_main(
+        [name, iterations, seed] {
+            if (!g_game) throw std::runtime_error("no game DLL loaded");
+            if (name == "list") return json::parse(g_game->diff_list());
+            return json::parse(g_game->diff(name.c_str(), iterations, seed));
+        },
+        30000);
 }
 
 }  // namespace probe

@@ -92,6 +92,7 @@ void rewrite_shutdown();               // render thread: remove all rewrite hook
 json rewrite_list();
 json rewrite_enable(const json& params);  // {"name"|"addr", "enabled": bool}
 json rewrite_reload();
+json diff_test(const json& params);  // {"name": test|"*"|"list", "iterations", "seed"}
 
 // ---- server.cpp ----
 void server_start(uint16_t port);

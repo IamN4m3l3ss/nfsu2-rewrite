@@ -6,7 +6,7 @@
 
 namespace probe {
 
-constexpr uint32_t kGameApiVersion = 1;
+constexpr uint32_t kGameApiVersion = 2;
 
 struct GameRewrite {
     uintptr_t addr;         // original function in SPEED2.EXE (NA v1.2)
@@ -21,6 +21,10 @@ struct GameApi {
     const char* build;
     uint32_t count;
     const GameRewrite* rewrites;
+    // M7 diff harness. Both return JSON owned by the game DLL, valid until the next call. Render thread.
+    const char* (*diff_list)();  // ["bStrLen", ...]
+    const char* (*diff)(const char* name, uint32_t iterations, uint32_t seed);
+    // {"name","iterations","mismatches","examples":[...],"error"} (name "*" = run all -> array)
 };
 
 }  // namespace probe

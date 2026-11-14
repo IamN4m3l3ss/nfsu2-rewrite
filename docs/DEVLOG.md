@@ -279,3 +279,21 @@ itself and picked it up)
   "see the new behaviour" is met by measurement only; a visible demo needs a function with a visible effect.
 - My throttle comparison ran while the user was driving (car at 218 km/h) — invalid, and it drove the user's car.
   Don't inject driving into a session the user is playing without asking.
+
+## 2026-11-14 — M7: diff harness; first verified rewrites (EA bString)
+
+**Changed**
+- `game/src/diff.h`: seeded xorshift inputs (empty strings, letters, punct, bytes >= 0x80), `run_diff` (original via
+  MinHook trampoline vs rewrite), `NFSU2_DIFF_TEST`. Game API v2 exports `diff_list` / `diff(name, n, seed)`; core RPC
+  `diff_test`, MCP `diff_test`, `tests/m7_diff.py`.
+- `game/src/bstring/bstring.cpp`: bStringHash 0x43DB50, bStringHash2 0x43DB80, bStrLen 0x43DBB0, bStrCpy 0x43DBD0
+  (compares output buffers), bStrCmp 0x43DC30, bStrICmp 0x43DCC0 — written from the disassembly, keeping the game's
+  quirks (signed-char compares, `&0x5F` uppercasing). Plus `bStringHash_BROKEN` (signed bytes) as a harness self-check.
+
+**Verified** (live game, user playing, hot-reloaded — no restart)
+- `tests/m7_diff.py`: 6 rewrites × 3 seeds × 10,000 cases, 0 mismatches; the broken hash is caught (~8,000/10,000,
+  with reproducible inputs). 70,000 cases run in 0.05 s on the render thread.
+- All six enabled in the running game (1,300+ call sites now run our code): 601 frames in 10 s, no errors.
+- Interface version guard: the old core refused the v2 game DLL during the reload; the new core loaded it.
+
+**Coverage:** 6 functions verified (+1 rewritten passthrough) of ~23,278 (0.03 %).

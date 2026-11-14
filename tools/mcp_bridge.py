@@ -95,6 +95,13 @@ def rewrite_reload() -> dict:
 
 
 @server.tool()
+def diff_test(name: str = "*", iterations: int = 10000, seed: int = 12345) -> list | dict:
+    """Run diff tests (original vs our rewrite on the same random inputs) inside the game. name: a test, "*" for all,
+    or "list". Returns mismatch counts and the first failing inputs."""
+    return pc.call("diff_test", {"name": name, "iterations": iterations, "seed": seed}, timeout=120)
+
+
+@server.tool()
 def reload_core() -> dict:
     """Reload the probe core (out/nfsu2_core.dll) inside the running game. Rebuilding the core also triggers this
     automatically within ~0.5 s. Returns the new core's ping (build stamp, reload_count)."""

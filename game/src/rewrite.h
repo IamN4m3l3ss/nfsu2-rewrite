@@ -32,3 +32,11 @@ struct Registrar {
 
 // read/write game globals by address
 template <class T> inline T& game_var(uintptr_t addr) { return *reinterpret_cast<T*>(addr); }
+
+// Call a game function by address. The address stays opaque (volatile), so the compiler can't see a mismatched
+// function type (CLAUDE.md). Calling through the game address also goes through that function's own hook, so each
+// rewrite's on/off switch stays independent of its callers.
+template <class F> inline F game_fn(uintptr_t addr) {
+    volatile uintptr_t a = addr;
+    return reinterpret_cast<F>(a);
+}

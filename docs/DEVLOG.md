@@ -435,3 +435,17 @@ return values.
   Register test incl. bad header. Live.
 
 **Coverage:** 43 verified of ~23,278, all live.
+
+## 2026-11-14 — chunk dispatch, progress tracker
+
+- `game/src/bchunk/chunks.cpp`: FindChunkLoader 0x43C100 (exhaustive over all registered IDs + random), LoadChunk
+  0x570D70, LoadChunks 0x577AB0 (they call real loaders, so verified by exact transcription, three full boots with
+  them on, and the M5 drive test). New `game_fn<F>(addr)`: rewrites call other game functions through their game
+  address, so every rewrite's switch stays independent.
+- **M5 test finding:** with ALL rewrites off the replay (B) still ends ~0.3 m from the recording (A) while the rerun
+  script (C) matches exactly: `record_start` and `schedule` are separate RPCs, so A's inputs can land one frame
+  off. Same pattern with rewrites on → not caused by rewrites. To fix: start recording and schedule atomically.
+- User's GitHub repo; `tools/progress.py` generates `docs/progress.svg` (card in README) and `PROGRESS.md`. SSH push
+  needs the user's key authorised (github.com host key added after checking the published fingerprint).
+
+**Coverage:** 46 verified of ~23,278, all live.

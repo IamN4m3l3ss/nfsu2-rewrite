@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="556" viewBox="0 0 760 556" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+<rect width="760" height="556" rx="14" fill="#0b1220"/>
+<text x="28" y="44" font-size="22" font-weight="700" fill="#f9fafb">NFSU2 rewrite progress</text>
+<text x="732" y="44" font-size="13" fill="#9ca3af" text-anchor="end">updated 2026-11-14</text>
+<text x="28" y="84" font-size="15" fill="#e5e7eb">Functions rewritten and verified</text>
+<text x="732" y="84" font-size="15" font-weight="700" fill="#34d399" text-anchor="end">46 / 23,278 (0.20%)</text>
+<rect x="28" y="96" width="704" height="22" rx="11.0" fill="#1f2937"/><rect x="28" y="96" width="3.0" height="22" rx="11.0" fill="#34d399"/>
+<text x="28" y="152" font-size="15" fill="#e5e7eb">Milestones (tooling M0–M7, then the rewrite)</text>
+<text x="732" y="152" font-size="15" font-weight="700" fill="#60a5fa" text-anchor="end">8 / 9 done</text>
+<rect x="28.0" y="164" width="72.9" height="22" rx="6" fill="#60a5fa"/>
+<text x="64.4" y="180" font-size="12" font-weight="700" fill="#0b1220" text-anchor="middle">M0</text>
+<rect x="106.9" y="164" width="72.9" height="22" rx="6" fill="#60a5fa"/>
+<text x="143.3" y="180" font-size="12" font-weight="700" fill="#0b1220" text-anchor="middle">M1</text>
+<rect x="185.8" y="164" width="72.9" height="22" rx="6" fill="#60a5fa"/>
+<text x="222.2" y="180" font-size="12" font-weight="700" fill="#0b1220" text-anchor="middle">M2</text>
+<rect x="264.7" y="164" width="72.9" height="22" rx="6" fill="#60a5fa"/>
+<text x="301.1" y="180" font-size="12" font-weight="700" fill="#0b1220" text-anchor="middle">M3</text>
+<rect x="343.6" y="164" width="72.9" height="22" rx="6" fill="#60a5fa"/>
+<text x="380.0" y="180" font-size="12" font-weight="700" fill="#0b1220" text-anchor="middle">M4</text>
+<rect x="422.4" y="164" width="72.9" height="22" rx="6" fill="#60a5fa"/>
+<text x="458.9" y="180" font-size="12" font-weight="700" fill="#0b1220" text-anchor="middle">M5</text>
+<rect x="501.3" y="164" width="72.9" height="22" rx="6" fill="#60a5fa"/>
+<text x="537.8" y="180" font-size="12" font-weight="700" fill="#0b1220" text-anchor="middle">M6</text>
+<rect x="580.2" y="164" width="72.9" height="22" rx="6" fill="#60a5fa"/>
+<text x="616.7" y="180" font-size="12" font-weight="700" fill="#0b1220" text-anchor="middle">M7</text>
+<rect x="659.1" y="164" width="72.9" height="22" rx="6" fill="#fbbf24"/>
+<text x="695.6" y="180" font-size="12" font-weight="700" fill="#0b1220" text-anchor="middle">M8</text>
+<text x="28" y="222" font-size="15" fill="#e5e7eb">Verified functions per system</text>
+<text x="28" y="254" font-size="13" fill="#e5e7eb">Leaf utilities</text>
+<rect x="250" y="243" width="420" height="14" rx="7.0" fill="#1f2937"/><rect x="250" y="243" width="420.0" height="14" rx="7.0" fill="#34d399"/>
+<text x="732" y="254" font-size="13" font-weight="700" fill="#e5e7eb" text-anchor="end">42</text>
+<text x="28" y="288" font-size="13" fill="#e5e7eb">File &amp; chunk loading</text>
+<rect x="250" y="277" width="420" height="14" rx="7.0" fill="#1f2937"/><rect x="250" y="277" width="40.0" height="14" rx="7.0" fill="#34d399"/>
+<text x="732" y="288" font-size="13" font-weight="700" fill="#e5e7eb" text-anchor="end">4</text>
+<text x="28" y="322" font-size="13" fill="#6b7280">Frontend / menus</text>
+<rect x="250" y="311" width="420" height="14" rx="7.0" fill="#1f2937"/><rect x="250" y="311" width="0.0" height="14" rx="7.0" fill="#374151"/>
+<text x="732" y="322" font-size="13" font-weight="700" fill="#6b7280" text-anchor="end">—</text>
+<text x="28" y="356" font-size="13" fill="#6b7280">Camera</text>
+<rect x="250" y="345" width="420" height="14" rx="7.0" fill="#1f2937"/><rect x="250" y="345" width="0.0" height="14" rx="7.0" fill="#374151"/>
+<text x="732" y="356" font-size="13" font-weight="700" fill="#6b7280" text-anchor="end">—</text>
+<text x="28" y="390" font-size="13" fill="#6b7280">Car physics / handling</text>
+<rect x="250" y="379" width="420" height="14" rx="7.0" fill="#1f2937"/><rect x="250" y="379" width="0.0" height="14" rx="7.0" fill="#374151"/>
+<text x="732" y="390" font-size="13" font-weight="700" fill="#6b7280" text-anchor="end">—</text>
+<text x="28" y="424" font-size="13" fill="#6b7280">World streaming</text>
+<rect x="250" y="413" width="420" height="14" rx="7.0" fill="#1f2937"/><rect x="250" y="413" width="0.0" height="14" rx="7.0" fill="#374151"/>
+<text x="732" y="424" font-size="13" font-weight="700" fill="#6b7280" text-anchor="end">—</text>
+<text x="28" y="458" font-size="13" fill="#6b7280">AI / traffic / cops</text>
+<rect x="250" y="447" width="420" height="14" rx="7.0" fill="#1f2937"/><rect x="250" y="447" width="0.0" height="14" rx="7.0" fill="#374151"/>
+<text x="732" y="458" font-size="13" font-weight="700" fill="#6b7280" text-anchor="end">—</text>
+<text x="28" y="492" font-size="13" fill="#6b7280">Audio</text>
+<rect x="250" y="481" width="420" height="14" rx="7.0" fill="#1f2937"/><rect x="250" y="481" width="0.0" height="14" rx="7.0" fill="#374151"/>
+<text x="732" y="492" font-size="13" font-weight="700" fill="#6b7280" text-anchor="end">—</text>
+<text x="28" y="526" font-size="13" fill="#6b7280">Rendering</text>
+<rect x="250" y="515" width="420" height="14" rx="7.0" fill="#1f2937"/><rect x="250" y="515" width="0.0" height="14" rx="7.0" fill="#374151"/>
+<text x="732" y="526" font-size="13" font-weight="700" fill="#6b7280" text-anchor="end">—</text>
+</svg>

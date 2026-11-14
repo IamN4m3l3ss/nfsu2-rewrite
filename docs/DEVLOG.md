@@ -125,3 +125,27 @@
 **Open**
 - Second half of M4: find the frontend state machine / save-load path and boot directly into free roam without
   menu input.
+
+## 2026-11-14 — M4: faster, verified boot (~13 s); Camera Toolkit workspace as reference
+
+**Changed**
+- `tools/boot_freeroam.py` rewritten around screen classification: each step waits until two consecutive frames
+  match that step's reference shot (`work/boot_refs/`, 320x180, made from `work/oracle/m4/`; gitignored because they
+  are game imagery). The title Enter is re-pressed only while the title is still showing. The final Enter is only
+  pressed when the Explore dialog shows Yes selected (Yes/No decided on the button strip only: 7.1 vs 20.0).
+  Loading/in-game from the game state int `0x008654A4` (3 frontend, 4 loading started, 5 loading, 6 in game).
+- Reference workspace from the user: `/mnt/m2drive/waah/games/NFSU2 Mod/` (Camera Toolkit fork + notes, CE table,
+  two full-memory dumps, ZMenu, analysis scripts). Verified live from it: game state `0x8654A4`, frame time
+  `0x865198` (1/60), time scale `0x7A5730` (1.0), player car `*(CarState**)0x89CCF8` → `+0x34` → `+0x20` = RigidBody
+  (vtable `0x7A20C4`, tag `'Rigi'`, position at `+0x20`).
+
+**Verified**
+- `tests/m4_loop.sh 5` → 5/5, free roam 12.9–13.3 s after launch (14.1–14.7 s incl. process start); menus take
+  ~2.3 s after the title accepts Enter (~6.6 s in). Final screenshot checked: free roam, not a race.
+
+**Broke / learned**
+- First "press faster" attempt (fixed 0.15–0.25 s settles + Enter retries on the last step) ended in a **circuit race**
+  (reported by the user): screens counted as "changed" at the start of a fade, keys landed mid-transition, and blind
+  Enter retries walked into Quick Race. Lesson: never retry Enter blindly in menus; confirm the screen first.
+- The Toolkit notes say the keyboard is window messages, not DirectInput. For this game it is action-mapped
+  DirectInput (EnumDevicesBySemantics, so no GUID_SysKeyboard reference) — see docs/structs/input.md.

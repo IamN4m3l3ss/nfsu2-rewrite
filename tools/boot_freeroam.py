@@ -7,10 +7,14 @@ Key sequence (from the user, verified by screenshots in work/oracle/m4/):
   -Left-> Yes -Enter-> LOADING -> free roam
 Needs a save in the prefix (C:\\users\\<user>\\AppData\\Local\\NFS Underground 2\\<profile>).
 
-Free roam is detected by the picture moving away from the LOADING screen (stopgap until the car struct is mapped).
+Game state int at 0x008654A4 (from the user's Camera Toolkit fork notes, verified live 2026-11-13):
+3 = frontend, 4 = loading started (after "Yes"), 5 = loading, 6 = in game / free roam.
+Timing knobs below; env BOOT_LEFT_WAIT / BOOT_TITLE_RETRY override them for experiments.
 Exit code 0 = in free roam; prints the elapsed time.
 """
 import io
+import os
+import struct
 import sys
 import time
 from pathlib import Path
@@ -19,11 +23,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import probe_client as pc  # noqa: E402
 from PIL import Image, ImageChops, ImageStat  # noqa: E402
 
-# (key, label, enter-threshold) after the first (title) Enter
-SEQUENCE = [("enter", "Load profile", 5), ("enter", "Load complete -> Main Menu", 5), ("left", "Career", 0),
-            ("enter", "Career menu", 5), ("enter", "Resume Career -> Garage", 5), ("enter", "Explore Mode?", 5),
-            ("left", "Yes", 0), ("enter", "Yes -> LOADING", 10)]
 step = "start"
+GAME_STATE = 0x008654A4
+LEFT_WAIT = float(os.environ.get("BOOT_LEFT_WAIT", "0.3"))  # after Left (only moves a highlight)
+TITLE_RETRY = float(os.environ.get("BOOT_TITLE_RETRY", "1.0"))
+
+
+def game_state() -> int:
+    return struct.unpack("<i", bytes.fromhex(pc.call("read_mem", {"addr": GAME_STATE, "size": 4})["hex"]))[0]
 
 
 def log(msg: str) -> None:
@@ -39,55 +46,95 @@ def diff(a: Image.Image, b: Image.Image) -> float:
     return sum(ImageStat.Stat(ImageChops.difference(a, b)).mean) / 3
 
 
-def press_until_change(key: str, threshold: float, timeout: float, retry_every: float | None = None) -> float:
-    before = grab()
-    pc.key(key, "press", 120)
-    t_end = time.monotonic() + timeout
-    t_retry = time.monotonic() + retry_every if retry_every else None
-    while time.monotonic() < t_end:
-        time.sleep(0.2)
-        d = diff(before, grab())
-        if d > threshold:
-            return d
-        if t_retry and time.monotonic() >= t_retry:
-            pc.key(key, "press", 120)
-            t_retry = time.monotonic() + retry_every
-    raise pc.ProbeError(f"screen did not react to {key!r} within {timeout}s (diff {d:.1f})")
+REFS = Path(__file__).resolve().parents[1] / "work" / "boot_refs"  # 320x180 shots of each screen (gitignored)
+# screen class -> reference images (the two Left steps only move a highlight, so they share a class)
+CLASSES = {"title": ["title"], "load": ["load"], "load_complete": ["load_complete"],
+           "main": ["main_quickrace", "main_career"], "career": ["career"], "garage": ["garage"],
+           "explore": ["explore_no", "explore_yes"]}
+YESNO_STRIP = (48, 100, 278, 134)  # Yes/No buttons of the Explore dialog, in 320x180 coordinates
+_refs: dict[str, Image.Image] = {}
+
+
+def ref(name: str) -> Image.Image:
+    if name not in _refs:
+        _refs[name] = Image.open(REFS / f"{name}.png").convert("RGB")
+    return _refs[name]
+
+
+def frame() -> Image.Image:
+    return grab().resize((320, 180))
+
+
+def classify(img: Image.Image) -> tuple[str, float]:
+    best = min(((c, min(diff(img, ref(r)) for r in rs)) for c, rs in CLASSES.items()), key=lambda x: x[1])
+    return best
+
+
+def wait_for(cls: str, timeout: float, max_dist: float = 15.0) -> float:
+    """Wait until two consecutive frames classify as `cls` (a fading/half-drawn frame matches nothing)."""
+    end = time.monotonic() + timeout
+    hits, last = 0, ("?", 99.0)
+    while time.monotonic() < end:
+        last = classify(frame())
+        hits = hits + 1 if (last[0] == cls and last[1] < max_dist) else 0
+        if hits >= 2:
+            return last[1]
+        time.sleep(0.05)
+    raise pc.ProbeError(f"expected screen '{cls}', got '{last[0]}' (dist {last[1]:.1f}) after {timeout}s")
 
 
 def main() -> int:
+    global step
     t0 = time.monotonic()
+    el = lambda: f"{time.monotonic() - t0:5.1f}s"
     try:
         pc.wait_frames(60)
-        # title screen: wait until drawn, then Enter (ignored for a few seconds; retry)
-        end = time.monotonic() + 30
-        while sum(ImageStat.Stat(grab()).mean) / 3 < 12:
-            if time.monotonic() > end:
-                raise pc.ProbeError("title screen never appeared")
-            time.sleep(0.25)
-        global step
         step = "title"
-        d = press_until_change("enter", 20, 20, retry_every=1.5)
-        log(f"  {time.monotonic() - t0:5.1f}s title accepted Enter (diff {d:.1f})")
-        time.sleep(0.6)
-        for key, label, threshold in SEQUENCE:
-            step = label
-            if key == "left":
-                pc.key(key, "press", 120)
-                time.sleep(0.6)
-                d = 0.0
-            else:
-                d = press_until_change(key, threshold, 6)
-                time.sleep(0.6)
-            log(f"  {time.monotonic() - t0:5.1f}s {label} (diff {d:.1f})")
-        step = "loading"
-        loading = grab()
-        end = time.monotonic() + 40
-        while diff(loading, grab()) < 25:
+        wait_for("title", 30)
+        # The title ignores Enter for a few seconds. Re-press only while it is still showing the title, so a
+        # late-reacting first press can't be followed by a second Enter on the next screen.
+        pc.key("enter", "press", 80)
+        end = time.monotonic() + 20
+        while True:
+            c, dist = classify(frame())
+            if c != "title":
+                break
             if time.monotonic() > end:
-                raise pc.ProbeError("still loading after 40 s")
-            time.sleep(0.25)
-        time.sleep(0.5)
+                raise pc.ProbeError("title never accepted Enter")
+            time.sleep(TITLE_RETRY)
+            if classify(frame())[0] == "title":
+                pc.key("enter", "press", 80)
+        for key, expect in [(None, "load"), ("enter", "load_complete"), ("enter", "main"), ("left", None),
+                            ("enter", "career"), ("enter", "garage"), ("enter", "explore"), ("left", None)]:
+            step = f"{key or 'wait'} -> {expect or 'highlight'}"
+            if key:
+                pc.key(key, "press", 80)
+            if expect:
+                dist = wait_for(expect, 6)
+                log(f"  {el()} {expect} (dist {dist:.1f})")
+            else:
+                time.sleep(LEFT_WAIT)
+        # Never press the last Enter blindly: anywhere else it starts a race instead of free roam.
+        step = "Yes -> LOADING"
+        strip = frame().crop(YESNO_STRIP)
+        d_yes = diff(strip, ref("explore_yes").crop(YESNO_STRIP))
+        d_no = diff(strip, ref("explore_no").crop(YESNO_STRIP))
+        if not (classify(frame())[0] == "explore" and d_yes < d_no):
+            raise pc.ProbeError(f"not on 'Return to Explore Mode? -> Yes' (strip yes {d_yes:.1f}, no {d_no:.1f})")
+        log(f"  {el()} Yes selected (strip yes {d_yes:.1f}, no {d_no:.1f})")
+        pc.key("enter", "press", 80)
+        end = time.monotonic() + 6
+        while game_state() == 3:
+            if time.monotonic() > end:
+                raise pc.ProbeError("game state still 3 (frontend) 6 s after Yes")
+            time.sleep(0.05)
+        log(f"  {el()} loading (state {game_state()})")
+        step = "loading"
+        end = time.monotonic() + 40
+        while game_state() != 6:
+            if time.monotonic() > end:
+                raise pc.ProbeError(f"game state {game_state()} after 40 s of loading")
+            time.sleep(0.1)
         _, meta, path = pc.screenshot_png(4)
     except pc.ProbeError as e:
         print(f"FAIL at step '{step}' after {time.monotonic() - t0:.1f}s: {e}", file=sys.stderr)

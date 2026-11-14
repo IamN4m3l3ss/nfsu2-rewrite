@@ -557,3 +557,23 @@ return values.
   test take a game lock the game itself would never take.
 - Next: Wait / Result / ReleaseWithCallback (19+14+7 callers; threading - transcription + live), then the I/O
   thread and the platform layer (CreateFileA/ReadFile wrappers at 0x6F9xxx).
+
+## 2026-11-14 — Async file library round trip: stopped after 3 attempts
+
+Wait / Result / ReleaseWithCallback are transcribed in filelib.cpp (re-checked line by line against the
+disassembly) but **not verified and not enabled**. The planned test drives the real library from inside the
+game's frame (open a game file, Wait, Result, size request, release with a recording callback, close released
+with the game's callback 0x5755D0), once through the originals and once through ours. All 3 attempts failed
+before comparing anything, and in the user's session:
+1. STATUS_INVALID_HANDLE inside the library, then the game crashed: the test used a failed open's "handle"
+   (the game only uses a result when the status is 1). Fixed in the test.
+2. Privileged instruction at a heap address (garbage function pointer): plausibly Result(0) after an open that
+   returned no request, grabbing a recycled request with handle 0. Guarded in the test.
+3. Access violation executing a heap address again (0x06CA7B3C), first case, after a fresh restart.
+Facts: the game's main thread is the library's service thread (0x6F58C1(0) true: Wait pumps 0x6F56BD itself);
+requests are recycled; finished requests keep handle 0 in the done lists. Not known yet: which call executes
+garbage (the original or ours), whether driving the library from inside Present is safe at all, what
+0x5755D0 and the request vtables do.
+Options: (a) verify these three live only (enable + 3 boots + play; boots call them hundreds of times), reverting
+on any problem; (b) debug the round trip offline with the game paused / under a debugger (x64dbg MCP), not in the
+user's session; (c) move on to another system and come back later. The test is #if 0'd.

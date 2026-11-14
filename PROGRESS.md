@@ -160,6 +160,9 @@ Functions we have found and named but not rewritten yet (everything else in the 
 | Address | Name | Notes |
 |---|---|---|
 | `0x0057EAD0` | UpdateFrameTime _(rewritten, not verified)_ | only caller 0x5812ED passes QPC delta; writes 0x865198 (not the sim step: halving it had no visible effect)… |
+| `0x006F75DD` | FileLib_Wait_rw _(rewritten, not verified)_ | game/systems/file/filelib.cpp: transcribed, NOT verified/enabled (see DEVLOG) |
+| `0x006F767C` | FileLib_Result_rw _(rewritten, not verified)_ | transcribed, NOT verified/enabled |
+| `0x006F76F2` | FileLib_ReleaseWithCallback_rw _(rewritten, not verified)_ | transcribed, NOT verified/enabled |
 | `0x004022C0` | nullsub_4022C0 | empty (ret); stripped debug hook |
 | `0x0043BD50` | bBreak | int3; ret (debug break left in release) |
 | `0x0043BDF0` | bGetTicker | QueryPerformanceCounter-based tick |
@@ -175,9 +178,6 @@ Functions we have found and named but not rewritten yet (everything else in the 
 | `0x005B7EE0` | ResetControllerStates | called on WM_ACTIVATEAPP; resets per-device state blocks at 0x874C48/0x874FB8/0x875328 |
 | `0x005C1840` | InputDevice_ReadKeyboard | Poll + buffered GetDeviceData; sets/clears bit uAppData of this+0x08 (u64 held actions); see docs/structs/i… |
 | `0x005CCD60` | MainWndProc | registered by RegisterClassExA at 0x005D25E4; switch on msg; hooked by probe keep_active |
-| `0x006F75DD` | FileLib_Wait | loops: pump requests itself (0x6F58C1/0x6F56BD/0x6F5889) or WaitForSingleObject+ResetEvent on channel+0x78;… |
-| `0x006F767C` | FileLib_Result | removes from done list, virtual result (EDX:EAX), frees request; 0x6F76E9 = jmp thunk |
-| `0x006F76F2` | FileLib_ReleaseWithCallback | pending: store callback (+0x1C); done: call cb(handle, status, user) now |
 | `0x006F7C1B` | FileLib_Open | EA async file library (0x6F7xxx); wait 0x6F75DD, result+release 0x6F76E9, size 0x6F7861, close 0x6F7790, st… |
 | `0x0075BED4` | _ftol2 | MSVC CRT float->int, 1120 callers |
 | `0x0075C6C8` | operator_new | CRT |

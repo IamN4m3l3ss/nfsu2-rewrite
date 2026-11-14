@@ -27,6 +27,12 @@ struct RegOut {
 // cdecl call with up to 8 dword args (floats passed as their bits)
 RegOut call_regs(const void* fn, const uint32_t* args, int nargs, bool returns_float);
 
+// __thiscall call: ECX = self, EAX/EDX sentinels; `popped` = bytes the callee removed from the stack (must be 4*nargs).
+struct RegOutThis {
+    uint32_t eax, edx, popped;
+};
+RegOutThis call_regs_this(const void* fn, const void* self, const uint32_t* args, int nargs);
+
 inline uint32_t bits(float f) {
     uint32_t u;
     memcpy(&u, &f, 4);
@@ -41,6 +47,18 @@ inline uint32_t arg(float f) { return bits(f); }
 // at their sentinel (= preserved) must be preserved by ours; EAX must match unless the function returns a float.
 // compare_eax=false only for functions whose EAX is garbage AND no call site reads it (tools/re/regcontract.py
 // shows "none") — e.g. bSinCos leaves the x87 status word there.
+// thiscall variant: same EAX/EDX rules, plus the callee must pop exactly its stack args.
+inline Case check_regs_this(const char* what, const void* orig, const void* mine, const void* self_a,
+                            const void* self_b, std::initializer_list<uint32_t> args, bool compare_eax = true) {
+    const RegOutThis a = call_regs_this(orig, self_a, args.begin(), static_cast<int>(args.size()));
+    const RegOutThis b = call_regs_this(mine, self_b, args.begin(), static_cast<int>(args.size()));
+    std::string bad;
+    if (compare_eax && a.eax != b.eax) bad += " eax " + std::to_string(a.eax) + "/" + std::to_string(b.eax);
+    if (a.edx == kSentEDX && b.edx != kSentEDX) bad += " edx not preserved";
+    if (a.popped != b.popped) bad += " popped " + std::to_string(a.popped) + "/" + std::to_string(b.popped);
+    return bad.empty() ? Ok() : MismatchText(std::string(what) + ": register contract:" + bad);
+}
+
 inline Case check_regs(const char* what, const void* orig, const void* mine, std::initializer_list<uint32_t> args,
                        bool returns_float, bool compare_eax = true) {
     const RegOut a = call_regs(orig, args.begin(), static_cast<int>(args.size()), returns_float);
@@ -54,6 +72,10 @@ inline Case check_regs(const char* what, const void* orig, const void* mine, std
 }
 
 }  // namespace game
+
+// Calls currently inside any entry stub (all threads). The core waits for 0 after disabling the hooks before it
+// unloads this DLL: the allocator etc. also run on the game's other threads (audio, streaming).
+extern "C" volatile long nfsu2_inflight;
 
 // ---- entry stubs: push ecx, push edx, copy N args, call impl, pop, ret (cdecl: caller cleans its args)
 // After the two pushes, arg i of N is at [esp + 12 + 4*i]; pushing them last-to-first keeps the source offset
@@ -76,10 +98,24 @@ inline Case check_regs(const char* what, const void* orig, const void* mine, std
     static void* const g_impl_##fn = reinterpret_cast<void*>(&fn);                          \
     static volatile uint32_t g_calls_##fn = 0;                          \
     extern "C" __declspec(naked) void nfsu2_entry_##fn() {                                  \
-        __asm lock inc dword ptr [g_calls_##fn] __asm push ecx __asm push edx NFSU2_PUSH_ARGS_##nargs __asm call dword ptr [g_impl_##fn] \
-            __asm add esp, 4 * nargs __asm pop edx __asm pop ecx __asm ret                   \
+        __asm lock inc dword ptr [g_calls_##fn] __asm lock inc dword ptr [nfsu2_inflight] __asm push ecx __asm push edx NFSU2_PUSH_ARGS_##nargs __asm call dword ptr [g_impl_##fn] \
+            __asm add esp, 4 * nargs __asm pop edx __asm pop ecx __asm lock dec dword ptr [nfsu2_inflight] __asm ret                   \
     }                                                                                       \
     static ::game::Registrar g_reg_##fn(addr, #fn, sig, reinterpret_cast<void*>(&nfsu2_entry_##fn), \
+                                        reinterpret_cast<void**>(&original), __FILE__, &g_calls_##fn)
+
+// ---- __thiscall entry stub: `this` arrives in ECX, callee pops its N stack args. Our implementation is a plain
+// cdecl function taking `this` as its FIRST argument: R __cdecl fn(T* self, args...).
+#define NFSU2_PUSH_ARGS_0
+#define NFSU2_REWRITE_THIS(addr, fn, nargs, sig, original)                                               \
+    static void* const g_impl_##fn = reinterpret_cast<void*>(&fn);                                       \
+    static volatile uint32_t g_calls_##fn = 0;                                                           \
+    extern "C" __declspec(naked) void nfsu2_entry_##fn() {                                               \
+        __asm lock inc dword ptr [g_calls_##fn] __asm lock inc dword ptr [nfsu2_inflight] __asm push ecx __asm push edx NFSU2_PUSH_ARGS_##nargs \
+            __asm push ecx __asm call dword ptr [g_impl_##fn] __asm add esp, 4 * (nargs + 1)          \
+                __asm pop edx __asm pop ecx __asm lock dec dword ptr [nfsu2_inflight] __asm ret 4 * nargs                                       \
+    }                                                                                                    \
+    static ::game::Registrar g_reg_##fn(addr, #fn, sig, reinterpret_cast<void*>(&nfsu2_entry_##fn),      \
                                         reinterpret_cast<void**>(&original), __FILE__, &g_calls_##fn)
 
 #define NFSU2_ENTRY(fn) reinterpret_cast<const void*>(&nfsu2_entry_##fn)
@@ -93,9 +129,9 @@ inline Case check_regs(const char* what, const void* orig, const void* mine, std
     static void* const g_impl_##fn = reinterpret_cast<void*>(&fn);                          \
     static volatile uint32_t g_calls_##fn = 0;                                   \
     extern "C" __declspec(naked) void nfsu2_entry_##fn() {                                           \
-        __asm lock inc dword ptr [g_calls_##fn] __asm push ecx __asm push edx __asm push eax NFSU2_PUSH_ARGS_E##nargs                         \
+        __asm lock inc dword ptr [g_calls_##fn] __asm lock inc dword ptr [nfsu2_inflight] __asm push ecx __asm push edx __asm push eax NFSU2_PUSH_ARGS_E##nargs                         \
             __asm call dword ptr [g_impl_##fn] __asm add esp, 4 * (nargs + 1) __asm pop edx __asm pop ecx \
-                __asm ret                                                                             \
+                __asm lock dec dword ptr [nfsu2_inflight] __asm ret                                                                             \
     }                                                                                                \
     static ::game::Registrar g_reg_##fn(addr, #fn, sig, reinterpret_cast<void*>(&nfsu2_entry_##fn),  \
                                         reinterpret_cast<void**>(&original), __FILE__, &g_calls_##fn)

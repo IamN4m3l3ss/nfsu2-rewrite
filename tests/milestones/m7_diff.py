@@ -10,8 +10,12 @@ import probe_client as pc  # noqa: E402
 N = int(sys.argv[1]) if len(sys.argv) > 1 else 10000
 SEEDS = [12345, 777, 2026]
 ok = True
+# One test per call: each runs on the game's render thread (the game pauses while it runs), so keep calls short.
+names = pc.call("diff_test", {"name": "list"})
 for seed in SEEDS:
-    for r in pc.call("diff_test", {"name": "*", "iterations": N, "seed": seed}, timeout=120):
+    for name in names:
+        print(f"... {name} seed={seed}", end="\r", flush=True)
+        r = pc.call("diff_test", {"name": name, "iterations": N, "seed": seed}, timeout=120)
         broken = r["name"].endswith("_BROKEN")
         passed = (r["mismatches"] > 0) if broken else (r["mismatches"] == 0 and "error" not in r)
         ok &= passed

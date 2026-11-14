@@ -103,15 +103,26 @@ std::string exe_disk_bytes(uintptr_t va, size_t n) {
 }
 
 void unload_locked() {
-    for (Entry& e : g_entries) {
-        if (e.hooked) {
-            MH_DisableHook(reinterpret_cast<void*>(e.addr));
-            MH_RemoveHook(reinterpret_cast<void*>(e.addr));
-        }
+    // 1. no new calls into the DLL; 2. wait until no thread is still inside one (other game threads call the
+    // allocator etc.; one may be blocked on a pool lock inside our code); 3. remove hooks (frees the trampolines
+    // those calls may use); 4. unload. If calls don't drain, keep the old DLL loaded (leak) rather than crash.
+    for (Entry& e : g_entries)
+        if (e.hooked) MH_DisableHook(reinterpret_cast<void*>(e.addr));
+    bool drained = true;
+    if (g_game && g_game->inflight) {
+        Sleep(2);  // a thread may sit between the hook jump and the stub's counter
+        const ULONGLONG until = GetTickCount64() + 2000;
+        while (*g_game->inflight != 0 && GetTickCount64() < until) Sleep(1);
+        drained = *g_game->inflight == 0;
+        if (!drained) logf("rewrite: %ld calls still inside the old game DLL after 2 s - keeping it loaded", *g_game->inflight);
     }
+    for (Entry& e : g_entries)
+        if (e.hooked && drained) MH_RemoveHook(reinterpret_cast<void*>(e.addr));
     g_entries.clear();
     g_game = nullptr;
-    if (g_mod) {
+    if (g_mod && !drained) {
+        g_mod = nullptr;  // leaked on purpose
+    } else if (g_mod) {
         FreeLibrary(g_mod);
         g_mod = nullptr;
         DeleteFileW(g_temp.c_str());

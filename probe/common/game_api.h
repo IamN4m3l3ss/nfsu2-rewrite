@@ -6,7 +6,7 @@
 
 namespace probe {
 
-constexpr uint32_t kGameApiVersion = 4;  // v3: GameRewrite.file, v4: GameRewrite.calls
+constexpr uint32_t kGameApiVersion = 5;  // v3: GameRewrite.file, v4: GameRewrite.calls, v5: inflight
 
 struct GameRewrite {
     uintptr_t addr;         // original function in SPEED2.EXE (NA v1.2)
@@ -26,6 +26,8 @@ struct GameApi {
     // M7 diff harness. Both return JSON owned by the game DLL, valid until the next call. Render thread.
     const char* (*diff_list)();  // ["bStrLen", ...]
     const char* (*diff)(const char* name, uint32_t iterations, uint32_t seed);
+    // v5: number of calls currently inside an entry stub, all threads (wait for 0 before unloading the DLL)
+    volatile long* inflight;
     // {"name","iterations","mismatches","examples":[...],"error"} (name "*" = run all -> array)
 };
 

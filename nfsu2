@@ -59,7 +59,7 @@ case "${1:-}" in
         if [[ -n "${2:-}" ]]; then
             "$PY" -c "import sys,json; sys.path.insert(0,'tools/probe'); import probe_client as pc; print(json.dumps(pc.call('diff_test',{'name':'$2','iterations':10000,'seed':12345},timeout=120),indent=1))"
         else
-            out="$("$PY" tests/milestones/m7_diff.py 10000)" || true
+            out="$("$PY" tests/milestones/m7_diff.py 10000 | tr '\r' '\n')" || true
             echo "$out" | grep '^FAIL ' || true
             echo "$(echo "$out" | grep -c '^PASS seed') passed, $(echo "$out" | grep -c '^FAIL seed') failed (3 seeds x every diff test; *_BROKEN self-checks must fail and count as passed)"
         fi ;;

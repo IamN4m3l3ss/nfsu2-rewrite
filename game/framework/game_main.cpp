@@ -1,3 +1,5 @@
+#include <windows.h>
+#include <cstdio>
 // nfsu2_game.dll: our rewrite of SPEED2.EXE, one function at a time. Loaded and hot-reloaded by the probe core.
 #include <nlohmann/json.hpp>
 #include <string>
@@ -17,6 +19,8 @@ std::vector<DiffTestReg>& diff_registry() {
     static std::vector<DiffTestReg> r;
     return r;
 }
+
+extern "C" volatile long nfsu2_inflight = 0;
 
 RegOut call_regs(const void* fn, const uint32_t* args, int nargs, bool returns_float) {
     uint32_t ra = 0, rc = 0, rd = 0;
@@ -50,6 +54,34 @@ RegOut call_regs(const void* fn, const uint32_t* args, int nargs, bool returns_f
     return {ra, rc, rd, f};
 }
 
+RegOutThis call_regs_this(const void* fn, const void* self, const uint32_t* args, int nargs) {
+    uint32_t ra = 0, rd = 0, before = 0, after = 0;
+    __asm {
+        mov ebx, fn
+        mov esi, args
+        mov edi, nargs
+        mov ecx, edi
+    push_loop:
+        test ecx, ecx
+        jz do_call
+        dec ecx
+        push dword ptr [esi + ecx*4]
+        jmp push_loop
+    do_call:
+        lea eax, [esp + edi*4]
+        mov before, eax
+        mov ecx, self
+        mov eax, 0xA0A0A0A0
+        mov edx, 0xD0D0D0D0
+        call ebx
+        mov ra, eax
+        mov rd, edx
+        mov after, esp
+        mov esp, before
+    }
+    return {ra, rd, after - (before - static_cast<uint32_t>(nargs) * 4)};
+}
+
 namespace {
 
 using json = nlohmann::json;
@@ -69,17 +101,55 @@ const char* diff_list() {
     return g_out.c_str();
 }
 
+// A crash inside a diff test must not take the probe core down (its frame handler disables the core): run each
+// test under SEH and report the exception as the test's error. No /EHa, so C++ objects in the crashed frames are
+// not destroyed (leaks are acceptable for a failed test). The __try lives in a function without C++ objects.
+struct SehJob {
+    DiffTestFn fn;
+    const DiffCtx* ctx;
+    DiffResult* out;
+};
+void seh_thunk(SehJob* j) { *j->out = j->fn(*j->ctx); }
+int seh_filter(EXCEPTION_POINTERS* ep, uint32_t* code, uintptr_t* where) {
+    *code = ep->ExceptionRecord->ExceptionCode;
+    *where = reinterpret_cast<uintptr_t>(ep->ExceptionRecord->ExceptionAddress);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+bool seh_run(SehJob* j, uint32_t* code, uintptr_t* where) {
+    __try {
+        seh_thunk(j);
+        return true;
+    } __except (seh_filter(GetExceptionInformation(), code, where)) {
+        return false;
+    }
+}
+json run_one(const DiffTestReg& t, const DiffCtx& ctx) {
+    DiffResult r;
+    SehJob job{t.fn, &ctx, &r};
+    uint32_t code = 0;
+    uintptr_t where = 0;
+    if (seh_run(&job, &code, &where)) return result_json(r);
+    HMODULE self = nullptr;
+    GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                       reinterpret_cast<LPCSTR>(&run_one), &self);
+    char buf[160];
+    snprintf(buf, sizeof buf, "exception %08X at %08X (nfsu2_game.dll+0x%X: llvm-symbolizer --relative-address)",
+             code, static_cast<unsigned>(where), static_cast<unsigned>(where - reinterpret_cast<uintptr_t>(self)));
+    return json{{"name", t.name}, {"iterations", 0}, {"mismatches", 1}, {"examples", json::array({std::string(buf)})},
+                {"error", std::string(buf)}};
+}
+
 const char* diff(const char* name, uint32_t iterations, uint32_t seed) {
     const DiffCtx ctx{iterations, seed};
     json out;
     try {
         if (std::string(name) == "*") {
             out = json::array();
-            for (auto& t : diff_registry()) out.push_back(result_json(t.fn(ctx)));
+            for (auto& t : diff_registry()) out.push_back(run_one(t, ctx));
         } else {
             out = json{{"error", std::string("no diff test ") + name}};
             for (auto& t : diff_registry())
-                if (std::string(t.name) == name) out = result_json(t.fn(ctx));
+                if (std::string(t.name) == name) out = run_one(t, ctx);
         }
     } catch (const std::exception& e) {
         out = json{{"error", e.what()}};
@@ -94,6 +164,15 @@ const char* diff(const char* name, uint32_t iterations, uint32_t seed) {
 extern "C" __declspec(dllexport) const probe::GameApi* nfsu2_game_api() {
     auto& r = game::registry();
     game::g_api = {probe::kGameApiVersion, __DATE__ " " __TIME__, static_cast<uint32_t>(r.size()), r.data(),
-                   &game::diff_list, &game::diff};
+                   &game::diff_list, &game::diff, &nfsu2_inflight};
     return &game::g_api;
+}
+
+// Harness self-check: a test that crashes must come back as a failed test (exception + address), not disable the
+// probe core. _BROKEN = expected to fail.
+NFSU2_DIFF_TEST(crash_BROKEN) {
+    volatile int* volatile p = nullptr;
+    *p = 1;
+    (void)ctx;
+    return game::DiffResult{};  // not reached
 }

@@ -480,3 +480,28 @@ return values.
   (GameApi v4 `GameRewrite.calls`), shown in `./nfsu2 rewrites` and the F8 panel.
 - **Live**: all 49 on, 3 boots to free roam (12–13 s, no errors). Per boot: UnloadChunks 6, CopyChunksAligned 404,
   LoadChunks 73, LoadChunk ~1790, JdlzDecompress ~121 calls. ClearChunks not reached during boot (realign path only).
+
+## 2026-11-14 — Memory allocator (bMalloc/bFree + bMemoryPool)
+
+- **New system `game/systems/memory/`**: bMalloc 0x440390, bMalloc2 0x440820, bFree 0x440540, bMemoryPool::Init /
+  AddFreeMemory / Allocate / Destroy, bInitMemoryPool, bCloseMemoryPool (9 functions). Layout in pool.cpp and
+  symbols.csv. New `NFSU2_REWRITE_THIS` entry stub (thiscall: `this` in ECX, callee pops) + `check_regs_this`
+  (also checks how many bytes the callee popped).
+- **Diff tests**: two private pools on two arenas with the same alignment run identical random operation sequences
+  (original vs ours); after every op the whole pool state (free/alloc/OS-block lists, stats) is compared with
+  pointers normalised to region+offset, and the memory at the end (pointer-aware). bMalloc/bFree run through pool
+  slot 7 (unused by the game). Test pitfalls found and handled: OS blocks come from the CRT heap at unrelated
+  addresses (only 8-aligned, and in arbitrary address order vs the arena, which matters because the free list is
+  sorted by address) → growing cases use alignment 4/8 and stop comparing when the region order differs.
+  Mutation checks: min-waste 16→8 → 1173 mismatches; bFree not clearing the magic → 4958.
+- **Incident**: a test of mine read a freed header after its OS block had gone back to the heap → access violation
+  → the probe core disabled itself (user: F8 stopped working, game froze during tests). Fixes: diff tests now run
+  under SEH (a crash = failed test with address, core survives; `crash_BROKEN` self-check), the suite calls one
+  test per request (game pauses briefly instead of 30 s), slot 7 reclaimed after a crashed test. Crash addresses
+  are symbolized with `llvm-symbolizer --obj=out/nfsu2_game.dll --pdb=out/nfsu2_game.pdb --relative-address`.
+- **Hot reload safety**: the entry stubs count in-flight calls (`nfsu2_inflight`, GameApi v5); the core disables
+  the hooks and waits for 0 before removing hooks and unloading (other threads call the allocator; one can be
+  blocked on a pool lock inside our code). If it doesn't drain in 2 s the old DLL is kept loaded.
+- **Live**: enabled step by step in the user's session (pool internals, then bMalloc/bFree), then 3 boots to free
+  roam with all 58 on: 13 s each, no errors; per boot ~3100 bMalloc, ~2700 bMalloc2, ~2000 bFree, and our
+  PoolInit/bInitMemoryPool created the game's pools. Suite: 207/207.

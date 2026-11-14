@@ -149,3 +149,22 @@
   Enter retries walked into Quick Race. Lesson: never retry Enter blindly in menus; confirm the screen first.
 - The Toolkit notes say the keyboard is window messages, not DirectInput. For this game it is action-mapped
   DirectInput (EnumDevicesBySemantics, so no GUID_SysKeyboard reference) — see docs/structs/input.md.
+
+## 2026-11-14 — input passthrough fix; boot steps tolerate input-ignore windows
+
+**Broke**
+- User: their real keyboard stopped working in the game. Cause: on `DIERR_NOTACQUIRED`/`INPUTLOST` the game calls
+  `Acquire` and skips the frame; the probe turned those errors into success (to inject while unfocused), so the game
+  never re-acquired and the physical keyboard stayed dead after refocusing.
+- Two quick injected Enters merged into one (second `press` while the first was still held sent no new key-down).
+- The Load screen, like the title, ignores Enter for a moment after it appears.
+
+**Changed**
+- `input.cpp`: on those errors the hook acquires the keyboard itself and retries the read, so real keys pass through
+  when focused and injected keys are merged on top; unfocused, injected keys only. A `press` on a held key now sends
+  release + press.
+- `boot_freeroam.py`: one `step_enter(src, dst)` for every Enter: press, wait ≤1 s for `dst`; re-press only while the
+  screen is still clearly `src` (never once a transition started).
+
+**Verified**
+- `tests/m4_loop.sh 5` → 5/5, free roam 12.1–13.4 s.

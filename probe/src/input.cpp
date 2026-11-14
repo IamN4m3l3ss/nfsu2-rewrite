@@ -160,7 +160,18 @@ HRESULT STDMETHODCALLTYPE hk_GetDeviceState(void* dev, DWORD cb, LPVOID data) {
 HRESULT STDMETHODCALLTYPE hk_GetDeviceData(void* dev, DWORD cbObj, LPDIDEVICEOBJECTDATA rgdod, LPDWORD inout,
                                            DWORD flags) {
     DWORD cap = inout ? *inout : 0;
-    HRESULT hr = orig(dev, &DevVtbl::get_data)(dev, cbObj, rgdod, inout, flags);
+    auto get_data = orig(dev, &DevVtbl::get_data);
+    HRESULT hr = get_data(dev, cbObj, rgdod, inout, flags);
+    if ((hr == DIERR_NOTACQUIRED || hr == DIERR_INPUTLOST) && inout && keep_active_on()) {
+        // The game answers these errors with Acquire + skip. Because we report success below (so injection works
+        // while unfocused), it would never re-acquire, and the real keyboard would stay dead once the window has
+        // focus again. So acquire here and retry: real keys pass through when focused, injected keys always.
+        HRESULT ha = orig(dev, &DevVtbl::acquire)(dev);
+        if (SUCCEEDED(ha)) {
+            *inout = cap;
+            hr = get_data(dev, cbObj, rgdod, inout, flags);
+        }
+    }
     std::lock_guard lk(g_mu);
     DevInfo& info = dev_info_locked(dev);
     if (++info.data_calls <= 3)
@@ -357,6 +368,11 @@ json input_key(const json& p) {
     } else if (action == "press" || action == "hold") {
         if (!k.down) {
             ++g_injected_down;
+            push_key_event_locked(static_cast<uint8_t>(dik), true);
+        } else if (action == "press") {
+            // A press while the previous press is still held must still be a new key-down for the game,
+            // otherwise two quick Enters merge into one: release, then press again.
+            push_key_event_locked(static_cast<uint8_t>(dik), false);
             push_key_event_locked(static_cast<uint8_t>(dik), true);
         }
         k.down = true;

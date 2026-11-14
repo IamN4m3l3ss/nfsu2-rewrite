@@ -9,7 +9,7 @@ Needs a save in the prefix (C:\\users\\<user>\\AppData\\Local\\NFS Underground 2
 
 Game state int at 0x008654A4 (from the user's Camera Toolkit fork notes, verified live 2026-11-13):
 3 = frontend, 4 = loading started (after "Yes"), 5 = loading, 6 = in game / free roam.
-Timing knobs below; env BOOT_LEFT_WAIT / BOOT_TITLE_RETRY override them for experiments.
+Timing knobs below; env BOOT_LEFT_WAIT / BOOT_RETRY override them for experiments.
 Exit code 0 = in free roam; prints the elapsed time.
 """
 import io
@@ -26,7 +26,7 @@ from PIL import Image, ImageChops, ImageStat  # noqa: E402
 step = "start"
 GAME_STATE = 0x008654A4
 LEFT_WAIT = float(os.environ.get("BOOT_LEFT_WAIT", "0.3"))  # after Left (only moves a highlight)
-TITLE_RETRY = float(os.environ.get("BOOT_TITLE_RETRY", "1.0"))
+RETRY = float(os.environ.get("BOOT_RETRY", "1.0"))  # re-press Enter if the screen ignored it
 
 
 def game_state() -> int:
@@ -83,6 +83,23 @@ def wait_for(cls: str, timeout: float, max_dist: float = 15.0) -> float:
     raise pc.ProbeError(f"expected screen '{cls}', got '{last[0]}' (dist {last[1]:.1f}) after {timeout}s")
 
 
+def step_enter(src: str, dst: str, timeout: float = 8.0) -> float:
+    """Press Enter on screen `src` until screen `dst` is confirmed. Re-press only while still clearly on `src`
+    (screens ignore input for a moment after they appear); never once a transition has started."""
+    end = time.monotonic() + timeout
+    while True:
+        pc.key("enter", "press", 80)
+        try:
+            return wait_for(dst, RETRY)
+        except pc.ProbeError:
+            pass
+        if time.monotonic() > end:
+            raise pc.ProbeError(f"'{src}' never accepted Enter")
+        c, dist = classify(frame())
+        if not (c == src and dist < 10):
+            return wait_for(dst, 4)  # in transition: wait for it, don't press again
+
+
 def main() -> int:
     global step
     t0 = time.monotonic()
@@ -93,27 +110,17 @@ def main() -> int:
         wait_for("title", 30)
         # The title ignores Enter for a few seconds. Re-press only while it is still showing the title, so a
         # late-reacting first press can't be followed by a second Enter on the next screen.
-        pc.key("enter", "press", 80)
-        end = time.monotonic() + 20
-        while True:
-            c, dist = classify(frame())
-            if c != "title":
-                break
-            if time.monotonic() > end:
-                raise pc.ProbeError("title never accepted Enter")
-            time.sleep(TITLE_RETRY)
-            if classify(frame())[0] == "title":
-                pc.key("enter", "press", 80)
-        for key, expect in [(None, "load"), ("enter", "load_complete"), ("enter", "main"), ("left", None),
+        prev = "title"
+        for key, expect in [("enter", "load"), ("enter", "load_complete"), ("enter", "main"), ("left", None),
                             ("enter", "career"), ("enter", "garage"), ("enter", "explore"), ("left", None)]:
-            step = f"{key or 'wait'} -> {expect or 'highlight'}"
-            if key:
-                pc.key(key, "press", 80)
-            if expect:
-                dist = wait_for(expect, 6)
-                log(f"  {el()} {expect} (dist {dist:.1f})")
-            else:
+            step = f"{key} -> {expect or 'highlight'}"
+            if key == "left":
+                pc.key("left", "press", 80)
                 time.sleep(LEFT_WAIT)
+                continue
+            dist = step_enter(prev, expect, timeout=20 if prev == "title" else 8)
+            log(f"  {el()} {expect} (dist {dist:.1f})")
+            prev = expect
         # Never press the last Enter blindly: anywhere else it starts a race instead of free roam.
         step = "Yes -> LOADING"
         strip = frame().crop(YESNO_STRIP)

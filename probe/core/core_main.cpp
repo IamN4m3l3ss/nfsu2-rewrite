@@ -58,10 +58,12 @@ void core_on_frame(uint64_t frame) {
     if (g_hooks) rewrite_on_frame(frame);
     input_frame_tick(frame);
     run_tasks();
+    overlay_frame();
 }
 
 const char* core_shutdown() {
     logf("core shutdown");
+    overlay_shutdown();
     server_stop();
     tasks_close();
     json state = json::object();

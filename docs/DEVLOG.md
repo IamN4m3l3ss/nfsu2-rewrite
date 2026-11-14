@@ -449,3 +449,20 @@ return values.
   needs the user's key authorised (github.com host key added after checking the published fingerprint).
 
 **Coverage:** 46 verified of ~23,278, all live.
+
+## 2026-11-14 — Reorganization, ./nfsu2, in-game panel
+
+- **No cops in NFSU2**: removed from the tracker and the M8 plan.
+- **Layout**: `probe/core`, `game/framework` + `game/systems/<system>`, `tools/{game,probe,re}`, `tests/milestones`
+  (git mv, all paths/imports updated, clean rebuild, all scripts compile, 177/177 diff runs pass). `./nfsu2` is the
+  single entry point (run/freeroam/kill/status/build/rewrites/on/off/all-on/all-off/test/progress/push).
+  `docs/GUIDE.md` explains the project for the user. `.idea/` untracked.
+- **In-game panel (F8)**: Dear ImGui v1.93.0 (vendored core + dx9/win32 backends) in the core, so it hot-reloads.
+  Loader 0.3.0 / API v2 adds `set_msg_hook` (called first in the WndProc hook; overlay swallows mouse/keys it
+  captures) and `set_reset_hook` (IDirect3DDevice9::Reset, slot 16, so ImGui drops/recreates its D3D objects).
+  GameApi v3 adds `GameRewrite.file` → rewrites grouped by system. Tabs: Rewrites (toggles, all on/off, per-function
+  and all diff tests), Car, Probe, Log. Verified: log "overlay: ready (ImGui 1.93.0, scale 1.53)"; user confirmed
+  panel, toggles and car tab work in free roam.
+- **Fixed**: after an API-version mismatch the loader/core retried loading the same file every 0.5 s (log spam);
+  now it waits for the next rebuild.
+- Known: the game still reads DirectInput while the panel is open (typing in the filter box also reaches the game).

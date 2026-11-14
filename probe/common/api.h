@@ -9,7 +9,11 @@ struct IDirect3DDevice9;
 
 namespace probe {
 
-constexpr uint32_t kApiVersion = 1;
+constexpr uint32_t kApiVersion = 2;
+
+// v2: window-message and device-reset hooks for the in-game overlay (core registers them, clears them on shutdown)
+using MsgHook = int (*)(void* hwnd, uint32_t msg, uintptr_t wparam, intptr_t lparam);  // nonzero = swallow
+using ResetHook = void (*)(int phase);  // 0 = before IDirect3DDevice9::Reset, 1 = after (success or not)
 
 struct LoaderApi {
     uint32_t version;
@@ -36,6 +40,9 @@ struct LoaderApi {
     // reload
     void (*request_reload)();
     uint32_t (*reload_count)();  // 0 = first load
+    // v2
+    void (*set_msg_hook)(MsgHook hook);      // called from the game's WndProc (main thread); nullptr to clear
+    void (*set_reset_hook)(ResetHook hook);  // called around IDirect3DDevice9::Reset (render thread)
 };
 
 struct CoreApi {

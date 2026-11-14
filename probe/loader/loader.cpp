@@ -29,7 +29,7 @@
 namespace {
 
 using json = nlohmann::json;
-constexpr const char* kLoaderVersion = "0.2.0";
+constexpr const char* kLoaderVersion = "0.3.0";  // 0.3: msg/reset hooks for the overlay (API v2)
 constexpr const char* kExpectedSha256 = "f9dd86c054878ce6276beb07c1fd61874f7a1e4bf1f241b084c65b73e24168a7";
 
 // ---------------------------------------------------------------- log (file + ring, survives reloads)
@@ -191,6 +191,7 @@ bool load_core_module(HMODULE& mod, const probe::CoreApi*& api, std::wstring& te
         DeleteFileW(temp.c_str());
         mod = nullptr;
         api = nullptr;
+        g_core_mtime = g_pending_mtime = mt;  // retry only after the next rebuild
         return false;
     }
     g_core_mtime = mt;
@@ -259,6 +260,7 @@ int call_on_frame_seh(const probe::CoreApi* core, uint64_t frame, DWORD* code, v
 // ---------------------------------------------------------------- D3D9 hooks
 constexpr int kSlotCreateDevice = 16;  // IDirect3D9 (SDK 10.0.26100 d3d9.h)
 constexpr int kSlotPresent = 17;       // IDirect3DDevice9
+constexpr int kSlotReset = 16;         // IDirect3DDevice9
 
 using Direct3DCreate9_t = IDirect3D9*(WINAPI*)(UINT);
 using CreateDevice_t = HRESULT(STDMETHODCALLTYPE*)(IDirect3D9*, UINT, D3DDEVTYPE, HWND, DWORD,
@@ -267,6 +269,10 @@ using Present_t = HRESULT(STDMETHODCALLTYPE*)(IDirect3DDevice9*, const RECT*, co
 Direct3DCreate9_t o_Direct3DCreate9 = nullptr;
 CreateDevice_t o_CreateDevice = nullptr;
 Present_t o_Present = nullptr;
+using Reset_t = HRESULT(STDMETHODCALLTYPE*)(IDirect3DDevice9*, D3DPRESENT_PARAMETERS*);
+Reset_t o_Reset = nullptr;
+std::atomic<probe::MsgHook> g_msg_hook{nullptr};
+std::atomic<probe::ResetHook> g_reset_hook{nullptr};
 
 std::atomic<IDirect3DDevice9*> g_device{nullptr};
 std::atomic<HWND> g_window{nullptr};
@@ -296,6 +302,15 @@ HRESULT STDMETHODCALLTYPE hk_Present(IDirect3DDevice9* dev, const RECT* src, con
     return o_Present(dev, src, dst, wnd, dirty);
 }
 
+HRESULT STDMETHODCALLTYPE hk_Reset(IDirect3DDevice9* dev, D3DPRESENT_PARAMETERS* pp) {
+    probe::ResetHook h = g_reset_hook.load();
+    if (h) h(0);  // core releases its D3D objects (overlay) before the reset
+    HRESULT hr = o_Reset(dev, pp);
+    logf("Reset hr=%08lx", hr);
+    if ((h = g_reset_hook.load())) h(1);
+    return hr;
+}
+
 HRESULT STDMETHODCALLTYPE hk_CreateDevice(IDirect3D9* d3d, UINT adapter, D3DDEVTYPE type, HWND focus, DWORD flags,
                                           D3DPRESENT_PARAMETERS* pp, IDirect3DDevice9** out) {
     HRESULT hr = o_CreateDevice(d3d, adapter, type, focus, flags, pp, out);
@@ -311,6 +326,8 @@ HRESULT STDMETHODCALLTYPE hk_CreateDevice(IDirect3D9* d3d, UINT adapter, D3DDEVT
             logf("ERROR: patching Present failed");
         else
             logf("Present hooked (orig=%p)", o_Present);
+        if (!patch_slot(*out, kSlotReset, reinterpret_cast<void*>(&hk_Reset), reinterpret_cast<void**>(&o_Reset)))
+            logf("ERROR: patching Reset failed");
     }
     return hr;
 }
@@ -335,6 +352,12 @@ std::atomic<bool> g_keep_active{true};
 
 LRESULT CALLBACK hk_WndProc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp) {
     const bool keep = g_keep_active.load(std::memory_order_relaxed);
+    if (probe::MsgHook h = g_msg_hook.load()) {
+        if (h(wnd, msg, wp, lp)) {  // overlay consumed it (e.g. typing in the panel)
+            if (keep) *reinterpret_cast<volatile int*>(kAppActive) = 1;
+            return 0;
+        }
+    }
     if (keep) {
         if (msg == WM_ACTIVATEAPP && !wp) wp = TRUE;
         if (msg == WM_ACTIVATE && LOWORD(wp) == WA_INACTIVE) wp = MAKEWPARAM(WA_ACTIVE, HIWORD(wp));
@@ -383,7 +406,8 @@ void init(HMODULE self) {
             if (e) *reinterpret_cast<volatile int*>(kAppActive) = 1;
         },
         [] { return *reinterpret_cast<volatile int*>(kAppActive); },
-        [] { g_reload_requested = true; }, [] { return g_reload_count.load(); }};
+        [] { g_reload_requested = true; }, [] { return g_reload_count.load(); },
+        [](probe::MsgHook h) { g_msg_hook = h; }, [](probe::ResetHook h) { g_reset_hook = h; }};
 
     if (const char* env = std::getenv("NFSU2_KEEP_ACTIVE")) g_keep_active = std::atoi(env) != 0;
     if (const wchar_t* env = _wgetenv(L"NFSU2_CORE"); env && *env)

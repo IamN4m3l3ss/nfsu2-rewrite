@@ -19,8 +19,8 @@ namespace game {
 std::vector<probe::GameRewrite>& registry();
 
 struct Registrar {
-    Registrar(uintptr_t addr, const char* name, const char* sig, void* fn, void** original) {
-        registry().push_back({addr, name, sig, fn, original});
+    Registrar(uintptr_t addr, const char* name, const char* sig, void* fn, void** original, const char* file = "") {
+        registry().push_back({addr, name, sig, fn, original, file});
     }
 };
 
@@ -28,7 +28,7 @@ struct Registrar {
 
 #define NFSU2_REWRITE(addr, fn, sig, original)                                                          \
     static ::game::Registrar g_reg_##fn(addr, #fn, sig, reinterpret_cast<void*>(&fn),                  \
-                                        reinterpret_cast<void**>(&original))
+                                        reinterpret_cast<void**>(&original), __FILE__)
 
 // read/write game globals by address
 template <class T> inline T& game_var(uintptr_t addr) { return *reinterpret_cast<T*>(addr); }

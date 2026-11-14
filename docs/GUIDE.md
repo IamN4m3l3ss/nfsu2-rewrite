@@ -45,6 +45,18 @@ Because the core and the rewrite reload themselves, you can keep driving while t
 | `tests/milestones/` | the checks that proved each milestone |
 | `docs/` | this guide, the day-by-day `DEVLOG.md`, `symbols.csv` (every named function), `structs/` (game data layouts) |
 
+## In-game panel (F8)
+
+Press **F8** in the game for the panel (F8 again hides it):
+
+- **Rewrites** — every rewritten function grouped by system, with a tick box to switch between our code and the
+  original, "All on" / "All off", and a **test** button that runs the side-by-side comparison right there.
+- **Car** — speed, gear, RPM, position, velocity, heading; copy the position to the clipboard.
+- **Probe** — versions, frame rate, FPU mode, keep-running-when-unfocused, reload.
+- **Log** — the probe's log, errors in red.
+
+The panel is part of the probe core, so it updates itself after a rebuild like everything else.
+
 ## Everyday commands
 
 Everything goes through one script in the project folder:

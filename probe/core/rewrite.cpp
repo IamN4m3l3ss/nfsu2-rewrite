@@ -18,6 +18,7 @@ struct Entry {
     std::string name, signature;
     void* replacement;
     void** original;
+    std::string system;    // game/systems/<system>/ folder of the source file
     bool hooked = false;   // MH_CreateHook succeeded
     bool enabled = false;  // rewrite active
     std::string disk_bytes, mem_bytes;  // first 8 bytes in the exe file vs. in memory before we hooked
@@ -129,9 +130,11 @@ bool load(const std::set<std::string>& enable) {
     auto get = mod ? reinterpret_cast<nfsu2_game_api_fn>(GetProcAddress(mod, "nfsu2_game_api")) : nullptr;
     const GameApi* api = get ? get() : nullptr;
     if (!api || api->version != kGameApiVersion) {
-        logf("rewrite: cannot load game DLL (LoadLibrary %s, api %s)", mod ? "ok" : "failed", api ? "version?" : "missing");
+        logf("rewrite: cannot load game DLL (LoadLibrary %s, api %u, want %u) - retrying after the next rebuild",
+             mod ? "ok" : "failed", api ? api->version : 0, kGameApiVersion);
         if (mod) FreeLibrary(mod);
         DeleteFileW(temp.c_str());
+        g_mtime = g_pending = mt;  // don't retry this same file every 30 frames
         return false;
     }
     unload_locked();  // the new one loaded fine: drop the old one
@@ -143,6 +146,13 @@ bool load(const std::set<std::string>& enable) {
     for (uint32_t i = 0; i < api->count; ++i) {
         const GameRewrite& r = api->rewrites[i];
         Entry e{r.addr, r.name, r.signature, r.replacement, r.original};
+        {
+            std::string f = r.file ? r.file : "";
+            for (char& c : f)
+                if (c == '\\') c = '/';
+            const size_t at = f.find("systems/");
+            e.system = at == std::string::npos ? "other" : f.substr(at + 8, f.find('/', at + 8) - (at + 8));
+        }
         uint8_t mem[8]{};
         mem_read(r.addr, mem, sizeof mem);
         e.mem_bytes = to_hex(mem, sizeof mem);
@@ -180,7 +190,7 @@ Entry* find(const json& p) {
 }
 
 json entry_json(const Entry& e) {
-    return {{"name", e.name}, {"addr", hex_addr(e.addr)}, {"signature", e.signature}, {"hooked", e.hooked},
+    return {{"name", e.name}, {"system", e.system}, {"addr", hex_addr(e.addr)}, {"signature", e.signature}, {"hooked", e.hooked},
             {"enabled", e.enabled}, {"disk_bytes", e.disk_bytes}, {"mem_bytes_before_hook", e.mem_bytes},
             {"patched_by_other_mod", e.mem_bytes != e.disk_bytes}};
 }
@@ -240,19 +250,48 @@ json rewrite_list() {
         5000);
 }
 
+namespace {
+void set_enabled(Entry* e, bool want) {  // render thread
+    if (!e->hooked) throw std::runtime_error("not hooked");
+    MH_STATUS s = want ? MH_EnableHook(reinterpret_cast<void*>(e->addr)) : MH_DisableHook(reinterpret_cast<void*>(e->addr));
+    if (s != MH_OK && s != MH_ERROR_ENABLED && s != MH_ERROR_DISABLED) throw std::runtime_error(MH_StatusToString(s));
+    e->enabled = want;
+    save_enabled_file();
+    logf("rewrite: %s %s", e->name.c_str(), want ? "ENABLED (rewrite)" : "disabled (original)");
+}
+}  // namespace
+
+// ---- direct access for the overlay (render thread only) ----
+std::vector<RewriteInfo> rewrite_snapshot() {
+    std::vector<RewriteInfo> v;
+    for (const Entry& e : g_entries) v.push_back({e.name, e.system, e.signature, e.addr, e.enabled, e.hooked});
+    return v;
+}
+bool rewrite_set(const std::string& name, bool on) {
+    for (Entry& e : g_entries)
+        if (e.name == name) {
+            try {
+                set_enabled(&e, on);
+                return true;
+            } catch (const std::exception& ex) {
+                logf("rewrite: %s: %s", name.c_str(), ex.what());
+                return false;
+            }
+        }
+    return false;
+}
+std::string rewrite_diff_now(const std::string& name, uint32_t iterations, uint32_t seed) {
+    if (!g_game) return "{\"error\":\"no game DLL\"}";
+    return g_game->diff(name.c_str(), iterations, seed);
+}
+std::string rewrite_build() { return g_build; }
+
 json rewrite_enable(const json& p) {
     const bool want = p.value("enabled", true);
     return run_on_main(
         [p, want] {
             Entry* e = find(p);
-            if (!e->hooked) throw std::runtime_error("not hooked");
-            MH_STATUS s = want ? MH_EnableHook(reinterpret_cast<void*>(e->addr))
-                               : MH_DisableHook(reinterpret_cast<void*>(e->addr));
-            if (s != MH_OK && s != MH_ERROR_ENABLED && s != MH_ERROR_DISABLED)
-                throw std::runtime_error(MH_StatusToString(s));
-            e->enabled = want;
-            save_enabled_file();
-            logf("rewrite: %s %s", e->name.c_str(), want ? "ENABLED (rewrite)" : "disabled (original)");
+            set_enabled(e, want);
             return entry_json(*e);
         },
         5000);

@@ -73,7 +73,7 @@ inline Case check_regs(const char* what, const void* orig, const void* mine, std
             __asm add esp, 4 * nargs __asm pop edx __asm pop ecx __asm ret                   \
     }                                                                                       \
     static ::game::Registrar g_reg_##fn(addr, #fn, sig, reinterpret_cast<void*>(&nfsu2_entry_##fn), \
-                                        reinterpret_cast<void**>(&original))
+                                        reinterpret_cast<void**>(&original), __FILE__)
 
 #define NFSU2_ENTRY(fn) reinterpret_cast<const void*>(&nfsu2_entry_##fn)
 
@@ -90,4 +90,4 @@ inline Case check_regs(const char* what, const void* orig, const void* mine, std
                 __asm ret                                                                             \
     }                                                                                                \
     static ::game::Registrar g_reg_##fn(addr, #fn, sig, reinterpret_cast<void*>(&nfsu2_entry_##fn),  \
-                                        reinterpret_cast<void**>(&original))
+                                        reinterpret_cast<void**>(&original), __FILE__)

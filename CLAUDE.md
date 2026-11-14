@@ -94,6 +94,7 @@ SPEED2.EXE (original, under Wine/Proton)
         ├─ hook manager (MinHook, x86): table of {addr, original, replacement, enabled}
         ├─ input injector (DirectInput8 GetDeviceState/GetDeviceData hooks)
         ├─ frame hook (IDirect3DDevice9::Present): screenshots, safe point for hot reload + queued calls
+        ├─ in-game panel (Dear ImGui 1.93.0, F8): rewrite toggles + diff tests, car telemetry, probe info, log
         └─ loads nfsu2_game.dll (ours: the rewrite) from a temp copy, hot-reloadable
 tools/probe/mcp_bridge.py  (stdio MCP server for Claude Code ↔ TCP to the probe)
 tools/game/run_game.sh     (launch, wait for probe, --freeroam boots into free roam)

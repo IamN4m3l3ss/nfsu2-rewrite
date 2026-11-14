@@ -92,7 +92,23 @@ void rewrite_shutdown();               // render thread: remove all rewrite hook
 json rewrite_list();
 json rewrite_enable(const json& params);  // {"name"|"addr", "enabled": bool}
 json rewrite_reload();
-json diff_test(const json& params);  // {"name": test|"*"|"list", "iterations", "seed"}
+json diff_test(const json& params);
+struct RewriteInfo {
+    std::string name, system, signature;
+    uintptr_t addr;
+    bool enabled, hooked;
+};
+std::vector<RewriteInfo> rewrite_snapshot();                                        // render thread
+bool rewrite_set(const std::string& name, bool on);                                  // render thread
+std::string rewrite_diff_now(const std::string& name, uint32_t iterations, uint32_t seed);  // render thread, JSON
+std::string rewrite_build();
+
+// ---- overlay.cpp (Dear ImGui panel, F8) ----
+void overlay_init();
+void overlay_frame();     // render thread, at Present after queued tasks
+void overlay_shutdown();
+bool overlay_wants_keyboard();
+bool overlay_wants_mouse();  // {"name": test|"*"|"list", "iterations", "seed"}
 
 // ---- server.cpp ----
 void server_start(uint16_t port);

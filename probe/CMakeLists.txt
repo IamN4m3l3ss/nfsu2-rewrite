@@ -25,7 +25,14 @@ add_library(nfsu2_core SHARED
   core/patches.cpp
   core/input.cpp
   core/car.cpp
-  core/rewrite.cpp)
+  core/rewrite.cpp
+  core/overlay.cpp)
+# Dear ImGui 1.93.0 for the in-game panel (F8), D3D9 + Win32 backends
+set(IMGUI_DIR ${CMAKE_SOURCE_DIR}/third_party/imgui)
+add_library(imgui STATIC ${IMGUI_DIR}/imgui.cpp ${IMGUI_DIR}/imgui_draw.cpp ${IMGUI_DIR}/imgui_tables.cpp
+  ${IMGUI_DIR}/imgui_widgets.cpp ${IMGUI_DIR}/backends/imgui_impl_dx9.cpp ${IMGUI_DIR}/backends/imgui_impl_win32.cpp)
+target_include_directories(imgui PUBLIC ${IMGUI_DIR})
+target_link_libraries(nfsu2_core PRIVATE imgui d3d9 dwmapi)
 target_include_directories(nfsu2_core PRIVATE core common ${CMAKE_SOURCE_DIR}/third_party/json)
 target_compile_definitions(nfsu2_core PRIVATE _CRT_SECURE_NO_WARNINGS)
 target_link_libraries(nfsu2_core PRIVATE minhook ws2_32 dxguid)

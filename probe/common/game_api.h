@@ -6,7 +6,7 @@
 
 namespace probe {
 
-constexpr uint32_t kGameApiVersion = 2;
+constexpr uint32_t kGameApiVersion = 3;  // v3: GameRewrite.file
 
 struct GameRewrite {
     uintptr_t addr;         // original function in SPEED2.EXE (NA v1.2)
@@ -14,6 +14,7 @@ struct GameRewrite {
     const char* signature;  // e.g. "void __cdecl(float real_dt)"
     void* replacement;      // our function, same calling convention and signature
     void** original;        // filled by the core: call this to run the original
+    const char* file;       // source file (game/systems/<system>/...), used to group rewrites by system
 };
 
 struct GameApi {

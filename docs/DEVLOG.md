@@ -421,3 +421,17 @@ return values.
 - bInvertMatrix: 3 seeds × 20,000 (incl. near-singular, singular, in place) + register test pass; live.
 
 **Coverage:** 42 verified of ~23,278, all live.
+
+## 2026-11-14 — M8: file/chunk loading starts with JDLZ
+
+- Note: I confused the user's session (closed with Alt+F4 before a usage-limit break) with a new launch, and read
+  its exit as a crash. Real issue found on the way: **Alt+F4 exit ends in a fail-fast (c0000409) inside CRT cleanup
+  of one of our DLLs** (offset 0xDBA8; symbolized candidates: vector emplace in game DLL / json dealloc in core).
+  Harmless for play; to fix (clean shutdown of probe/core/game DLLs at process exit). Also: a game launched from
+  the background terminal starts minimized on Wayland (fullscreen without focus) — the user can't see it.
+- Data reality check: `GlobalB.lzc`/`FrontB.lzc` in this install contain no JDLZ; 86 files do (car/global textures).
+- `game/src/bchunk/jdlz.cpp`: JdlzDecompress 0x573700 (function-pointer target, no direct callers). Diff test
+  decompresses all real blocks (861) from three texture packs with both versions into guarded buffers: identical.
+  Register test incl. bad header. Live.
+
+**Coverage:** 43 verified of ~23,278, all live.

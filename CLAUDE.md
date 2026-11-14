@@ -74,7 +74,9 @@ registers a small function doesn't touch (ECX live across bSin) and on pointers 
 in EAX, and every diff test file includes a register test (`game/src/regs.h`, `tools/re/regcontract.py`).
 
 **Data:** EA chunk bundles (`u32 id, u32 size`; high bit `0x80000000` = container). `GLOBAL/GlobalB.lzc` and
-`FRONTEND/FrontB.lzc` are JDLZ-compressed (magic `JDLZ`); uncompressed `GLOBAL/GLOBALB.BUN` also exists.
+`FRONTEND/FrontB.lzc` are chunk containers (`0xB3300000`) — in this (HD repack) install they contain NO JDLZ blocks;
+JDLZ v2 data lives in texture packs (`CARS/TEXTURES.BIN` 541 blocks, `CARS/<car>/TEXTURES.BIN`, `GLOBAL/DYNTEX.BIN`,
+`FRONTEND/MAGAZINES_STREAMING_HIGH.bin`). Decompressor: `0x573700`. Uncompressed `GLOBAL/GLOBALB.BUN` also exists.
 Tracks: `TRACKS/L4Rx.BUN` + `TRACKS/STREAML4Rx.BUN` (x = A,B,C,D,F,G,H,R; STREAML4RA is 118 MB = most of Bayview),
 per-event routes `TRACKS/ROUTESL4Rx/`. Event table chunk `0x00034201` in GLOBALB (IDs from 4001).
 Cars: `CARS/<NAME>/GEOMETRY.BIN, TEXTURES.BIN, VINYLS.BIN`. The exe loads tracks via format strings

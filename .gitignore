@@ -24,3 +24,6 @@ SAVE/
 __pycache__/
 *.pyc
 .venv/
+
+# CLion / IDE settings (personal)
+.idea/

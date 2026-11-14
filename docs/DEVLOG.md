@@ -249,3 +249,10 @@
 **Open**
 - Make AI repeatable (find EA's RNG + seed, and/or start recordings at a fixed frame after loading) or find the real
   traffic spawner for a true no-traffic switch.
+
+## 2026-11-14 — AI cars mapped from a live traffic car
+
+With the user parked next to a traffic car: scanned memory for RigidBodies (vtable `0x7A20C4` + tag `'Rigi'`,
+6 found, the traffic car 2.9 m away), walked back to its MellowMover (`'Melo'`) and PsychoDriver, found the AI roster
+of 14 controllers at `0x89CE58` (player, 3 RaceCarControllers, 10 TrafficControllers), and named every class through
+its vtable slot-2 name method. Details: `docs/structs/traffic.md`.

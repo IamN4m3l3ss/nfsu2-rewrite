@@ -73,7 +73,8 @@ Cars: `CARS/<NAME>/GEOMETRY.BIN, TEXTURES.BIN, VINYLS.BIN`. The exe loads tracks
 
 ```
 SPEED2.EXE (original, under Wine/Proton)
-  └─ dinput8.dll (ASI loader) ─► nfsu2_probe.asi   (ours, C++, 32-bit)
+  └─ dinput8.dll (ASI loader) ─► nfsu2_probe.asi   (ours: stable loader — D3D hooks, keep_active, log)
+        └─ nfsu2_core.dll (ours: hot-reloadable core — server, input, car, schedules; reloads when rebuilt)
         ├─ TCP JSON-RPC server on 127.0.0.1:<port>   (game side)
         ├─ hook manager (MinHook, x86): table of {addr, original, replacement, enabled}
         ├─ input injector (DirectInput8 GetDeviceState/GetDeviceData hooks)
@@ -82,6 +83,12 @@ SPEED2.EXE (original, under Wine/Proton)
 tools/mcp_bridge.py  (stdio MCP server for Claude Code ↔ TCP to the probe)
 tools/run_game.sh    (launch, clean profile, wait for probe, boot to free roam)
 ```
+
+Probe hot reload (done 14 Nov 2026): the loader loads `out/nfsu2_core.dll` (env `NFSU2_CORE`, set by
+`run_game.sh`) from a temp copy and reloads it at Present when the file changes (or on `reload`). The old core stops
+its server, fails queued tasks, restores every vtable slot it patched, and hands its state (DirectInput devices +
+key→action maps) to the new core as JSON. Interface: `probe/common/api.h` (C types only; each DLL has its own static
+CRT). Loader changes still need a game restart.
 
 Rules for the probe:
 - **Anything that calls game code or changes hooks runs on the game's main thread**, queued and executed at the

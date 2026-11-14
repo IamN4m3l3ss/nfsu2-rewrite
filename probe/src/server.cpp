@@ -8,6 +8,7 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
+#include <atomic>
 #include <stdexcept>
 #include <thread>
 
@@ -22,7 +23,8 @@ uintptr_t parse_addr(const json& v) {
 
 json dispatch(const std::string& method, const json& p) {
     if (method == "ping") {
-        return {{"pong", true}, {"version", kVersion}, {"pid", GetCurrentProcessId()},
+        return {{"pong", true}, {"version", kVersion}, {"core_build", core_build()}, {"reload_count", api().reload_count()},
+                {"loader", api().loader_version}, {"pid", GetCurrentProcessId()},
                 {"uptime_ms", GetTickCount64()}, {"frames", d3d_info()["frames"]}};
     }
     if (method == "info") {
@@ -66,6 +68,10 @@ json dispatch(const std::string& method, const json& p) {
         return log_tail(p.value("n", 50u), p.value("since", uint64_t{0}));
     }
     if (method == "keep_active") return keep_active(p);
+    if (method == "reload") {
+        api().request_reload();
+        return {{"requested", true}, {"reload_count", api().reload_count()}};
+    }
     if (method == "no_traffic") return no_traffic(p);
     if (method == "key") return input_key(p);
     if (method == "release_all") return input_release_all();
@@ -124,6 +130,11 @@ void serve_client(SOCKET c) {
     }
 }
 
+std::atomic<bool> g_stop{false};
+std::atomic<SOCKET> g_listen{INVALID_SOCKET};
+std::atomic<SOCKET> g_client{INVALID_SOCKET};
+std::thread g_thread;
+
 void server_thread(uint16_t port) {
     WSADATA wsa;
     if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
@@ -137,26 +148,48 @@ void server_thread(uint16_t port) {
     a.sin_family = AF_INET;
     a.sin_port = htons(port);
     a.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    if (bind(ls, reinterpret_cast<sockaddr*>(&a), sizeof a) != 0 || listen(ls, 4) != 0) {
+    // a reload can race the old socket's teardown: retry bind briefly
+    int tries = 0;
+    while (bind(ls, reinterpret_cast<sockaddr*>(&a), sizeof a) != 0 && ++tries < 50 && !g_stop) Sleep(100);
+    if (tries >= 50 || listen(ls, 4) != 0) {
         logf("ERROR: cannot listen on 127.0.0.1:%u (wsa %d)", port, WSAGetLastError());
         closesocket(ls);
+        WSACleanup();
         return;
     }
+    g_listen = ls;
     logf("listening on 127.0.0.1:%u", port);
-    for (;;) {
+    while (!g_stop) {
         SOCKET c = accept(ls, nullptr, nullptr);
-        if (c == INVALID_SOCKET) continue;
+        if (c == INVALID_SOCKET) continue;  // closed by server_stop, or transient
+        if (g_stop) {
+            closesocket(c);
+            break;
+        }
         int one = 1;
         setsockopt(c, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&one), sizeof one);
+        g_client = c;
         serve_client(c);  // one client at a time; the bridge connects per call
+        g_client = INVALID_SOCKET;
         closesocket(c);
     }
+    WSACleanup();
 }
 
 }  // namespace
 
 void server_start(uint16_t port) {
-    std::thread(server_thread, port).detach();
+    g_stop = false;
+    g_thread = std::thread(server_thread, port);
+}
+
+void server_stop() {
+    g_stop = true;
+    SOCKET ls = g_listen.exchange(INVALID_SOCKET);
+    if (ls != INVALID_SOCKET) closesocket(ls);  // unblocks accept
+    SOCKET c = g_client.load();
+    if (c != INVALID_SOCKET) shutdown(c, SD_BOTH);  // unblocks recv; serve_client returns
+    if (g_thread.joinable()) g_thread.join();
 }
 
 }  // namespace probe

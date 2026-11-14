@@ -1,4 +1,4 @@
-// nfsu2_probe: shared declarations
+// nfsu2_core: declarations shared by the hot-reloadable core's sources
 #pragma once
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -11,14 +11,20 @@
 
 #include <nlohmann/json.hpp>
 
+#include "api.h"
+
 namespace probe {
 
 using json = nlohmann::json;
-constexpr const char* kVersion = "0.1.0";
+constexpr const char* kVersion = "0.2.1";
 constexpr uint16_t kDefaultPort = 47800;  // override with env NFSU2_PROBE_PORT
 
-// ---- log.cpp ----
-void log_init(const std::wstring& path);
+// ---- core_main.cpp ----
+const LoaderApi& api();
+bool has_api();
+const char* core_build();
+
+// ---- log.cpp (forwards to the loader) ----
 void logf(const char* fmt, ...);
 // last `n` lines with sequence number > since
 json log_tail(size_t n, uint64_t since);
@@ -29,8 +35,9 @@ bool mem_write(uintptr_t addr, const void* data, size_t size);
 // pattern: hex bytes separated by spaces, "??" or "?" = wildcard
 std::vector<uintptr_t> aob_scan(const std::string& pattern, uintptr_t start, uintptr_t end, size_t max_hits);
 
-// ---- d3d.cpp ----
-bool d3d_install_hooks();
+// ---- d3d.cpp (task queue + screenshots; the loader owns the D3D hooks) ----
+void run_tasks();    // render thread, from on_frame
+void tasks_close();  // fail queued tasks (shutdown)
 json d3d_info();
 // Run fn on the render thread at the next Present (before the original Present). Blocks up to timeout_ms.
 // Throws std::runtime_error on timeout.
@@ -39,7 +46,6 @@ json screenshot(int scale);  // must be called on the render thread
 uint64_t current_frame();
 
 // ---- patches.cpp ----
-bool patches_install();
 json keep_active(const json& params);  // {"enabled": bool}? -> state
 bool keep_active_enabled();
 json no_traffic(const json& params);  // {"enabled": bool}? -> state
@@ -50,6 +56,9 @@ bool input_install_hooks();
 json input_key(const json& params);  // {"key": DIK, "action": "press"|"hold"|"release", "ms": n}
 json input_release_all();
 json input_state();
+json input_save_state();                 // devices + key->action maps, for the next core after a reload
+void input_restore_state(const json& s);  // re-patch the devices from a previous core's state
+void input_shutdown();                    // restore every vtable slot this core patched
 
 // ---- car.cpp ----
 struct CarSample {
@@ -77,6 +86,7 @@ json trace_stop();
 
 // ---- server.cpp ----
 void server_start(uint16_t port);
+void server_stop();
 
 // ---- main.cpp ----
 struct ExeInfo {

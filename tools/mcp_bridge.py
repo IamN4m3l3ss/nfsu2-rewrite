@@ -70,6 +70,13 @@ def log_tail(n: int = 50) -> str:
 
 
 @server.tool()
+def reload_core() -> dict:
+    """Reload the probe core (out/nfsu2_core.dll) inside the running game. Rebuilding the core also triggers this
+    automatically within ~0.5 s. Returns the new core's ping (build stamp, reload_count)."""
+    return pc.reload()
+
+
+@server.tool()
 def keep_active(enabled: bool | None = None) -> dict:
     """Get/set whether the game keeps running when its window loses focus (probe patch, default on)."""
     return pc.call("keep_active", {} if enabled is None else {"enabled": enabled})

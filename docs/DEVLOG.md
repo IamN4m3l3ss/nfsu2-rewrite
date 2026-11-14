@@ -209,3 +209,23 @@
 - A *live* human drive drifts from its replay from the first input on (3 cm at +17 frames, ~1 m after 10 s, then
   a wall). The recording misses something the game takes from live input. Next: short live drive with a per-frame
   trace vs. its replay, find the first divergent frame and field.
+
+## 2026-11-14 — probe hot reload (user request: play while the probe changes)
+
+**Changed**
+- Probe split: `nfsu2_probe.asi` = stable loader (`probe/loader/loader.cpp`: exe hash, log file + ring, D3D9
+  Direct3DCreate9/CreateDevice/Present hooks, keep_active WndProc hook, core management); `nfsu2_core.dll` = core
+  (`probe/src/`: server, input, car, schedule/record/trace, screenshots, no_traffic). Interface `probe/common/api.h`.
+- Loader loads the core from a temp copy of `out/nfsu2_core.dll` (path via env `NFSU2_CORE`), polls its mtime twice a
+  second at Present and reloads once it stopped changing; `reload` RPC / `tools/probe.py reload` / MCP `reload_core`.
+  New core is loaded before the old one is shut down, so a broken build leaves the running core in place.
+- Core shutdown: stop server thread (close listen socket, shut down client, join), fail queued tasks, save input state
+  (devices, kinds, key→action maps), restore every patched vtable slot that still points at us, MH_Uninitialize.
+  Core init after reload re-patches the saved devices. Exceptions in the core's per-frame code are caught (SEH) and
+  disable the core until the next reload.
+- Screenshots: `work/screenshots` capped at the newest 20 (user request).
+
+**Verified** (one game session, no restart)
+- `touch out/nfsu2_core.dll` → reload #1: keyboard restored with 53 mapped keys, injected W drove the car 5 m.
+- Version bump + rebuild → auto reload #2 picked up `0.2.1`; `tools/probe.py reload` → #3.
+- After 3 reloads: car_state, screenshot, schedule + trace, no_traffic, keep_active, log_tail all OK.

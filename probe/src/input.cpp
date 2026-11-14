@@ -352,6 +352,33 @@ bool patch(void* obj, int slot, void* detour, void** original) {
     return mem_write(reinterpret_cast<uintptr_t>(&vt[slot]), &detour, sizeof detour);
 }
 
+// patch the device's vtable (shared by devices of the same class) once; called with g_mu held
+void patch_device_locked(void* dev) {
+    void* vt = vtbl_of(dev);
+    if (g_dev_vtbl.count(vt)) return;
+    DevVtbl& v = g_dev_vtbl[vt];
+    bool ok = patch(dev, kSlotAcquire, reinterpret_cast<void*>(&hk_Acquire), reinterpret_cast<void**>(&v.acquire)) &&
+              patch(dev, kSlotGetDeviceState, reinterpret_cast<void*>(&hk_GetDeviceState),
+                    reinterpret_cast<void**>(&v.get_state)) &&
+              patch(dev, kSlotGetDeviceData, reinterpret_cast<void*>(&hk_GetDeviceData),
+                    reinterpret_cast<void**>(&v.get_data)) &&
+              patch(dev, kSlotSetDataFormat, reinterpret_cast<void*>(&hk_SetDataFormat),
+                    reinterpret_cast<void**>(&v.set_format)) &&
+              patch(dev, kSlotSetCooperativeLevel, reinterpret_cast<void*>(&hk_SetCoop),
+                    reinterpret_cast<void**>(&v.set_coop)) &&
+              patch(dev, kSlotBuildActionMap, reinterpret_cast<void*>(&hk_BuildActionMap),
+                    reinterpret_cast<void**>(&v.build_map)) &&
+              patch(dev, kSlotSetActionMap, reinterpret_cast<void*>(&hk_SetActionMap),
+                    reinterpret_cast<void**>(&v.set_map));
+    logf("device vtable %p patched: %s", vt, ok ? "ok" : "FAILED");
+}
+
+// write `orig` back into vt[slot] if it still points at our detour (never undo someone else's later patch)
+void unpatch(void* vt, int slot, void* detour, void* orig) {
+    void** v = static_cast<void**>(vt);
+    if (orig && v[slot] == detour) mem_write(reinterpret_cast<uintptr_t>(&v[slot]), &orig, sizeof orig);
+}
+
 HRESULT STDMETHODCALLTYPE hk_CreateDevice(void* di, REFGUID guid, void** out, LPUNKNOWN outer) {
     CreateDevice_t o;
     {
@@ -368,24 +395,7 @@ HRESULT STDMETHODCALLTYPE hk_CreateDevice(void* di, REFGUID guid, void** out, LP
     void* dev = *out;
     std::lock_guard lk(g_mu);
     g_devs[dev].kind = kind;
-    void* vt = vtbl_of(dev);
-    if (!g_dev_vtbl.count(vt)) {
-        DevVtbl& v = g_dev_vtbl[vt];
-        bool ok = patch(dev, kSlotAcquire, reinterpret_cast<void*>(&hk_Acquire), reinterpret_cast<void**>(&v.acquire)) &&
-                  patch(dev, kSlotGetDeviceState, reinterpret_cast<void*>(&hk_GetDeviceState),
-                        reinterpret_cast<void**>(&v.get_state)) &&
-                  patch(dev, kSlotGetDeviceData, reinterpret_cast<void*>(&hk_GetDeviceData),
-                        reinterpret_cast<void**>(&v.get_data)) &&
-                  patch(dev, kSlotSetDataFormat, reinterpret_cast<void*>(&hk_SetDataFormat),
-                        reinterpret_cast<void**>(&v.set_format)) &&
-                  patch(dev, kSlotSetCooperativeLevel, reinterpret_cast<void*>(&hk_SetCoop),
-                        reinterpret_cast<void**>(&v.set_coop)) &&
-                  patch(dev, kSlotBuildActionMap, reinterpret_cast<void*>(&hk_BuildActionMap),
-                        reinterpret_cast<void**>(&v.build_map)) &&
-                  patch(dev, kSlotSetActionMap, reinterpret_cast<void*>(&hk_SetActionMap),
-                        reinterpret_cast<void**>(&v.set_map));
-        logf("device vtable %p patched: %s", vt, ok ? "ok" : "FAILED");
-    }
+    patch_device_locked(dev);
     return hr;
 }
 
@@ -581,6 +591,55 @@ json record_stop() {
     t["events"] = events;
     t["frames"] = frames;
     return t;
+}
+
+json input_save_state() {
+    std::lock_guard lk(g_mu);
+    json devs = json::array();
+    for (auto& [dev, info] : g_devs) {
+        json acts = json::object();
+        for (auto& [dik, ids] : info.key_actions) {
+            json a = json::array();
+            for (UINT_PTR id : ids) a.push_back(static_cast<uint32_t>(id));
+            acts[std::to_string(dik)] = a;
+        }
+        devs.push_back({{"dev", reinterpret_cast<uintptr_t>(dev)}, {"kind", static_cast<int>(info.kind)},
+                        {"actions", acts}});
+    }
+    return {{"devices", devs}};
+}
+
+void input_restore_state(const json& st) {
+    if (!st.contains("input")) return;
+    std::lock_guard lk(g_mu);
+    for (const json& d : st["input"]["devices"]) {
+        void* dev = reinterpret_cast<void*>(d["dev"].get<uintptr_t>());
+        DevInfo& info = g_devs[dev];
+        info.kind = static_cast<Kind>(d["kind"].get<int>());
+        for (auto& [dik, ids] : d["actions"].items())
+            for (const json& id : ids) info.key_actions[static_cast<uint8_t>(std::stoi(dik))].push_back(id.get<uint32_t>());
+        patch_device_locked(dev);
+        logf("restored device %p (%s, %zu mapped keys)", dev, kind_name(info.kind), info.key_actions.size());
+    }
+}
+
+void input_shutdown() {
+    std::lock_guard lk(g_mu);
+    for (auto& [vt, o] : g_di_create)
+        unpatch(vt, kSlotCreateDevice, reinterpret_cast<void*>(&hk_CreateDevice), reinterpret_cast<void*>(o));
+    for (auto& [vt, v] : g_dev_vtbl) {
+        unpatch(vt, kSlotAcquire, reinterpret_cast<void*>(&hk_Acquire), reinterpret_cast<void*>(v.acquire));
+        unpatch(vt, kSlotGetDeviceState, reinterpret_cast<void*>(&hk_GetDeviceState), reinterpret_cast<void*>(v.get_state));
+        unpatch(vt, kSlotGetDeviceData, reinterpret_cast<void*>(&hk_GetDeviceData), reinterpret_cast<void*>(v.get_data));
+        unpatch(vt, kSlotSetDataFormat, reinterpret_cast<void*>(&hk_SetDataFormat), reinterpret_cast<void*>(v.set_format));
+        unpatch(vt, kSlotSetCooperativeLevel, reinterpret_cast<void*>(&hk_SetCoop), reinterpret_cast<void*>(v.set_coop));
+        unpatch(vt, kSlotBuildActionMap, reinterpret_cast<void*>(&hk_BuildActionMap), reinterpret_cast<void*>(v.build_map));
+        unpatch(vt, kSlotSetActionMap, reinterpret_cast<void*>(&hk_SetActionMap), reinterpret_cast<void*>(v.set_map));
+    }
+    g_di_create.clear();
+    g_dev_vtbl.clear();
+    g_devs.clear();
+    logf("input hooks removed");
 }
 
 }  // namespace probe

@@ -91,6 +91,12 @@ log="$LOG_DIR/game_$(date +%Y%m%d_%H%M%S).log"
 ln -sfn "$log" "$LOG_DIR/game_latest.log"
 
 export WINEDLLOVERRIDES="dinput8=n,b;d3d9=n,b"
+# The loader (scripts/nfsu2_probe.asi) loads the core straight from the build output and reloads it whenever
+# out/nfsu2_core.dll changes: rebuild while the game runs.
+if [[ -f "$ROOT/out/nfsu2_core.dll" ]]; then
+  NFSU2_CORE="$(winepath -w "$ROOT/out/nfsu2_core.dll" 2>/dev/null)"
+  export NFSU2_CORE
+fi
 export WINEDEBUG="${WINEDEBUG:-err+all,fixme-all}"
 
 cmd=("$WINE" SPEED2.EXE)

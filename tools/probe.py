@@ -9,6 +9,7 @@
   tools/probe.py shot [SCALE]          -> saves PNG under work/screenshots/, prints the path
   tools/probe.py press KEY [MS] | hold KEY | release KEY | release_all | input
                                        -> DirectInput key injection (names from tools/dik.py, e.g. enter, up, esc)
+  tools/probe.py reload               -> reload the core now (it also auto-reloads when out/nfsu2_core.dll changes)
   tools/probe.py wait [TIMEOUT]        -> wait until the probe answers
   tools/probe.py ready [TIMEOUT]       -> wait until the probe answers and frames are being presented
 """
@@ -65,6 +66,8 @@ def main(argv: list[str]) -> int:
         elif cmd in ("press", "hold", "release"):
             ms = int(args[1]) if len(args) > 1 else 100
             print(json.dumps(pc.key(args[0], cmd, ms)))
+        elif cmd == "reload":
+            print(json.dumps(pc.reload()))
         elif cmd == "release_all":
             print(json.dumps(pc.call("release_all")))
         elif cmd == "input":

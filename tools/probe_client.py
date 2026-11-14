@@ -70,6 +70,16 @@ def wait_frames(timeout: float = 60.0, min_frames: int = 2, port: int = DEFAULT_
     raise ProbeError(f"no frames after {timeout}s (last ping: {r})")
 
 
+KEEP_SHOTS = 20
+
+
+def prune_shots(keep: int = KEEP_SHOTS) -> None:
+    """Keep only the newest `keep` screenshots in work/screenshots (references live in work/oracle, work/boot_refs)."""
+    shots = sorted(SHOT_DIR.glob("shot_*.png"), key=lambda p: p.stat().st_mtime)
+    for p in shots[:-keep]:
+        p.unlink(missing_ok=True)
+
+
 def screenshot_png(scale: int = 2, port: int = DEFAULT_PORT, save: bool = True) -> tuple[bytes, dict, Path | None]:
     """Returns (png bytes, metadata, saved path)."""
     from PIL import Image
@@ -85,7 +95,24 @@ def screenshot_png(scale: int = 2, port: int = DEFAULT_PORT, save: bool = True) 
         SHOT_DIR.mkdir(parents=True, exist_ok=True)
         path = SHOT_DIR / time.strftime(f"shot_%Y%m%d_%H%M%S_f{r['frame']}.png")
         path.write_bytes(png)
+        prune_shots()
     return png, r, path
+
+
+def reload(timeout: float = 15.0, port: int = DEFAULT_PORT) -> dict:
+    """Ask the loader to reload the core now and wait until the new core answers."""
+    before = call("ping", port=port)["reload_count"]
+    call("reload", port=port)
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        time.sleep(0.2)
+        try:
+            r = call("ping", port=port, timeout=2.0)
+            if r["reload_count"] > before:
+                return r
+        except ProbeError:
+            pass  # server is restarting
+    raise ProbeError("core did not come back after reload")
 
 
 def key(name, action: str = "press", ms: int = 100, port: int = DEFAULT_PORT) -> dict:

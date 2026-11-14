@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Launch / stop NFSU2 under the project's Wine prefix.
 #
-#   tools/run_game.sh [--freeroam] [--desktop WxH] [--wait] [--no-probe] [--timeout SEC]
+#   tools/run_game.sh [--freeroam] [--no-traffic] [--desktop WxH] [--wait] [--no-probe] [--timeout SEC]
 #   tools/run_game.sh --kill
 #
 # By default returns once the probe answers and the game has presented frames ("ready").
+# --no-traffic: probe stops traffic from startup (repeatable drives).
 # --freeroam then drives the menus into Explore Mode with injected keys (tools/boot_freeroam.py, needs a save).
 #
 # The game runs from work/profile: a symlink copy of GAME_DIR, so the user's folder is never written to.
@@ -48,6 +49,7 @@ while [[ $# -gt 0 ]]; do
     --wait) wait_exit=1; shift ;;
     --no-probe) wait_probe=0; shift ;;
     --freeroam) freeroam=1; shift ;;
+    --no-traffic) export NFSU2_NO_TRAFFIC=1; shift ;;
     --timeout) probe_timeout="$2"; shift 2 ;;
     --kill)
       kill_game || { echo "game still running after kill" >&2; exit 6; }

@@ -42,6 +42,8 @@ uint64_t current_frame();
 bool patches_install();
 json keep_active(const json& params);  // {"enabled": bool}? -> state
 bool keep_active_enabled();
+json no_traffic(const json& params);  // {"enabled": bool}? -> state
+void no_traffic_apply_env();         // NFSU2_NO_TRAFFIC=1 at startup
 
 // ---- input.cpp ----
 bool input_install_hooks();
@@ -57,6 +59,8 @@ struct CarSample {
     float pos[3]{}, forward[3]{}, up[3]{}, side[3]{}, vel[3]{}, angvel[3]{};
     int gear = 0;
     float engine_rad_s = 0;
+    uint32_t watch[8]{};  // raw dwords of the trace's watch addresses
+    uint8_t nwatch = 0;
 };
 bool car_read(CarSample& s);  // false if not in game / chain invalid
 json car_sample_json(const CarSample& s);

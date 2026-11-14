@@ -73,6 +73,7 @@ void init(HMODULE self) {
     } else {
         d3d_install_hooks();
         patches_install();
+        no_traffic_apply_env();
         input_install_hooks();
     }
     server_start(port);

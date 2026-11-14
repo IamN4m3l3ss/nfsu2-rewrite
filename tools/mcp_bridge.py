@@ -107,6 +107,13 @@ def input_state() -> dict:
 
 
 @server.tool()
+def no_traffic(enabled: bool | None = None) -> dict:
+    """Get/set traffic off (patches the traffic update at 0x42F910 to return, like ZMenu's No Traffic).
+    For repeatable drives start the game with tools/run_game.sh --no-traffic instead."""
+    return pc.call("no_traffic", {} if enabled is None else {"enabled": enabled})
+
+
+@server.tool()
 def car_state() -> dict:
     """Player car telemetry: position, forward/up/side axes, velocity, speed (m/s, km/h), gear (1=N, 2=1st), rpm,
     game state (3 frontend, 6 in game), frame time. Errors when not in game."""

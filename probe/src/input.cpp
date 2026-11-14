@@ -101,6 +101,7 @@ std::vector<RecEvent> g_rec;
 bool g_trace_active = false;
 uint64_t g_trace_base = 0, g_trace_every = 30;
 std::vector<CarSample> g_trace;
+std::vector<uintptr_t> g_trace_watch;  // extra addresses sampled with every trace sample (max 8)
 
 const char* kind_name(Kind k) { return k == Kind::Keyboard ? "keyboard" : k == Kind::Mouse ? "mouse" : "other"; }
 
@@ -488,10 +489,13 @@ void input_frame_tick(uint64_t frame) {
         else
             set_key_locked(static_cast<uint8_t>(e.code), e.down);
     }
-    if (g_trace_active && (frame - g_trace_base) % g_trace_every == 0) {
+    if (g_trace_active && frame >= g_trace_base && (frame - g_trace_base) % g_trace_every == 0) {
         CarSample cs;
         cs.frame = frame - g_trace_base;
-        if (car_read(cs)) g_trace.push_back(cs);
+        const bool ok = car_read(cs);
+        cs.nwatch = static_cast<uint8_t>(std::min<size_t>(8, g_trace_watch.size()));
+        for (uint8_t i = 0; i < cs.nwatch; ++i) mem_read(g_trace_watch[i], &cs.watch[i], 4);
+        if (ok || cs.nwatch) g_trace.push_back(cs);
     }
 }
 
@@ -530,6 +534,9 @@ json trace_start(const json& p) {
     std::lock_guard lk(g_mu);
     g_trace.clear();
     g_trace_every = std::max<uint64_t>(1, p.value("every", uint64_t{30}));
+    g_trace_watch.clear();
+    if (p.contains("watch"))
+        for (const json& a : p["watch"]) g_trace_watch.push_back(static_cast<uintptr_t>(a.get<uint64_t>()));
     g_trace_base = current_frame() + 1;
     g_trace_active = true;
     return {{"base_frame", g_trace_base}, {"every", g_trace_every}};
@@ -539,7 +546,15 @@ json trace_stop() {
     std::lock_guard lk(g_mu);
     g_trace_active = false;
     json arr = json::array();
-    for (const CarSample& cs : g_trace) arr.push_back(car_sample_json(cs));
+    for (const CarSample& cs : g_trace) {
+        json j = car_sample_json(cs);
+        if (cs.nwatch) {
+            json w = json::array();
+            for (uint8_t i = 0; i < cs.nwatch; ++i) w.push_back(cs.watch[i]);
+            j["watch"] = w;
+        }
+        arr.push_back(j);
+    }
     return {{"samples", arr}, {"every", g_trace_every}};
 }
 

@@ -188,3 +188,24 @@
 
 **Open**
 - The test road is a 30 m straight; a longer route with steering/shifting/traffic is the real stress test.
+
+## 2026-11-14 — no-traffic switch, determinism findings
+
+**Changed**
+- Probe `no_traffic` (MCP tool, `run_game.sh --no-traffic`): `0x42F910` (per-frame traffic update, `__thiscall`,
+  1 arg, only caller `0x609ED7`) patched to `ret 4`, the same patch ZMenu's "No Traffic" makes (found by tracing
+  its menu label to the handler at `0x10057DA0` in ZMenuU2.asi). Refuses if the original bytes aren't there.
+- Trace samples can carry raw dwords of up to 8 watch addresses (`trace_start {"watch": [...]}`).
+
+**Verified**
+- Frame timing is fixed: frame time `0x865198` = 1/60, tick count `0x865140` = 30, mode `0x7FB700` = 2 on every
+  frame while driving. The sim advances one fixed step per presented frame.
+- Determinism: a scripted run and its recorded replay read identical event streams and end 0.000 m apart; two
+  replays of the user's 60 s / ~1 km route (no traffic) are identical to the millimetre at all checkpoints.
+- `WM_KEYDOWN` in MainWndProc only handles End/Home/Left/Right (cursor of a list/console at `0x8709B8`, only while
+  `0x8709BC` is set) and F12 (`0x870994`); not driving input.
+
+**Open**
+- A *live* human drive drifts from its replay from the first input on (3 cm at +17 frames, ~1 m after 10 s, then
+  a wall). The recording misses something the game takes from live input. Next: short live drive with a per-frame
+  trace vs. its replay, find the first divergent frame and field.

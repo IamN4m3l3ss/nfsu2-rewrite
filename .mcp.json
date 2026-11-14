@@ -4,7 +4,7 @@
       "type": "stdio",
       "command": "/home/nameless/CLionProjects/nfsu2-rewrite/.venv/bin/python",
       "args": [
-        "/home/nameless/CLionProjects/nfsu2-rewrite/tools/mcp_bridge.py"
+        "/home/nameless/CLionProjects/nfsu2-rewrite/tools/probe/mcp_bridge.py"
       ],
       "env": {}
     }

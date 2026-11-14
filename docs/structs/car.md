@@ -1,7 +1,7 @@
 # Player car (telemetry)
 
 Chain and fields first found in the user's Camera Toolkit fork notes (`/mnt/m2drive/waah/games/NFSU2 Mod/CLAUDE.md`);
-every field below was re-verified live on 2026-11-14 with the probe (`probe/src/car.cpp`).
+every field below was re-verified live on 2026-11-14 with the probe (`probe/core/car.cpp`).
 
 ```
 CarState* player = *(CarState**)0x0089CCF8          // render-side mirror (don't write it)

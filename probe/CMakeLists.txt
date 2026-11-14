@@ -17,16 +17,16 @@ set_target_properties(nfsu2_probe PROPERTIES
 
 # Hot-reloadable core: server, input, car, schedules, screenshots. Rebuild -> the running game reloads it.
 add_library(nfsu2_core SHARED
-  src/core_main.cpp
-  src/log.cpp
-  src/mem.cpp
-  src/d3d.cpp
-  src/server.cpp
-  src/patches.cpp
-  src/input.cpp
-  src/car.cpp
-  src/rewrite.cpp)
-target_include_directories(nfsu2_core PRIVATE src common ${CMAKE_SOURCE_DIR}/third_party/json)
+  core/core_main.cpp
+  core/log.cpp
+  core/mem.cpp
+  core/d3d.cpp
+  core/server.cpp
+  core/patches.cpp
+  core/input.cpp
+  core/car.cpp
+  core/rewrite.cpp)
+target_include_directories(nfsu2_core PRIVATE core common ${CMAKE_SOURCE_DIR}/third_party/json)
 target_compile_definitions(nfsu2_core PRIVATE _CRT_SECURE_NO_WARNINGS)
 target_link_libraries(nfsu2_core PRIVATE minhook ws2_32 dxguid)
 set_target_properties(nfsu2_core PROPERTIES

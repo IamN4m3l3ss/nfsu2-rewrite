@@ -33,7 +33,7 @@ A function counts as **verified** only when our C++ replaces the original inside
 | Camera | 0 | ⬜ not started |
 | Car physics / handling | 0 | ⬜ not started |
 | World streaming | 0 | ⬜ not started |
-| AI / traffic / cops | 0 | ⬜ not started |
+| AI racers / traffic | 0 | ⬜ not started |
 | Audio | 0 | ⬜ not started |
 | Rendering — Last: the future port boundary | 0 | ⬜ not started |
 

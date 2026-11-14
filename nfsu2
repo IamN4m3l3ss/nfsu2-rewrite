@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# One command for everyday things. Run ./nfsu2 with no arguments for the list.
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PY="$ROOT/.venv/bin/python"
+cd "$ROOT"
+
+usage() {
+    cat <<'EOF'
+./nfsu2 <command>
+
+  Game
+    run                 start the game (title screen)
+    freeroam            start the game and drive the menus into free roam (~13 s)
+    kill                stop the game
+    status              is it running? probe + core build, frames, how many rewrites are on
+
+  Build
+    build               build probe, core and rewrite (a running game hot-reloads core + rewrite)
+
+  Rewrite
+    rewrites            list every rewritten function and whether it's on
+    on NAME | off NAME  switch one function to our rewrite / back to the original
+    all-on | all-off    every verified rewrite on / everything back to the original
+    test [NAME]         run the diff tests in the running game (all, or one)
+
+  Project
+    progress            regenerate the tracker (docs/progress.svg, PROGRESS.md)
+    push                regenerate the tracker, commit it if changed, push to GitHub
+EOF
+}
+
+case "${1:-}" in
+    run) tools/game/run_game.sh ;;
+    freeroam) tools/game/run_game.sh --freeroam ;;
+    kill) tools/game/run_game.sh --kill ;;
+    status)
+        if "$PY" tools/probe/probe.py ping >/dev/null 2>&1; then
+            "$PY" tools/probe/probe.py ping
+            echo "rewrites on: $("$PY" tools/probe/probe.py rewrites | grep -c ' ON ') of $("$PY" tools/probe/probe.py rewrites | wc -l)"
+        else
+            echo "game not running (or probe not answering)"
+        fi ;;
+    build) cmake --preset win32 >/dev/null && cmake --build --preset win32 ;;
+    rewrites) "$PY" tools/probe/probe.py rewrites ;;
+    on) "$PY" tools/probe/probe.py enable "$2" ;;
+    off) "$PY" tools/probe/probe.py disable "$2" ;;
+    all-on)
+        for f in $(awk -F, '$4=="verified"{print $2}' docs/symbols.csv); do
+            "$PY" tools/probe/probe.py enable "$f" >/dev/null 2>&1 || true
+        done
+        "$PY" tools/probe/probe.py rewrites | grep -c ' ON ' | xargs echo "rewrites on:" ;;
+    all-off)
+        for f in $("$PY" tools/probe/probe.py rewrites | awk '$3=="ON"{print $2}'); do
+            "$PY" tools/probe/probe.py disable "$f" >/dev/null
+        done
+        echo "all rewrites off (original code)" ;;
+    test)
+        if [[ -n "${2:-}" ]]; then
+            "$PY" -c "import sys,json; sys.path.insert(0,'tools/probe'); import probe_client as pc; print(json.dumps(pc.call('diff_test',{'name':'$2','iterations':10000,'seed':12345},timeout=120),indent=1))"
+        else
+            out="$("$PY" tests/milestones/m7_diff.py 10000)" || true
+            echo "$out" | grep '^FAIL ' || true
+            echo "$(echo "$out" | grep -c '^PASS seed') passed, $(echo "$out" | grep -c '^FAIL seed') failed (3 seeds x every diff test; *_BROKEN self-checks must fail and count as passed)"
+        fi ;;
+    progress) "$PY" tools/progress.py ;;
+    push)
+        "$PY" tools/progress.py
+        git add PROGRESS.md docs/progress.svg
+        git diff --cached --quiet || git commit -q -m "Update progress tracker" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+        git push ;;
+    ""|-h|--help|help) usage ;;
+    *) echo "unknown command: $1"; usage; exit 2 ;;
+esac

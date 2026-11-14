@@ -1,6 +1,6 @@
 # Input (DirectInput 8)
 
-Measured 2026-11-13 with the probe (`probe/src/input.cpp`) on NA v1.2 + the user's mod set.
+Measured 2026-11-13 with the probe (`probe/core/input.cpp`) on NA v1.2 + the user's mod set.
 
 ## Devices
 

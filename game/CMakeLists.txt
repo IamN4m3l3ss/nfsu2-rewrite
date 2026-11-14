@@ -1,8 +1,10 @@
 # nfsu2_game.dll: the rewrite. Loaded by the probe core; rebuilding it hot-reloads it in the running game.
-file(GLOB_RECURSE GAME_SOURCES CONFIGURE_DEPENDS src/*.cpp)
+#   framework/  rewrite registration, register-preserving stubs, diff harness, x87-lift helpers
+#   systems/    rewritten game code, one folder per system (each function next to its diff test)
+file(GLOB_RECURSE GAME_SOURCES CONFIGURE_DEPENDS framework/*.cpp systems/*.cpp)
 add_library(nfsu2_game SHARED ${GAME_SOURCES})
 target_compile_definitions(nfsu2_game PRIVATE _CRT_SECURE_NO_WARNINGS)
-target_include_directories(nfsu2_game PRIVATE src ${CMAKE_SOURCE_DIR}/probe/common ${CMAKE_SOURCE_DIR}/third_party/json)
+target_include_directories(nfsu2_game PRIVATE framework ${CMAKE_SOURCE_DIR}/probe/common ${CMAKE_SOURCE_DIR}/third_party/json)
 set_target_properties(nfsu2_game PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${OUT_DIR}"
   LIBRARY_OUTPUT_DIRECTORY "${OUT_DIR}")

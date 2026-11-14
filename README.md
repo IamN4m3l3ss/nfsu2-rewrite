@@ -20,14 +20,9 @@ while the original game keeps running.
 
 The game files are not part of this repository; you need your own copy of NFSU2 (NA v1.2).
 
-## Layout
+## Getting around
 
-| Folder | What's in it |
-|---|---|
-| `probe/` | the in-game probe: stable loader (`nfsu2_probe.asi`) + hot-reloadable core (`nfsu2_core.dll`) |
-| `game/` | the rewrite (`nfsu2_game.dll`), one folder per system, each function with its diff test |
-| `tools/` | launcher, MCP bridge, reverse-engineering helpers, the x87 → C++ lifter, `progress.py` |
-| `tests/` | milestone checks and recorded drives |
-| `docs/` | `DEVLOG.md` (day-by-day log), `symbols.csv` (every named function), `structs/` |
+**Start here: [docs/GUIDE.md](docs/GUIDE.md)** — what each part is, how a function gets rewritten, the folders, and
+the everyday commands (`./nfsu2 freeroam`, `./nfsu2 status`, `./nfsu2 all-off`, …).
 
-Update the tracker after a batch: `.venv/bin/python tools/progress.py`
+Update the tracker after a batch: `./nfsu2 progress` (or `./nfsu2 push` to publish it).

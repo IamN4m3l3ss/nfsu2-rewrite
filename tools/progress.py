@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate the progress tracker: docs/progress.svg (card for the README) and PROGRESS.md (full lists).
 
-Sources: docs/symbols.csv (status per function) and the rewrite sources in game/src/<system>/ (which system a
+Sources: docs/symbols.csv (status per function) and the rewrite sources in game/systems/<system>/ (which system a
 rewrite belongs to). Run after every batch:  .venv/bin/python tools/progress.py
 """
 from __future__ import annotations
@@ -28,7 +28,7 @@ MILESTONES = [
     ("M8", "System-by-system rewrite", "in progress"),
 ]
 
-# Planned systems in order (CLAUDE.md M8+). Folder names under game/src map onto these.
+# Planned systems in order (CLAUDE.md M8+). Folder names under game/systems map onto these.
 SYSTEMS = [
     ("Leaf utilities", ["bstring", "bmath", "time"], "Strings, maths, hashing, RNG"),
     ("File & chunk loading", ["bchunk"], "Bundles, chunks, decompression"),
@@ -36,7 +36,7 @@ SYSTEMS = [
     ("Camera", ["camera"], ""),
     ("Car physics / handling", ["car", "physics"], ""),
     ("World streaming", ["world"], ""),
-    ("AI / traffic / cops", ["ai"], ""),
+    ("AI racers / traffic", ["ai"], ""),
     ("Audio", ["audio"], ""),
     ("Rendering", ["render"], "Last: the future port boundary"),
 ]
@@ -55,10 +55,10 @@ def load_symbols():
 
 
 def rewrite_folders():
-    """function name -> game/src folder, from NFSU2_REWRITE[_N[_EAX]] registrations."""
+    """function name -> game/systems folder, from NFSU2_REWRITE[_N[_EAX]] registrations."""
     out = {}
-    for p in (ROOT / "game" / "src").rglob("*.cpp"):
-        folder = p.parent.name if p.parent.name != "src" else "misc"
+    for p in (ROOT / "game" / "systems").rglob("*.cpp"):
+        folder = p.parent.name if p.parent.name != "systems" else "misc"
         for m in re.finditer(r"NFSU2_REWRITE(?:_N(?:_EAX)?)?\(\s*0x[0-9A-Fa-f]+\s*,\s*(\w+)", p.read_text()):
             out[m.group(1)] = folder
     return out

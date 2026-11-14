@@ -58,7 +58,7 @@ ASI loader (`dinput8.dll`, Ultimate ASI Loader), DXVK 3.1 (`d3d9.dll`) and `scri
 WidescreenFix's `NoOpticalDriveFix` bypasses "please insert disc 2", and the data has an HD UI that needs
 HDContentSupport (without it, menu text is garbled). Always run with the full `scripts/` set plus our probe.
 They patch game code, so when mapping a function, check whether one of them hooks it (compare bytes against the exe
-on disk). `tools/run_game.sh` runs from a symlink copy in `work/profile/`, so the user's folder is never written to.
+on disk). `tools/game/run_game.sh` runs from a symlink copy in `work/profile/`, so the user's folder is never written to.
 
 **Floating point (measured 14 Nov 2026):** on the game thread the x87 control word is `0x007F` — 24-bit (single)
 precision, round to nearest, exceptions masked (D3D9 default); MXCSR `0x1FA0`. So x87 `+ - * / fsqrt` round like
@@ -66,12 +66,12 @@ SSE single precision: rewrites in plain `float` match in normal ranges. Transcen
 precision control → use the same x87 instructions; float→int conversions must copy the original's method. Always
 diff-test. **NaN contract:** bit-exact for every non-NaN result; where the original yields NaN ours must yield NaN,
 but sign/payload may differ (x87 and SSE propagate NaN operands differently; emulating that on every op isn't worth
-it). Compare floats with `game::same_float`. `tools/re/x87lift.py` lifts straight-line x87 code to C++ (game/src/lift.h).
+it). Compare floats with `game::same_float`. `tools/re/x87lift.py` lifts straight-line x87 code to C++ (game/framework/lift.h).
 
 **Register contract (learned 14 Nov 2026):** the exe was built with whole-program optimisation; callers rely on
 registers a small function doesn't touch (ECX live across bSin) and on pointers left in EAX by "void" functions
 (bScaleAdd's out). Rewrites go through `NFSU2_REWRITE_N` entry stubs (save ECX/EDX), return what the original leaves
-in EAX, and every diff test file includes a register test (`game/src/regs.h`, `tools/re/regcontract.py`).
+in EAX, and every diff test file includes a register test (`game/framework/regs.h`, `tools/re/regcontract.py`).
 
 **Data:** EA chunk bundles (`u32 id, u32 size`; high bit `0x80000000` = container). `GLOBAL/GlobalB.lzc` and
 `FRONTEND/FrontB.lzc` are chunk containers (`0xB3300000`) — in this (HD repack) install they contain NO JDLZ blocks;
@@ -95,8 +95,8 @@ SPEED2.EXE (original, under Wine/Proton)
         ├─ input injector (DirectInput8 GetDeviceState/GetDeviceData hooks)
         ├─ frame hook (IDirect3DDevice9::Present): screenshots, safe point for hot reload + queued calls
         └─ loads nfsu2_game.dll (ours: the rewrite) from a temp copy, hot-reloadable
-tools/mcp_bridge.py  (stdio MCP server for Claude Code ↔ TCP to the probe)
-tools/run_game.sh    (launch, clean profile, wait for probe, boot to free roam)
+tools/probe/mcp_bridge.py  (stdio MCP server for Claude Code ↔ TCP to the probe)
+tools/game/run_game.sh     (launch, wait for probe, --freeroam boots into free roam)
 ```
 
 Probe hot reload (done 14 Nov 2026): the loader loads `out/nfsu2_core.dll` (env `NFSU2_CORE`, set by
@@ -121,16 +121,21 @@ addresses opaque (integers / volatile), never cast our own functions to game sig
 
 ## Repository layout
 
+See `docs/GUIDE.md` (written for the user — keep it current). Entry point: `./nfsu2` (run, freeroam, build, status,
+rewrites, on/off, all-on/all-off, test, progress, push).
+
 ```
 nfsu2-rewrite/
-  CLAUDE.md  docs/DEVLOG.md
-  docs/symbols.csv        addr,name,signature,status(unknown|named|rewritten|verified),notes
-  docs/structs/           one file per reverse-engineered struct/class
-  probe/                  the ASI (server, hooks, input, frame hook, loader)
-  game/                   the rewrite DLL, one folder per system (frontend/, camera/, car/, world/, ...)
-  tools/                  run_game.sh, mcp_bridge.py, helpers, Ghidra scripts
-  tests/                  diff tests + scripted scenarios (record/replay files)
-  third_party/            MinHook, nlohmann/json (pinned, verified versions)
+  nfsu2  README.md  PROGRESS.md  CLAUDE.md
+  docs/            GUIDE.md  DEVLOG.md  symbols.csv  structs/  progress.svg
+  probe/loader/    stable loader (nfsu2_probe.asi)        probe/core/   hot-reloadable core (nfsu2_core.dll)
+  probe/common/    loader<->core<->game interfaces
+  game/framework/  rewrite registration, register stubs, diff harness, lift helpers
+  game/systems/    rewritten code, one folder per system (each function next to its diff test)
+  tools/game/      run_game.sh, boot_freeroam.py           tools/probe/  probe CLI/client, MCP bridge, drive, dik
+  tools/re/        RE helpers (xrefs, regcontract, regwrites, x87lift)   tools/progress.py
+  tests/milestones/ milestone checks    tests/abi/    tests/drives/
+  third_party/ cmake/
   .env.local work/ out/   gitignored
 ```
 
@@ -144,7 +149,7 @@ Check how the game behaves when unfocused/minimised; if it pauses, run it in a W
 **M1 — Probe + MCP bridge.** Tools: `ping`, `read_mem`, `write_mem`, `aob_scan`, `log_tail`, `screenshot`.
 ✔ Claude Code reads the exe header from memory, reads a known constant, gets a screenshot of the menu.
 
-**M2 — `tools/run_game.sh`.** Clean profile (move other ASIs aside, restore on exit), launch, wait for the probe port,
+**M2 — `tools/game/run_game.sh`.** Clean profile (move other ASIs aside, restore on exit), launch, wait for the probe port,
 exit codes for failure. `--kill` to stop the game. ✔ Launch + connect + screenshot + kill, 5 times in a row, unattended.
 
 **M3 — Input injection.** Hook DirectInput so the probe feeds keys/axes the game reads (no OS key events, no focus
@@ -172,7 +177,7 @@ scripted scenarios with original vs rewrite and comparing telemetry. ✔ Prove i
 
 **M8+ — System by system.** Suggested order (adjust as mapping shows dependencies): leaf utilities → file/chunk
 loading (formats are well documented) → frontend/menus → camera → car physics/handling → world streaming →
-AI/traffic/cops → audio → rendering last (renderer is the future port boundary). Each function: name it in
+AI racers/traffic → audio → rendering last (renderer is the future port boundary). Each function: name it in
 `docs/symbols.csv`, write it in `game/`, diff-test it, mark `verified`. Report coverage (verified / total) in DEVLOG.
 
 ## Later (not now)

@@ -374,3 +374,14 @@ return values.
   as equal), bInBox2. 3 seeds × 20,000 value cases + register tests, 0 mismatches; enabled in game, 60 fps.
 
 **Coverage:** 33 verified of ~23,278, all running in the user's game.
+
+## 2026-11-14 — bMath batch 3: matrix * point, seeded random, modulo
+
+- User: "everything feels normal so far" with all 33 live.
+- `game/src/bmath/bmatrix.cpp`: bMulMatrix (0x441000, 122 callers via the thunk 0x43C9C0), bRandomSeeded, bMod
+  (keeps the negative-multiple quirk), bFMod (copies the `_ftol2` truncation + `f > t` correction). 3 seeds × 20,000
+  value cases + register tests, 0 mismatches; enabled in game.
+- `regcontract.py` false positive noted: `push ecx` used to reserve a stack slot (then `fstp [esp]`) reads ECX
+  harmlessly.
+
+**Coverage:** 37 verified of ~23,278, all live.

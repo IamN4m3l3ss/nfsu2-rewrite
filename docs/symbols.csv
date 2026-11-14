@@ -49,3 +49,8 @@ addr,name,signature,status,notes
 0x0043CEB0,bNormalizeTo2,"bVector2* __cdecl(bVector2* out, const bVector2* in, float len)",verified,"2D; zero -> (1,0) (unlike 3D); length rounded to float before inverting"
 0x0043D190,bEqualEps,"int __cdecl(const bVector3*, const bVector3*, float eps)",verified,"!(|d|>eps) per axis: NaN counts as equal"
 0x0043D410,bInBox2,"int __cdecl(const bVector2* lo, const bVector2* hi, const bVector2* p, float margin)",verified,"lo-m <= p <= m+hi on x,y"
+0x00441000,bMulMatrix,"bVector3* __cdecl(bVector3* out, const bMatrix4*, const bVector3*)",verified,"point transform; 122 callers via thunk 0x43C9C0; per-row grouping copied (y,z rows group differently from x)"
+0x0043C9C0,bMulMatrix_thunk,,named,"jmp 0x441000"
+0x0043C140,bRandomSeeded,"uint32_t __cdecl(uint32_t range, uint32_t* seed)",verified,"bRandom with caller's seed"
+0x0043C280,bMod,"int __cdecl(int a, int b)",verified,"positive modulo; quirk: negative multiples of b return |b|"
+0x0043C240,bFMod,"float __cdecl(float a, float b)",verified,"(t - floor(t))*|b|, t=a/|b|; valid |t| < 2^31; preserves ECX/EDX only when |t|<1 (_ftol2 path)"

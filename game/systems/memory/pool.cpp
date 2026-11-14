@@ -793,3 +793,79 @@ NFSU2_DIFF_TEST(regs_memory) {
         return m2;
     });
 }
+
+// Integrity of the game's own pools (read-only, under each pool's lock): every free block has the magic, lies
+// inside an OS block or the pool's initial memory range bounds are unknown, so: ascending addresses, sizes >= 16 and
+// multiples of 4, prev/next links consistent; every live allocation header has magic 0x22 and its pool index.
+// Not a diff test: one pass over all pools per call (iterations ignored).
+namespace {
+void check_pools(game::DiffResult& res, bool include_test_slot) {
+    auto bad = [&res](const std::string& s) {
+        ++res.mismatches;
+        if (res.examples.size() < 8) res.examples.push_back(s);
+    };
+    for (uint32_t i = 0; i < 8; ++i) {
+        Pool* p = pool_slot(i);
+        if (!p || (i == 7 && g_slot7_ours && !include_test_slot)) continue;
+        cs_enter(p);
+        const FreeBlock* fh = reinterpret_cast<const FreeBlock*>(&p->free_list);
+        const FreeBlock* prev = fh;
+        int n = 0;
+        uint32_t free_total = 0;
+        for (const FreeBlock* b = fh->next; b != fh && n < 1000000; b = b->next, ++n) {
+            char where[96];
+            snprintf(where, sizeof where, "pool %u '%s' free block %d at %p", i, p->name ? p->name : "?", n, (const void*)b);
+            if (b->magic != kFreeMagic) bad(std::string(where) + ": magic");
+            if (b->prev != prev) bad(std::string(where) + ": prev link");
+            if (b->size < 16 || (b->size & 3)) bad(std::string(where) + ": size " + std::to_string(b->size));
+            if (prev != fh && reinterpret_cast<uintptr_t>(b) <= reinterpret_cast<uintptr_t>(prev) + prev->size)
+                bad(std::string(where) + ": not ascending / overlaps previous");
+            free_total += b->size;
+            prev = b;
+        }
+        if (fh->prev != prev) bad("pool " + std::to_string(i) + ": free list tail");
+        const AllocHeader* ah = reinterpret_cast<const AllocHeader*>(&p->allocs);
+        const AllocHeader* hp = ah;
+        int k = 0;
+        for (const AllocHeader* h = ah->next; h != ah && k < 1000000; h = h->next, ++k) {
+            if (h->magic != 0x22 || h->pool != i || h->prev != hp) {
+                bad("pool " + std::to_string(i) + " allocation " + std::to_string(k) + ": header");
+                break;
+            }
+            hp = h;
+        }
+        if (k != p->num_allocs) bad("pool " + std::to_string(i) + ": " + std::to_string(k) + " headers vs num_allocs " + std::to_string(p->num_allocs));
+        if (static_cast<int32_t>(free_total) != p->free_bytes && p->free_bytes != 0)
+            bad("pool " + std::to_string(i) + ": free list " + std::to_string(free_total) + " vs stat " + std::to_string(p->free_bytes));
+        cs_leave(p);
+    }
+}
+}  // namespace
+
+NFSU2_DIFF_TEST(heap_integrity) {
+    game::DiffResult res;
+    res.name = "heap_integrity";
+    res.iterations = 1;
+    check_pools(res, false);
+    return res;
+}
+
+// self-check: a test heap in slot 7 with one free block's magic broken must be reported
+NFSU2_DIFF_TEST(heap_integrity_BROKEN) {
+    game::DiffResult res;
+    res.name = "heap_integrity_BROKEN";
+    res.iterations = 1;
+    if (!slot7_free()) return res;
+    {
+        game::testing::TestHeap h(4096);
+        h.install();
+        void* a = bMalloc(100, nullptr, 0, 7);
+        Pool* p = reinterpret_cast<Pool*>(h.pool);
+        reinterpret_cast<FreeBlock*>(p->free_list.next)->magic = 0x12345678;
+        check_pools(res, true);
+        reinterpret_cast<FreeBlock*>(p->free_list.next)->magic = kFreeMagic;
+        bFree(a);
+        h.uninstall();
+    }
+    return res;
+}

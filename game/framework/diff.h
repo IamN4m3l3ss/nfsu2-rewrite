@@ -12,6 +12,7 @@
 // For functions with side effects: compare the memory they write (separate output buffers per run, or
 // MemSnapshot to save/restore game memory between the two runs).
 #pragma once
+#include <functional>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -126,3 +127,33 @@ struct DiffRegistrar {
     static ::game::DiffResult difftest_##name(const ::game::DiffCtx& ctx);        \
     static ::game::DiffRegistrar g_diffreg_##name(#name, &difftest_##name);       \
     static ::game::DiffResult difftest_##name(const ::game::DiffCtx& ctx)
+
+namespace game {
+// Undo actions for test fixtures that splice fakes into game structures (loader registry, file cache, ...).
+// A crashing test (SEH, no destructors) would leave them linked; the harness runs every pending undo after a crash.
+// Undo lambdas must capture by value only what they restore (not the fixture's memory, which may be gone).
+inline std::vector<std::function<void()>>& undo_stack() {
+    static std::vector<std::function<void()>> s;
+    return s;
+}
+struct ScopedUndo {
+    explicit ScopedUndo(std::function<void()> f) { undo_stack().push_back(std::move(f)); }
+    ~ScopedUndo() {
+        auto f = std::move(undo_stack().back());
+        undo_stack().pop_back();
+        f();
+    }
+    ScopedUndo(const ScopedUndo&) = delete;
+    ScopedUndo& operator=(const ScopedUndo&) = delete;
+};
+inline int run_pending_undos() {
+    int n = 0;
+    while (!undo_stack().empty()) {
+        auto f = std::move(undo_stack().back());
+        undo_stack().pop_back();
+        f();
+        ++n;
+    }
+    return n;
+}
+}  // namespace game

@@ -521,3 +521,26 @@ return values.
 - **Live**: all 70 on; the user entered a shop, browsed, left: "all normal". During it: Unload 23,
   LoadChunksAligned 74, DecPending 23, SetAllocParams 13, IsCompressed 2, ~3000 bMalloc/bFree; no errors.
 - Next: the constructor needs the file layer (0x57CA10 open/size, async reads) → file system is the next system.
+
+## 2026-11-14 — File layer (bFile, open-file cache) + a crash
+
+- **New system `game/systems/file/`** (10 verified): bFileNameHash, FindFileIndexEntry, FindOpenFile, AddOpenFile,
+  OpenFileEntry::Close, FlushOpenFileCache, bFile::bFile, bFile::Close, bOpen, bFileExists. They sit on EA's async
+  file library at 0x6F7xxx (called by address; not rewritten yet). Read-mode opens only stat the file, so the
+  open-file cache stays empty in normal play (handles are only cached on the CD-drive fallback path).
+- **Tests never write files and never close real handles** (the profile is symlinked to the user's game folder):
+  real names in read mode (stat), missing names, fake cache entries and a fake index node spliced into the game's
+  lists. Mutation checks: FindOpenFile not moving the hit (3255), ctor not taking a reference (61).
+- **Original bug found**: bFileNameHash copies into a 0xA0-byte stack buffer without a bound; a test name of 190+
+  chars smashed the original's stack (EIP 0x41414141). SEH caught it - but the crashed test's fixtures stayed
+  spliced: the archive-index head pointed into freed memory until repaired by hand. Fix: `game::ScopedUndo` undo
+  stack; the harness runs pending undos after a crashed test (crash_BROKEN checks "1 fixture(s) undone").
+- **Game crash 22:36** (user was playing): write fault in our PoolAllocate's debug fill on the main thread, i.e. a
+  game pool's free list was already damaged. Root cause NOT proven; prime suspect: the dangling index node above
+  (live for ~10 min before the repair). Added `heap_integrity` (walks every real pool: magic, links, ordering,
+  header counts, free total; `heap_integrity_BROKEN` proves it detects a planted bad magic). After a restart:
+  3 cycles of DLL reload + full suite with heap checks before/after: all clean. Keep running heap_integrity; if a
+  pool is ever damaged again this pins down when.
+- **Live**: 80 on; the user did a shop and a race (the save changed: start position differs from M5's recording).
+  bOpen/ctor 1342, Close 489, bFileExists 38, FlushOpenFileCache 11 (the save was written through our code);
+  heap clean, no errors. Suite 261/261.

@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <vector>
 
+#include "diff.h"
+
 namespace game::testing {
 
 constexpr uint32_t kFakeLeafId = 0x7EAD0001;
@@ -34,17 +36,21 @@ struct FakeChunkLoader {
     }
     Node nodes[2]{{nullptr, kFakeLeafId, &on_load, &on_unload}, {nullptr, kFakeContainerId, &on_load, &on_unload}};
     Node** heads[2];
-    FakeChunkLoader() {
+    Node* old_heads[2];
+    ScopedUndo undo;
+    static Node** bucket(uint32_t id) { return reinterpret_cast<Node**>(0x00828050 + (((id >> 6) + (id + (id >> 12))) & 0x3F) * 4); }
+    FakeChunkLoader()
+        : heads{bucket(kFakeLeafId), bucket(kFakeContainerId)},
+          old_heads{*heads[0], *heads[1]},
+          undo([h0 = heads[0], h1 = heads[1], o0 = old_heads[0], o1 = old_heads[1]] {
+              *h1 = o1;  // (restore in reverse: both ids may share a bucket)
+              *h0 = o0;
+          }) {
         for (int i = 0; i < 2; ++i) {
-            const uint32_t id = nodes[i].id;
-            heads[i] = reinterpret_cast<Node**>(0x00828050 + (((id >> 6) + (id + (id >> 12))) & 0x3F) * 4);
             nodes[i].next = *heads[i];
             *heads[i] = &nodes[i];
         }
         calls.clear();
-    }
-    ~FakeChunkLoader() {
-        for (int i = 1; i >= 0; --i) *heads[i] = nodes[i].next;
     }
 };
 

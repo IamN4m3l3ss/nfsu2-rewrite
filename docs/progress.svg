@@ -3,7 +3,7 @@
 <text x="28" y="44" font-size="22" font-weight="700" fill="#f9fafb">NFSU2 rewrite progress</text>
 <text x="732" y="44" font-size="13" fill="#9ca3af" text-anchor="end">updated 2026-11-14</text>
 <text x="28" y="84" font-size="15" fill="#e5e7eb">Functions rewritten and verified</text>
-<text x="732" y="84" font-size="15" font-weight="700" fill="#34d399" text-anchor="end">70 / 23,278 (0.30%)</text>
+<text x="732" y="84" font-size="15" font-weight="700" fill="#34d399" text-anchor="end">80 / 23,278 (0.34%)</text>
 <rect x="28" y="96" width="704" height="22" rx="11.0" fill="#1f2937"/><rect x="28" y="96" width="3.0" height="22" rx="11.0" fill="#34d399"/>
 <text x="28" y="152" font-size="15" fill="#e5e7eb">Milestones (tooling M0–M7, then the rewrite)</text>
 <text x="732" y="152" font-size="15" font-weight="700" fill="#60a5fa" text-anchor="end">8 / 9 done</text>

@@ -129,12 +129,13 @@ json run_one(const DiffTestReg& t, const DiffCtx& ctx) {
     uint32_t code = 0;
     uintptr_t where = 0;
     if (seh_run(&job, &code, &where)) return result_json(r);
+    const int undone = game::run_pending_undos();  // fixtures the crashed test left spliced into game structures
     HMODULE self = nullptr;
     GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
                        reinterpret_cast<LPCSTR>(&run_one), &self);
     char buf[160];
-    snprintf(buf, sizeof buf, "exception %08X at %08X (nfsu2_game.dll+0x%X: llvm-symbolizer --relative-address)",
-             code, static_cast<unsigned>(where), static_cast<unsigned>(where - reinterpret_cast<uintptr_t>(self)));
+    snprintf(buf, sizeof buf, "exception %08X at %08X (nfsu2_game.dll+0x%X: llvm-symbolizer --relative-address), %d fixture(s) undone",
+             code, static_cast<unsigned>(where), static_cast<unsigned>(where - reinterpret_cast<uintptr_t>(self)), undone);
     return json{{"name", t.name}, {"iterations", 0}, {"mismatches", 1}, {"examples", json::array({std::string(buf)})},
                 {"error", std::string(buf)}};
 }
@@ -171,6 +172,7 @@ extern "C" __declspec(dllexport) const probe::GameApi* nfsu2_game_api() {
 // Harness self-check: a test that crashes must come back as a failed test (exception + address), not disable the
 // probe core. _BROKEN = expected to fail.
 NFSU2_DIFF_TEST(crash_BROKEN) {
+    game::ScopedUndo undo([] {});  // must be reported as "1 fixture(s) undone"
     volatile int* volatile p = nullptr;
     *p = 1;
     (void)ctx;

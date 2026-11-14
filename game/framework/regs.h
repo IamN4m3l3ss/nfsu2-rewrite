@@ -65,15 +65,22 @@ inline Case check_regs(const char* what, const void* orig, const void* mine, std
 #define NFSU2_PUSH_ARGS_4                                                                              \
     __asm push dword ptr [esp + 24] __asm push dword ptr [esp + 24] __asm push dword ptr [esp + 24] \
     __asm push dword ptr [esp + 24]
+#define NFSU2_PUSH_ARGS_5                                                                              \
+    __asm push dword ptr [esp + 28] __asm push dword ptr [esp + 28] __asm push dword ptr [esp + 28] \
+    __asm push dword ptr [esp + 28] __asm push dword ptr [esp + 28]
+#define NFSU2_PUSH_ARGS_6                                                                              \
+    __asm push dword ptr [esp + 32] __asm push dword ptr [esp + 32] __asm push dword ptr [esp + 32] \
+    __asm push dword ptr [esp + 32] __asm push dword ptr [esp + 32] __asm push dword ptr [esp + 32]
 
 #define NFSU2_REWRITE_N(addr, fn, nargs, sig, original)                                     \
     static void* const g_impl_##fn = reinterpret_cast<void*>(&fn);                          \
+    static volatile uint32_t g_calls_##fn = 0;                          \
     extern "C" __declspec(naked) void nfsu2_entry_##fn() {                                  \
-        __asm push ecx __asm push edx NFSU2_PUSH_ARGS_##nargs __asm call dword ptr [g_impl_##fn] \
+        __asm lock inc dword ptr [g_calls_##fn] __asm push ecx __asm push edx NFSU2_PUSH_ARGS_##nargs __asm call dword ptr [g_impl_##fn] \
             __asm add esp, 4 * nargs __asm pop edx __asm pop ecx __asm ret                   \
     }                                                                                       \
     static ::game::Registrar g_reg_##fn(addr, #fn, sig, reinterpret_cast<void*>(&nfsu2_entry_##fn), \
-                                        reinterpret_cast<void**>(&original), __FILE__)
+                                        reinterpret_cast<void**>(&original), __FILE__, &g_calls_##fn)
 
 #define NFSU2_ENTRY(fn) reinterpret_cast<const void*>(&nfsu2_entry_##fn)
 
@@ -83,11 +90,12 @@ inline Case check_regs(const char* what, const void* orig, const void* mine, std
 #define NFSU2_PUSH_ARGS_E1 __asm push dword ptr [esp + 16]
 #define NFSU2_PUSH_ARGS_E2 __asm push dword ptr [esp + 20] __asm push dword ptr [esp + 20]
 #define NFSU2_REWRITE_N_EAX(addr, fn, nargs, sig, original)                                          \
-    static void* const g_impl_##fn = reinterpret_cast<void*>(&fn);                                   \
+    static void* const g_impl_##fn = reinterpret_cast<void*>(&fn);                          \
+    static volatile uint32_t g_calls_##fn = 0;                                   \
     extern "C" __declspec(naked) void nfsu2_entry_##fn() {                                           \
-        __asm push ecx __asm push edx __asm push eax NFSU2_PUSH_ARGS_E##nargs                         \
+        __asm lock inc dword ptr [g_calls_##fn] __asm push ecx __asm push edx __asm push eax NFSU2_PUSH_ARGS_E##nargs                         \
             __asm call dword ptr [g_impl_##fn] __asm add esp, 4 * (nargs + 1) __asm pop edx __asm pop ecx \
                 __asm ret                                                                             \
     }                                                                                                \
     static ::game::Registrar g_reg_##fn(addr, #fn, sig, reinterpret_cast<void*>(&nfsu2_entry_##fn),  \
-                                        reinterpret_cast<void**>(&original), __FILE__)
+                                        reinterpret_cast<void**>(&original), __FILE__, &g_calls_##fn)

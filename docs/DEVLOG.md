@@ -466,3 +466,17 @@ return values.
 - **Fixed**: after an API-version mismatch the loader/core retried loading the same file every 0.5 s (log spam);
   now it waits for the next rebuild.
 - Known: the game still reads DirectInput while the panel is open (typing in the filter box also reaches the game).
+
+## 2026-11-14 — Chunk unloading + realignment; call counters
+
+- **New verified rewrites** (`game/systems/bchunk/`): `UnloadChunks` 0x577B10, `CopyChunksAligned` 0x570DD0,
+  `ClearChunks` 0x570F00. UnloadChunks reuses EDI: after each group of up to 64 the earliest chunk unloaded becomes
+  the new end, so a bundle is unloaded in exact reverse order.
+- **Diff tests**: random chunk trees at random addresses mod 128 (copy/clear: 10k cases, 0 mismatches, byte-exact
+  dst + return); LoadChunks/UnloadChunks now have a real diff test too: a fake bChunkLoader is spliced into its
+  registry bucket for one case and records the call order (bundles of up to 300 chunks), plus the debug-name ring.
+  Mutation check: padding boundary 8→7 → 1384 mismatches, forward unload order → 9086 mismatches.
+- **Entry stubs** support 5 and 6 args; **call counters**: every stub does `lock inc` on a per-rewrite counter
+  (GameApi v4 `GameRewrite.calls`), shown in `./nfsu2 rewrites` and the F8 panel.
+- **Live**: all 49 on, 3 boots to free roam (12–13 s, no errors). Per boot: UnloadChunks 6, CopyChunksAligned 404,
+  LoadChunks 73, LoadChunk ~1790, JdlzDecompress ~121 calls. ClearChunks not reached during boot (realign path only).

@@ -171,10 +171,11 @@ void tab_rewrites() {
         const std::string title = (label.count(sys) ? label.at(sys) : sys) + "  (" + std::to_string(son) + "/" +
                                   std::to_string(rows.size()) + " on)###" + sys;
         if (!ImGui::CollapsingHeader(title.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) continue;
-        if (ImGui::BeginTable(sys.c_str(), 4, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
+        if (ImGui::BeginTable(sys.c_str(), 5, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
             ImGui::TableSetupColumn("On", ImGuiTableColumnFlags_WidthFixed);
             ImGui::TableSetupColumn("Function");
             ImGui::TableSetupColumn("Address", ImGuiTableColumnFlags_WidthFixed);
+            ImGui::TableSetupColumn("Calls", ImGuiTableColumnFlags_WidthFixed);
             ImGui::TableSetupColumn("Diff test");
             for (auto& r : rows) {
                 if (g_filter[0] && r.name.find(g_filter) == std::string::npos) continue;
@@ -188,6 +189,10 @@ void tab_rewrites() {
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", r.signature.c_str());
                 ImGui::TableNextColumn();
                 ImGui::TextColored(kGrey, "0x%08X", static_cast<unsigned>(r.addr));
+                ImGui::TableNextColumn();
+                if (r.calls) ImGui::Text("%u", r.calls);
+                else ImGui::TextColored(kGrey, "-");
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("times the game called our version since the last reload");
                 ImGui::TableNextColumn();
                 if (ImGui::SmallButton("test")) run_test(r.name);
                 auto it = g_results.find(r.name);

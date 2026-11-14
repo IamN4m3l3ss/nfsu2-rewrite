@@ -19,6 +19,7 @@ struct Entry {
     void* replacement;
     void** original;
     std::string system;    // game/systems/<system>/ folder of the source file
+    volatile uint32_t* calls = nullptr;  // in the game DLL; valid while it is loaded
     bool hooked = false;   // MH_CreateHook succeeded
     bool enabled = false;  // rewrite active
     std::string disk_bytes, mem_bytes;  // first 8 bytes in the exe file vs. in memory before we hooked
@@ -146,6 +147,7 @@ bool load(const std::set<std::string>& enable) {
     for (uint32_t i = 0; i < api->count; ++i) {
         const GameRewrite& r = api->rewrites[i];
         Entry e{r.addr, r.name, r.signature, r.replacement, r.original};
+        e.calls = r.calls;
         {
             std::string f = r.file ? r.file : "";
             for (char& c : f)
@@ -191,7 +193,7 @@ Entry* find(const json& p) {
 
 json entry_json(const Entry& e) {
     return {{"name", e.name}, {"system", e.system}, {"addr", hex_addr(e.addr)}, {"signature", e.signature}, {"hooked", e.hooked},
-            {"enabled", e.enabled}, {"disk_bytes", e.disk_bytes}, {"mem_bytes_before_hook", e.mem_bytes},
+            {"enabled", e.enabled}, {"calls", e.calls ? *e.calls : 0}, {"disk_bytes", e.disk_bytes}, {"mem_bytes_before_hook", e.mem_bytes},
             {"patched_by_other_mod", e.mem_bytes != e.disk_bytes}};
 }
 
@@ -264,7 +266,8 @@ void set_enabled(Entry* e, bool want) {  // render thread
 // ---- direct access for the overlay (render thread only) ----
 std::vector<RewriteInfo> rewrite_snapshot() {
     std::vector<RewriteInfo> v;
-    for (const Entry& e : g_entries) v.push_back({e.name, e.system, e.signature, e.addr, e.enabled, e.hooked});
+    for (const Entry& e : g_entries)
+        v.push_back({e.name, e.system, e.signature, e.addr, e.enabled, e.hooked, e.calls ? *e.calls : 0});
     return v;
 }
 bool rewrite_set(const std::string& name, bool on) {

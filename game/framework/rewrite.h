@@ -19,8 +19,9 @@ namespace game {
 std::vector<probe::GameRewrite>& registry();
 
 struct Registrar {
-    Registrar(uintptr_t addr, const char* name, const char* sig, void* fn, void** original, const char* file = "") {
-        registry().push_back({addr, name, sig, fn, original, file});
+    Registrar(uintptr_t addr, const char* name, const char* sig, void* fn, void** original, const char* file = "",
+              volatile uint32_t* calls = nullptr) {
+        registry().push_back({addr, name, sig, fn, original, file, calls});
     }
 };
 

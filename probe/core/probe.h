@@ -97,6 +97,7 @@ struct RewriteInfo {
     std::string name, system, signature;
     uintptr_t addr;
     bool enabled, hooked;
+    uint32_t calls;  // calls of our rewrite since the game DLL was (re)loaded
 };
 std::vector<RewriteInfo> rewrite_snapshot();                                        // render thread
 bool rewrite_set(const std::string& name, bool on);                                  // render thread

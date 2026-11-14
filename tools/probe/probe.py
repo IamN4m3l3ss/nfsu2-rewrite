@@ -70,7 +70,7 @@ def main(argv: list[str]) -> int:
             print(json.dumps(pc.key(args[0], cmd, ms)))
         elif cmd == "rewrites":
             for r in pc.call("rewrite_list")["rewrites"]:
-                print(f"{r['addr']} {r['name']:30s} {'ON ' if r['enabled'] else 'off'} {r['signature']}"
+                print(f"{r['addr']} {r['name']:30s} {'ON ' if r['enabled'] else 'off'} {r.get('calls', 0):>9} calls  {r['signature']}"
                       f"{'  [patched by another mod!]' if r['patched_by_other_mod'] else ''}")
         elif cmd in ("enable", "disable"):
             print(json.dumps(pc.call("rewrite_enable", {"name": args[0], "enabled": cmd == "enable"})))

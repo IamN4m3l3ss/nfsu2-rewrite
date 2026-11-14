@@ -19,9 +19,10 @@ json keep_active(const json& p) {
     return {{"enabled", api().keep_active_get()}, {"g_AppActive", api().app_active()}};
 }
 
-// no_traffic: 0x0042F910 is a __thiscall(1 arg) per-frame traffic update (only caller 0x00609ED7). Patching its
-// first bytes to `ret 4` stops traffic, the same patch ZMenu's "No Traffic" uses (found in ZMenuU2.asi at
-// 0x10057DA0). Used to make long drives repeatable (traffic collisions amplify any drift).
+// no_traffic (EXPERIMENTAL, DOES NOT WORK): patches 0x0042F910 (a __thiscall(1 arg) update, only caller 0x00609ED7)
+// to `ret 4`, the same patch ZMenu's "No Traffic" makes (ZMenuU2.asi 0x10057DA0). Verified 2026-11-14 with the user:
+// traffic and roaming racers still drive normally with it on, so 0x42F910 is NOT the traffic system and the effect
+// of skipping it is unknown. Not used by any tool by default; kept only so the finding is reproducible.
 namespace {
 constexpr uintptr_t kTrafficUpdate = 0x0042F910;
 const uint8_t kTrafficOrig[4] = {0x55, 0x8B, 0xEC, 0x83};  // push ebp; mov ebp, esp; sub esp, ..

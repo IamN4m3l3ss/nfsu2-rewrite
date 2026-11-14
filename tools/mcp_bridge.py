@@ -115,8 +115,8 @@ def input_state() -> dict:
 
 @server.tool()
 def no_traffic(enabled: bool | None = None) -> dict:
-    """Get/set traffic off (patches the traffic update at 0x42F910 to return, like ZMenu's No Traffic).
-    For repeatable drives start the game with tools/run_game.sh --no-traffic instead."""
+    """EXPERIMENTAL, does NOT remove traffic: patches 0x42F910 to return (ZMenu's 'No Traffic' patch); traffic and
+    roaming racers still drive with it on. Unknown side effects; don't use for tests."""
     return pc.call("no_traffic", {} if enabled is None else {"enabled": enabled})
 
 

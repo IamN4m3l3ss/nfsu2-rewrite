@@ -92,6 +92,8 @@ struct RecEvent {
     uint64_t f;
     uint32_t action;
     uint32_t data;
+    uint32_t ofs;
+    bool injected;
 };
 bool g_rec_active = false;
 uint64_t g_rec_base = 0;
@@ -241,7 +243,7 @@ HRESULT STDMETHODCALLTYPE hk_GetDeviceData(void* dev, DWORD cbObj, LPDIDEVICEOBJ
         for (DWORD i = 0; i < *inout; ++i) {
             auto* e = reinterpret_cast<const DIDEVICEOBJECTDATA*>(reinterpret_cast<const uint8_t*>(rgdod) +
                                                                   static_cast<size_t>(i) * cbObj);
-            g_rec.push_back({f, static_cast<uint32_t>(e->uAppData), e->dwData});
+            g_rec.push_back({f, static_cast<uint32_t>(e->uAppData), e->dwData, e->dwOfs, false});
         }
     }
     if (FAILED(hr)) {
@@ -269,7 +271,7 @@ HRESULT STDMETHODCALLTYPE hk_GetDeviceData(void* dev, DWORD cbObj, LPDIDEVICEOBJ
         memcpy(dst, &info.pending[take], std::min<size_t>(cbObj, sizeof(DIDEVICEOBJECTDATA)));
         if (g_rec_active && !peek)  // the recording holds everything the game read: real and injected events
             g_rec.push_back({current_frame() - g_rec_base, static_cast<uint32_t>(info.pending[take].uAppData),
-                             info.pending[take].dwData});
+                             info.pending[take].dwData, info.pending[take].dwOfs, true});
         ++n;
         ++take;
     }
@@ -584,7 +586,9 @@ json record_stop() {
     {
         std::lock_guard lk(g_mu);
         g_rec_active = false;
-        for (const RecEvent& e : g_rec) events.push_back({{"f", e.f}, {"action", e.action}, {"down", e.data != 0}});
+        for (const RecEvent& e : g_rec)
+            events.push_back({{"f", e.f}, {"action", e.action}, {"down", e.data != 0}, {"data", e.data},
+                              {"ofs", e.ofs}, {"injected", e.injected}});
         frames = current_frame() - g_rec_base;
     }
     json t = trace_stop();

@@ -5,7 +5,7 @@
 #   tools/run_game.sh --kill
 #
 # By default returns once the probe answers and the game has presented frames ("ready").
-# --no-traffic: probe stops traffic from startup (repeatable drives).
+# --no-traffic: EXPERIMENTAL, does not actually remove traffic (see probe/src/patches.cpp); avoid.
 # --freeroam then drives the menus into Explore Mode with injected keys (tools/boot_freeroam.py, needs a save).
 #
 # The game runs from work/profile: a symlink copy of GAME_DIR, so the user's folder is never written to.

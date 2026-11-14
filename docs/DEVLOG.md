@@ -229,3 +229,23 @@
 - `touch out/nfsu2_core.dll` → reload #1: keyboard restored with 53 mapped keys, injected W drove the car 5 m.
 - Version bump + rebuild → auto reload #2 picked up `0.2.1`; `tools/probe.py reload` → #3.
 - After 3 reloads: car_state, screenshot, schedule + trace, no_traffic, keep_active, log_tail all OK.
+
+## 2026-11-14 — live-drive replay: exact until traffic; "no_traffic" doesn't work
+
+**Verified**
+- User drove ~17 s live (147 steering taps, 12 shifts, up to 217 km/h), recorded with a sample every frame. Replay
+  after a reboot: identical event streams and identical car state on **every frame up to 1022** (~1 km). At 1022
+  the replay hits a traffic car (speed 217 → 130 km/h in one frame); the live drive didn't meet it.
+- So the game is deterministic given the same inputs; the remaining difference is AI (traffic, roaming racers)
+  placement differing between boots.
+- Real action-mapped events carry `dwOfs` = 4 × index into the action format (e.g. 4, 20); injected ones carry the
+  DIK. The game's read loop doesn't use `dwOfs` outside text entry. Now recorded (`ofs`, `injected`).
+
+**Broke**
+- The ZMenu "No Traffic" patch (`0x42F910` → `ret 4`) does **not** remove traffic: the user saw traffic (somewhat
+  less?) and roaming racers driving normally with it on. Marked experimental/not working; not used by default.
+- CRT `rand` (`0x760D7D`) has only 6 callers (`0x7034B4`–`0x71917A`); the game's own RNG is elsewhere (open).
+
+**Open**
+- Make AI repeatable (find EA's RNG + seed, and/or start recordings at a fixed frame after loading) or find the real
+  traffic spawner for a true no-traffic switch.

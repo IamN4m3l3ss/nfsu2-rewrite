@@ -13,7 +13,10 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-TOTAL_FUNCTIONS = 23278  # functions in SPEED2.EXE (NFSU2Recomp's count, see CLAUDE.md)
+# Game functions in SPEED2.EXE: Ghidra 12.2 functions below 0x75BBFA, where the Winsock import stubs and the MSVC
+# runtime start (counted 2026-11-15 from our PC export; the GameCube build has 14,666). NFSU2Recomp's 23,278 counted
+# every lifted entry point incl. runtime/D3DX and fragments - too high.
+TOTAL_FUNCTIONS = 14450
 
 # Milestones from CLAUDE.md, with their state. Update when one completes.
 MILESTONES = [
@@ -132,7 +135,7 @@ def make_svg(verified, mapped, per_system, per_folder_counts):
     y1 = y0 + 146
     pct_v = 100.0 * verified / TOTAL_FUNCTIONS
     t.append(f'<text x="{M}" y="{y1}" font-size="14" font-weight="600" fill="{TXT}">Whole game</text>')
-    t.append(f'<text x="{W-M}" y="{y1}" font-size="12" fill="{DIM}" text-anchor="end">~{TOTAL_FUNCTIONS:,} functions in SPEED2.EXE</text>')
+    t.append(f'<text x="{W-M}" y="{y1}" font-size="12" fill="{DIM}" text-anchor="end">~{TOTAL_FUNCTIONS:,} game functions in SPEED2.EXE (runtime libraries not counted)</text>')
     t.append(bar(M, y1 + 10, W - 2 * M, 14, [(verified / TOTAL_FUNCTIONS, GREEN), (mapped / TOTAL_FUNCTIONS, AMBER)]))
     ly = y1 + 44
     t.append(f'<rect x="{M}" y="{ly-10}" width="10" height="10" rx="2" fill="{GREEN}"/>'

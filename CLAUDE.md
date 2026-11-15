@@ -82,7 +82,14 @@ per-event routes `TRACKS/ROUTESL4Rx/`. Event table chunk `0x00034201` in GLOBALB
 Cars: `CARS/<NAME>/GEOMETRY.BIN, TEXTURES.BIN, VINYLS.BIN`. The exe loads tracks via format strings
 `TRACKS\%s.BUN`, `TRACKS\STREAM%s.BUN`, `Tracks\Routes%s\Paths%d.bin`.
 
-**Scale (from NFSU2Recomp's notes, as a reference number):** ~23,278 functions in the exe. Use it to track coverage.
+**Scale (measured 15 Nov 2026):** 14,450 game functions in the exe (Ghidra 12.2, below `0x75BBFA` where the Winsock
+stubs and MSVC runtime start; GameCube build: 14,666). Use it to track coverage. (NFSU2Recomp's 23,278 counts runtime,
+D3DX and fragments too.)
+
+**RE kit (15 Nov 2026):** EA names + Ghidra decompilations of the GameCube and PC builds live outside the repo
+(`.env.local`: `KNOWLEDGE_DB`, `GC_DECOMP`, `PC_DECOMP`). `tools/re/kb.py ADDR [--pc] [--gc]` shows everything for an
+address. Names from knowledge.db are hints (auto matches can be stale/wrong); our diff test still decides. Never
+commit the ELF or the dumps.
 
 ## Architecture
 

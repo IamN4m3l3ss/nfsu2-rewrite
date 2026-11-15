@@ -587,3 +587,20 @@ first function's code bytes as the table). So attempts 2 and 3 were our bug, cau
 attempt 1 was the test misusing a failed open. Fixed: round trip 200/200 (now also compares the size value);
 mutation (Result returning the high half) caught. Enabled; 3 boots: Result ~1120, ReleaseWithCallback ~1060,
 Wait 53 calls per boot, heap clean, no errors. 87 verified.
+
+## 2026-11-15 — RE kit: Ghidra decompilations, EA names, real function count
+
+- The user found nfsu2-gcpc (CC0, same exe) and its knowledge.db + the GameCube Speed.elf with EA's symbols.
+  Built both Ghidra 12.2 decompilations outside the repo (`/home/nameless/nfsu2-re/`, dumps in the kit):
+  GameCube 14,666 functions (0 failed; layout check 610/611 vs the debug info), PC 17,553 functions, 7,399 named from
+  the GameCube matches. nfsu2-gcpc's dw1-emoose.patch references a DebugSection class it never committed (Ghidra 12.2
+  removed ElfSectionProvider); wrote it (BaseSectionProvider) - worth reporting upstream.
+- `tools/re/kb.py`: address -> our symbols row, knowledge.db matches (low-confidence flagged), facts, nfsu2-gcpc
+  status, PC/GC decompilation (`--pc`, `--gc`, `find`, `gc GCADDR`).
+- Adopted 43 EA names in symbols.csv (old names kept in notes; code identifiers unchanged so the persisted on/off
+  set still matches). Rejected wrong automatic matches (e.g. MainWndProc≠SoundPause, _ftol2≠PATHX_getvolume,
+  bScaleAdd≠emTriggerEventsInSection, 0x577B10 = UnloadChunks not GetChunkName). Checked: 0x57CA10 is bOpen with
+  bInitFileSystem inlined; 0x4022C0 is one empty function shared by many (identical-code folding:
+  eWaitUntilRenderingDone, UIWidgetMenu::Setup, ...). LoadChunks/UnloadChunks: GC has a 3rd `name` arg, unused on PC.
+- Denominator: 14,450 game functions (Ghidra, below 0x75BBFA where Winsock stubs + MSVC runtime start) instead of
+  NFSU2Recomp's 23,278. 87 verified = 0.60%.

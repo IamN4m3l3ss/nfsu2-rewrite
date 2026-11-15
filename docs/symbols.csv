@@ -14,7 +14,7 @@ addr,name,signature,status,notes
 0x00865198,g_FrameTime,float,named,1/60 at 60 fps; NOT the simulation step (see UpdateFrameTime)
 0x0089CE58,g_AIRoster,Controller*[14],named,"player, 3 RaceCarControllers, 10 TrafficControllers; docs/structs/traffic.md"
 0x0043DB50,bStringHash,uint32_t __cdecl(const char*),verified,h=0xFFFFFFFF; h=h*33+(uint8)c. 800 callers. game/systems/bstring/bstring.cpp; diff 30k cases 0 mismatches; enabled in-game 2026-11-14
-0x0043DB80,bStringHash2,"uint32_t __cdecl(const char*, uint32_t prefix)",verified,same hash from a given start value. 113 callers
+0x0043DB80,bStringHash,"uint32_t __cdecl(const char*, uint32_t prefix)",verified,"EA name (EA overload bStringHash(const char*, int); was bStringHash2). same hash from a given start value. 113 callers"
 0x0043DBB0,bStrLen,int __cdecl(const char*),verified,nullptr -> 0. 115 callers
 0x0043DBD0,bStrCpy,"char* __cdecl(char* dst, const char* src)",verified,"returns dst, copies terminator. 195 callers"
 0x0043DC30,bStrCmp,"int __cdecl(const char*, const char*)",verified,"compares SIGNED chars (movsx), unlike strcmp. 167 callers"
@@ -24,8 +24,8 @@ addr,name,signature,status,notes
 0x0043DD10,bStrNICmp,"int __cdecl(const char*, const char*, int n)",verified,case-insensitive version of bStrNCmp
 0x0043DDA0,bStrCat,"char* __cdecl(char* dst, const char* a, const char* b)",verified,"dst = a + b (3 args, not strcat). 73 callers"
 0x0043DDF0,bStrChr,"const char* __cdecl(const char*, int c)",verified,signed compare before terminator test; nullptr in -> nullptr
-0x0043DE20,bStrUpr,char* __cdecl(char*),verified,in place; returns pointer to terminator
-0x0043DE50,bStrToInt,int __cdecl(const char*),verified,'0x' hex (lowercase x) or +/- decimal; stops at first invalid char; wraps
+0x0043DE20,bToUpper,char* __cdecl(char*),verified,EA name (manual match 1.00; was bStrUpr). in place; returns pointer to terminator
+0x0043DE50,bStrToLong,int __cdecl(const char*),verified,EA name (manual match 1.00; was bStrToInt). '0x' hex (lowercase x) or +/- decimal; stops at first invalid char; wraps
 0x0043DEF0,bStrToFloat,float __cdecl(const char*),named,x87 math (needs exact-x87 approach); uses bStrToInt for the exponent
 0x0043DFE0,bWStrLen,int __cdecl(const uint16_t*),verified,nullptr -> 0
 0x0043E000,bStrToWStr,"uint16_t* __cdecl(uint16_t* dst, const char*)",verified,SIGN-extends bytes (0xE9 -> 0xFFE9)
@@ -34,51 +34,51 @@ addr,name,signature,status,notes
 0x007EA624,g_RandomSeed,uint32_t,named,bRandom seed (lead for repeatable traffic)
 0x0043C780,bIdentity,Matrix4* __cdecl(Matrix4*),verified,returns m in EAX. 98 callers
 0x0043CE10,bDistBetween,"float __cdecl(const bVector3*, const bVector3*)",verified,sqrt((dz*dz + dy*dy) + dx*dx) — order matters (reordered variant differs in ~4% of cases)
-0x0043CE50,bNormalize2,"bVector2* __cdecl(bVector2* out, const bVector2* in)",verified,"zero -> (1,0); out in EAX; never writes EDX"
+0x0043CE50,bNormalize,"bVector2* __cdecl(bVector2* out, const bVector2* in)",verified,"EA name (EA overload (bVector2); manual 1.00; was bNormalize2). zero -> (1,0); out in EAX; never writes EDX"
 0x0043CF10,bNormalize,"bVector3* __cdecl(bVector3* out, const bVector3* in)",verified,"zero -> (1,0,0); in-place safe; out in EAX; never writes EDX. 97 callers"
-0x0043D090,bScaleAdd2,"void __cdecl(bVector2* out, const bVector2* a, const bVector2* b, float s)",verified,out = s*b + a
+0x0043D090,bScaleAdd,"void __cdecl(bVector2* out, const bVector2* a, const bVector2* b, float s)",verified,EA name (EA overload (bVector2); manual 1.00; was bScaleAdd2). out = s*b + a
 0x0043D0C0,bScaleAdd,"bVector3* __cdecl(bVector3* out, const bVector3* a, const bVector3* b, float s)",verified,out = s*b + a; out in EAX (callers use it!); never writes EDX. 72 callers
 0x0043D1E0,bCross,"bVector3* __cdecl(bVector3* out, const bVector3* a, const bVector3* b)",verified,85 callers; aliasing-safe; out in EAX; never writes EDX
-0x0043D220,bInitBounds2,"void __cdecl(bVector2* min, bVector2* max)",verified,"min=+FLT_MAX, max=-FLT_MAX"
+0x0043D220,bInitializeBoundingBox,"void __cdecl(bVector2* min, bVector2* max)",verified,"EA name (manual 1.00 (2D); was bInitBounds2). min=+FLT_MAX, max=-FLT_MAX"
 0x0075BED4,_ftol2,,named,"MSVC CRT float->int, 1120 callers"
 0x0043C2B0,bSin,float __cdecl(uint16 angle),verified,0x10000 = 2pi; folded Taylor series to x^9; all 65536 angles bit-exact; never writes ECX/EDX (a caller keeps ECX live across it)
 0x0043C370,bCos,float __cdecl(uint16 angle),verified,bSin(angle + 0x4000) via tail jump; all 65536 angles
-0x0043C350,bSinRad,float __cdecl(float radians),verified,_ftol2(rad*65536/2pi) then bSin
-0x0043C1F0,bRandomFloat,float __cdecl(float scale),verified,(seed % 0x7FFFFFFF) * 2^-31 * scale; advances g_RandomSeed
-0x0043CF90,bNormalizeTo,"bVector3* __cdecl(bVector3* out, const bVector3* in, float len)",verified,"out = in * 1/(|in|/len); zero -> (len,0,0); never writes EDX"
-0x0043CEB0,bNormalizeTo2,"bVector2* __cdecl(bVector2* out, const bVector2* in, float len)",verified,"2D; zero -> (1,0) (unlike 3D); length rounded to float before inverting"
-0x0043D190,bEqualEps,"int __cdecl(const bVector3*, const bVector3*, float eps)",verified,!(|d|>eps) per axis: NaN counts as equal
-0x0043D410,bInBox2,"int __cdecl(const bVector2* lo, const bVector2* hi, const bVector2* p, float margin)",verified,"lo-m <= p <= m+hi on x,y"
+0x0043C350,bSin,float __cdecl(float radians),verified,EA name (EA overload bSin(float); was bSinRad). _ftol2(rad*65536/2pi) then bSin
+0x0043C1F0,bRandom,float __cdecl(float scale),verified,EA name (EA overload bRandom(float); manual 1.00; was bRandomFloat). (seed % 0x7FFFFFFF) * 2^-31 * scale; advances g_RandomSeed
+0x0043CF90,bNormalize,"bVector3* __cdecl(bVector3* out, const bVector3* in, float len)",verified,"EA name (EA overload with length; manual 1.00; was bNormalizeTo). out = in * 1/(|in|/len); zero -> (len,0,0); never writes EDX"
+0x0043CEB0,bNormalize,"bVector2* __cdecl(bVector2* out, const bVector2* in, float len)",verified,"EA name (EA overload (bVector2, length); manual 1.00; was bNormalizeTo2). 2D; zero -> (1,0) (unlike 3D); length rounded to float before inverting"
+0x0043D190,bEqual,"int __cdecl(const bVector3*, const bVector3*, float eps)",verified,EA name (manual 1.00; was bEqualEps). !(|d|>eps) per axis: NaN counts as equal
+0x0043D410,bBoundingBoxIsInside,"int __cdecl(const bVector2* lo, const bVector2* hi, const bVector2* p, float margin)",verified,"EA name (callgraph 0.85, fits; was bInBox2). lo-m <= p <= m+hi on x,y"
 0x00441000,bMulMatrix,"bVector3* __cdecl(bVector3* out, const bMatrix4*, const bVector3*)",verified,"point transform; 122 callers via thunk 0x43C9C0; per-row grouping copied (y,z rows group differently from x)"
 0x0043C9C0,bMulMatrix_thunk,,named,jmp 0x441000
-0x0043C140,bRandomSeeded,"uint32_t __cdecl(uint32_t range, uint32_t* seed)",verified,bRandom with caller's seed
-0x0043C280,bMod,"int __cdecl(int a, int b)",verified,positive modulo; quirk: negative multiples of b return |b|
+0x0043C140,bRandom,"uint32_t __cdecl(uint32_t range, uint32_t* seed)",verified,"EA name (EA overload bRandom(int, unsigned*); manual 1.00; was bRandomSeeded). bRandom with caller's seed"
+0x0043C280,bSignedMod,"int __cdecl(int a, int b)",verified,EA name (manual 1.00; was bMod). positive modulo; quirk: negative multiples of b return |b|
 0x0043C240,bFMod,"float __cdecl(float a, float b)",verified,"(t - floor(t))*|b|, t=a/|b|; valid |t| < 2^31; preserves ECX/EDX only when |t|<1 (_ftol2 path)"
 0x0043C390,bSinCos,"void __cdecl(float* sin, float* cos, uint16 angle)",verified,all 65536 angles; cos series to x^10; EAX = FPU status word (unused by callers)
 0x0043C9D0,bTransposeMatrix,"bMatrix4* __cdecl(bMatrix4* out, const bMatrix4* in)",verified,"in-place safe; in[1],in[2] copied via x87 (SNaN -> QNaN)"
 0x0043C490,bASin,uint32 __cdecl(float x) -> angle,verified,"binary search + linear interp over table 0x7EA628 {u16 angle, float slope}; result upper bits from _ftol2 (callers use full EAX)"
-0x0043C570,bATan2,"uint32 __cdecl(float a, float b) -> angle",verified,octant fold + byte table 0x7EACB0 indexed backwards; equal case keeps caller's EAX upper half (stub passes entry EAX)
+0x0043C570,bFastATan,"uint32 __cdecl(float a, float b) -> angle",verified,EA name (manual 1.00; was bATan2). octant fold + byte table 0x7EACB0 indexed backwards; equal case keeps caller's EAX upper half (stub passes entry EAX)
 0x007EA628,g_ASinTable,struct{uint16 angle; uint16 pad; float slope}[],named,bASin table
 0x007EACB0,g_ATanTable,uint8_t[],named,"bATan2 table, indexed 0x7EACB0 - ftol(-256*ratio)"
 0x0043C7C0,bInvertMatrix,"bMatrix4* __cdecl(bMatrix4* out, const bMatrix4* in)",verified,"affine inverse (cofactors/det, -(R^-1 t)); lifted by tools/re/x87lift.py; NaN contract for singular input"
 0x00573700,JdlzDecompress,"uint32_t __cdecl(const uint8_t* src, uint8_t* dst)",verified,"JDLZ v2 LZ; via function pointer; byte-exact on all 861 real blocks (CARS/TEXTURES.BIN, DYNTEX, WHEELS); match copies unbounded, literals bounded"
-0x0043C100,FindChunkLoader,bChunkLoader* __cdecl(uint32_t id),verified,"64 buckets at 0x828050, (id+(id>>12)+(id>>6))&63"
-0x00570D70,LoadChunk,int __cdecl(bChunk*),verified,"registered loader, else 36 legacy handlers at 0x7FA858; verified by transcription + live boots + drive replay"
-0x00577AB0,LoadChunks,"void __cdecl(bChunk* start, int size)",verified,"walks chunks (next = c + size + 8), int3 on unhandled chunk, tail-calls 0x4887C0"
+0x0043C100,bChunkLoader::FindLoader,bChunkLoader* __cdecl(uint32_t id),verified,"EA name (static; was FindChunkLoader). 64 buckets at 0x828050, (id+(id>>12)+(id>>6))&63"
+0x00570D70,CallChunkLoader,int __cdecl(bChunk*),verified,"EA name (GC UnloadChunks calls the twin CallChunkUnloader; was LoadChunk). registered loader, else 36 legacy handlers at 0x7FA858; verified by transcription + live boots + drive replay"
+0x00577AB0,LoadChunks,"void __cdecl(bChunk* start, int size, const char* name /*unused on PC*/)",verified,"GC signature has the 3rd (name) arg; PC code never reads it. walks chunks (next = c + size + 8), int3 on unhandled chunk, tail-calls 0x4887C0"
 0x0043C0B0,bChunkLoader_ctor,"bChunkLoader* __thiscall(uint32_t id, load, unload)",named,registers into 0x828050 (static init only)
 0x0043BDF0,bGetTicker,uint64? __cdecl(),named,QueryPerformanceCounter-based tick
 0x0043BD50,bBreak,void __cdecl(),named,int3; ret (debug break left in release)
 0x00570DD0,CopyChunksAligned,"int __cdecl(int mode, bChunk* src, u32 size, u8* dst, int offset, int depth)",verified,measure (dst=null) or copy a chunk tree; id-0 padding chunks (0x11 bytes) so dst offset == src addr mod 128; empty containers dropped; depth>10 -> bBreak. game/systems/bchunk/chunk_copy.cpp; diff 10k random trees 0 mismatches; 404 calls per boot
 0x00570F00,ClearChunks,"void __cdecl(bChunk* src, u32 size)",verified,"ids -> 0, container sizes -> 0 (next taken before clearing); EAX = last size seen. diff 10k 0 mismatches"
-0x00577B10,UnloadChunks,"void __cdecl(bChunk* start, int size)",verified,"reverse order in groups of 64 (ring; edi = new end); names each id 'BCHUNK_0x%08X' into 4x20-byte ring 0x8665C0/idx 0x866610; unload via loader or 36 legacy handlers 0x7FA8E8; tail-calls 0x4887C0. diff with fake loader 10k 0 mismatches; 6 calls per boot, 3 boots OK"
-0x00577C70,LoadChunksAligned?,"bool __cdecl(bChunk** chunks, u32* size, ?)",named,"measures with CopyChunksAligned; if realign needed: alloc (0x440820), copy, ClearChunks, load, unload, free (0x440540)"
+0x00577B10,UnloadChunks,"void __cdecl(bChunk* start, int size, const char* name /*unused on PC*/)",verified,"GC signature has the 3rd (name) arg; PC code never reads it. reverse order in groups of 64 (ring; edi = new end); names each id 'BCHUNK_0x%08X' into 4x20-byte ring 0x8665C0/idx 0x866610; unload via loader or 36 legacy handlers 0x7FA8E8; tail-calls 0x4887C0. diff with fake loader 10k 0 mismatches; 6 calls per boot, 3 boots OK"
+0x00577C70,LoadTempPermChunks,"bool __cdecl(bChunk** chunks, u32* size, ?)",named,"EA name (was LoadChunksAligned). measures with CopyChunksAligned; if realign needed: alloc (0x440820), copy, ClearChunks, load, unload, free (0x440540)"
 0x004400D0,bSPrintf,"int __cdecl(char* buf, const char* fmt, ...)",named,-> 0x43FBC0 (vsprintf)
 0x004022C0,nullsub_4022C0,void __cdecl(),named,empty (ret); stripped debug hook
 0x008665C0,g_ChunkNameRing,char[4][20],named,debug names written by UnloadChunks; index at 0x866610
-0x00440390,bMalloc,"void* __cdecl(int size, const char* name, int line, int flags)",verified,"flags&7 pool, &8 bottom, &0x10 best fit, (f>>6)&0x1FFC align (0->16), (f>>17)&0x1FFC align offset; external allocator 0x82802C[pool] first; 0x14-byte header {next,prev,u8 pool,u8 0x22,u16 pad,size,requested}; name 'RCMP::chunkbuff' dropped (bStrICmp). game/systems/memory/pool.cpp; diff via private pool in slot 7, 10k x 3 seeds 0 mismatches; ~3100 calls per boot"
-0x00440820,bMalloc2,"void* __cdecl(int size, int flags)",verified,"bMalloc(size, 0, 0, flags); 197 callers"
-0x00440540,bFree,void __cdecl(void* p),verified,"external allocator range check (signed), magic 0x22 else int3, unlink, AddFreeMemory, stats; destroys Main Pool when it has 0 allocations"
-0x0043FA50,bMemoryPool::AddFreeMemory,"void __thiscall(u8* mem, u32 size)",verified,"address-sorted free list {next,prev,size,0x44443333}, merges both sides, 0xEE fill, releases a whole OS block when *0x7EB3CC"
+0x00440390,bWareMalloc,"void* __cdecl(int size, const char* name, int line, int flags)",verified,"EA name (strings 0.85; was bMalloc). flags&7 pool, &8 bottom, &0x10 best fit, (f>>6)&0x1FFC align (0->16), (f>>17)&0x1FFC align offset; external allocator 0x82802C[pool] first; 0x14-byte header {next,prev,u8 pool,u8 0x22,u16 pad,size,requested}; name 'RCMP::chunkbuff' dropped (bStrICmp). game/systems/memory/pool.cpp; diff via private pool in slot 7, 10k x 3 seeds 0 mismatches; ~3100 calls per boot"
+0x00440820,bMalloc,"void* __cdecl(int size, int flags)",verified,"EA name (EA bMalloc(int size, int flags) -> bWareMalloc; was bMalloc2). bMalloc(size, 0, 0, flags); 197 callers"
+0x00440540,bWareFree,void __cdecl(void* p),verified,"EA name (nfsu2-gcpc code name (db row 'SpeedScript::SpeedScript' is stale); was bFree). external allocator range check (signed), magic 0x22 else int3, unlink, AddFreeMemory, stats; destroys Main Pool when it has 0 allocations"
+0x0043FA50,MemoryPool::AddMemory,"void __thiscall(u8* mem, u32 size)",verified,"EA name (was bMemoryPool::AddFreeMemory). address-sorted free list {next,prev,size,0x44443333}, merges both sides, 0xEE fill, releases a whole OS block when *0x7EB3CC"
 0x0043FC80,bMemoryPool::Allocate,"u8* __thiscall(int size, int align, int align_off, int from_bottom, int best_fit, int* out_size)",verified,"first/best fit, waste 0 or >=16, top/bottom, 0xAA fill, stats; grows by OS blocks (>= *0x7EB3D0 = 100 KB) via operator new"
 0x004402C0,bMemoryPool::Init,"void __thiscall(u8* mem, int size, const char* name)",verified,"lists, stats, InitializeCriticalSection(+0x40), debug fill on"
 0x0043F9A0,bMemoryPool::Destroy,void __thiscall(),verified,"frees OS blocks, DeleteCriticalSection"
@@ -86,42 +86,42 @@ addr,name,signature,status,notes
 0x0043FB80,bCloseMemoryPool,void __cdecl(int idx),verified,
 0x00828154,g_MemoryPools,bMemoryPool*[8],named,"0 Main Pool, 2 FEngMemoryPool, 3 Online, 4 Cars, 5 LanguageMemoryPool, 6 Audio Memory Pool; 1 external allocator; 7 unused (diff tests use it)"
 0x0082802C,g_ExternalAllocators,bExtAllocator*[8],named,"{ctx, base, size, alloc(ctx,size,name,line,flags), free(ctx,p)}"
-0x0043FEF0,bMemoryPool::Validate,void __thiscall(int),named,called every *0x8284FC allocations (0 = never)
+0x0043FEF0,MemoryPool::VerifyPoolIntegrity,void __thiscall(int),named,EA name (was bMemoryPool::Validate). called every *0x8284FC allocations (0 = never)
 0x0075C6C8,operator_new,void* __cdecl(u32),named,CRT
 0x0075C6DA,crt_free,void __cdecl(void*),named,CRT
-0x00574630,IsCompressed,int __cdecl(const u8* header),verified,"RAWW/HUFF/COMP v1, JDLZ v2. game/systems/resource/resource_file.cpp"
+0x00574630,LZValidHeader,int __cdecl(const u8* header),verified,"EA name (was IsCompressed). RAWW/HUFF/COMP v1, JDLZ v2. game/systems/resource/resource_file.cpp"
 0x00574670,Decompress,"u32 __cdecl(const u8* src, u8* dst)",verified,"dispatch by magic: COMP 0x574530, HUFF 0x5744C0, RAWW 0x5744F0, JDLZ 0x573700"
 0x005744F0,RawwDecompress,"u32 __cdecl(const u8* src, u8* dst)",verified,stored block: copy uncompressed size from +0x10
 0x005744C0,HuffDecompress,"u32 __cdecl(const u8* src, u8* dst)",named,"checks HUFF v1, decoder 0x573840 (src+0x10 in EAX)"
 0x00574530,CompDecompress,"u32 __cdecl(const u8* src, u8* dst)",named,"COMP v1 LZ, decoder inline"
-0x00570FA0,ResourceFile::SetAllocParams,"void __thiscall(int alloc_flags, const char* name)",verified,"+0xC4 flags, +0x94 name[48] via bStrNCpy(0x2F)"
-0x00570FD0,ResourceFile::AllocateBuffer,void __thiscall(bool bottom),verified,"bMalloc2(size, alloc_flags | 8 if flags&2 or bottom)"
-0x00571010,ResourceFile::SetOwnsBuffer,void __thiscall(bool),verified,+0x08
-0x00571020,ResourceFile::FreeBuffer,void __thiscall(),verified,bFree if owned
+0x00570FA0,ResourceFile::SetAllocationParams,"void __thiscall(int alloc_flags, const char* name)",verified,"EA name (was SetAllocParams). +0xC4 flags, +0x94 name[48] via bStrNCpy(0x2F)"
+0x00570FD0,ResourceFile::AllocateMemory,void __thiscall(bool bottom),verified,"EA name (was AllocateBuffer). bMalloc2(size, alloc_flags | 8 if flags&2 or bottom)"
+0x00571010,ResourceFile::SetFreeMemoryEnabled,void __thiscall(bool),verified,EA name (was SetOwnsBuffer). +0x08
+0x00571020,ResourceFile::FreeMemory,void __thiscall(),verified,EA name (was FreeBuffer). bFree if owned
 0x00571050,ResourceFile_DecPending,void __cdecl(ResourceFile*),verified,--pending (+0xC8); async read callback
-0x00577C70,LoadChunksAligned,"int __cdecl(u8** chunks, u32* size, int alloc_flags, const char* name)",verified,re-align branch is dead code (CopyChunksAligned mode 1 never moves the offset) -> always LoadChunks in place; that branch verified by transcription only
+0x00577C70,LoadTempPermChunks,"int __cdecl(u8** chunks, u32* size, int alloc_flags, const char* name)",verified,EA name (was LoadChunksAligned). re-align branch is dead code (CopyChunksAligned mode 1 never moves the offset) -> always LoadChunks in place; that branch verified by transcription only
 0x00577D80,ResourceFile::Unload,void __thiscall(),verified,"UnloadChunks(chunks, size, name), bFree if owned"
-0x00577DE0,ResourceFile::Load,void __thiscall(),verified,polled every frame; skips if loaded/pending; flag 8: decompress; LoadChunksAligned; flag 4: free buffer after; loaded=1
+0x00577DE0,ResourceFile::LoadResourceIfFileTransferFinished,void __thiscall(),verified,EA name (PC decomp matches our code line for line; was ResourceFile::Load). polled every frame; skips if loaded/pending; flag 8: decompress; LoadChunksAligned; flag 4: free buffer after; loaded=1
 0x00577EB0,FindResourceFile,ResourceFile* __cdecl(const char* name),verified,"list 0x8651A4 walked via prev, bStrCmp on +0x1C"
 0x0057CDE0,ResourceFile::ResourceFile,"ResourceFile* __thiscall(const char* file, int type, int flags, int unk14, int size_override)",named,0xF0 object; file size via 0x57CA10 (file system) - next: file layer
 0x00864F78,g_ResourceFileSlotPool,bSlotPool*,named,"'ResourceFileSlotPool', 0x50 x 0xF0 (0x440DF0)"
 0x008651A4,g_ResourceFiles,bTList<ResourceFile>,named,"{next, prev} head"
-0x00575330,bFileNameHash,u32 __cdecl(const char* name),verified,"upper-case a-z, '/'->'\\', bStringHash. ORIGINAL BUG: 0xA0-byte stack buffer, no bound: names >= 160 chars smash the stack (game's own names are short). game/systems/file/bfile.cpp"
-0x00579870,FindFileIndexEntry,IndexEntry* __cdecl(const char* name),verified,archive index list 0x865218 (empty on PC)
-0x005798F0,FindOpenFile,OpenFileEntry* __cdecl(const char* name),verified,"open-file cache 0x866584, hit moves to MRU tail"
-0x005798C0,OpenFileEntry::Close,void __thiscall(),verified,"--count 0x865108, async close (0x6F7790 + release cb 0x5755D0)"
+0x00575330,bFileGetFilenameHash,u32 __cdecl(const char* name),verified,"EA name (was bFileNameHash). upper-case a-z, '/'->'\\', bStringHash. ORIGINAL BUG: 0xA0-byte stack buffer, no bound: names >= 160 chars smash the stack (game's own names are short). game/systems/file/bfile.cpp"
+0x00579870,FindMemoryFileEntry,IndexEntry* __cdecl(const char* name),verified,EA name (was FindFileIndexEntry). archive index list 0x865218 (empty on PC)
+0x005798F0,CachedRealFileHandle::FindHandle,OpenFileEntry* __cdecl(const char* name),verified,"EA name (was FindOpenFile). open-file cache 0x866584, hit moves to MRU tail"
+0x005798C0,CachedRealFileHandle::RemoveUnusedHandle,void __thiscall(),verified,"EA name (was OpenFileEntry::Close). --count 0x865108, async close (0x6F7790 + release cb 0x5755D0)"
 0x0057C4A0,AddOpenFile,"OpenFileEntry* __cdecl(const char* name, int handle, int size)",verified,"max 4 entries, evicts idle ones; eviction path transcription + live only"
-0x0057B5D0,FlushOpenFileCache,void __cdecl(int),verified,closes+frees idle entries; called before write-mode opens (saving)
+0x0057B5D0,CachedRealFileHandle::FlushUnusedHandles,void __cdecl(int),verified,EA name (was FlushOpenFileCache). closes+frees idle entries; called before write-mode opens (saving)
 0x0057C5B0,bFile::bFile,"bFile* __thiscall(const char* name, int mode)",verified,"cache share / archive index / stat (read) / async open (other modes) / CD-drive retry (0x80057F, transcription only); +0x10 not initialised on non-sharing paths (original)"
-0x00579B90,bFile::Close,bFile* __thiscall(int flags),verified,"shared: --refcount, else async close; &1 frees the slot"
+0x00579B90,bFile::~bFile,bFile* __thiscall(int flags),verified,"EA name (scalar deleting destructor (flags & 1 frees); was bFile::Close). shared: --refcount, else async close; &1 frees the slot"
 0x0057CA10,bOpen,"bFile* __cdecl(const char* name, int mode, int)",verified,names >= 200 rejected; slot pool 0x865104 (0x40 x 0xF0) created on first use
 0x0057CAC0,bFileExists,int __cdecl(const char* name),verified,"size+1, 0 = missing"
-0x006F7C1B,FileLib_Open,"Request* __cdecl(const char* name, int mode, int prio, int)",named,"EA async file library (0x6F7xxx); wait 0x6F75DD, result+release 0x6F76E9, size 0x6F7861, close 0x6F7790, stat 0x6F7C54"
-0x006F6C47,FileLib_ChannelFromHandle,Channel* __cdecl(int handle),verified,"(*0x8AD610)->channels(+0x98)[handle & 0xFF], 0x84 bytes each. game/systems/file/filelib.cpp"
+0x006F7C1B,FILESYS_open,"Request* __cdecl(const char* name, int mode, int prio, int)",named,"EA name (was FileLib_Open). EA async file library (0x6F7xxx); wait 0x6F75DD, result+release 0x6F76E9, size 0x6F7861, close 0x6F7790, stat 0x6F7C54"
+0x006F6C47,FILEOPERATION::GetDevice,Channel* __cdecl(int handle),verified,"EA name (channel = device; was FileLib_ChannelFromHandle). (*0x8AD610)->channels(+0x98)[handle & 0xFF], 0x84 bytes each. game/systems/file/filelib.cpp"
 0x006F734A,RequestList::Find,"Request* __thiscall(int handle, bool remove)",verified,"intrusive singly linked list {head, tail, count}, links at Request+8; remove via 0x6F7FA4 (thiscall, ret 8)"
-0x006F7473,FileLib_FindRequest,"Request* (ESI Channel*, EBX int* state, int handle)",verified,register args; state -1 current / 1 queued / 0 done; custom entry stub
-0x006F7542,FileLib_GetStatus,int __cdecl(int handle),verified,"0 pending, -1 done-but-running, status, -3 unknown"
+0x006F7473,iGetOpFromHandle,"Request* (ESI Channel*, EBX int* state, int handle)",verified,EA name (was FileLib_FindRequest). register args; state -1 current / 1 queued / 0 done; custom entry stub
+0x006F7542,FILESYS_opstatus,int __cdecl(int handle),verified,"EA name (was FileLib_GetStatus). 0 pending, -1 done-but-running, status, -3 unknown"
 0x008AD610,g_FileSys,FileSys*,named,"EA async file library state; channels 0,2,5,6 active (others: uninitialised locks!)"
-0x006F75DD,FileLib_Wait,int __cdecl(int handle),verified,"pumps timers+sleeps on the library thread (the game main thread), else waits on channel event; then GetStatus. round trip 200 x 0 mismatches; 53 calls/boot"
-0x006F767C,FileLib_Result,u32 __cdecl(int handle),verified,"done list remove, vtable slot 2 (+8) result, handle=0, FreeRequest 0x6F7F14 under FileSys lock; ~1100 calls/boot. thunk 0x6F76E9"
-0x006F76F2,FileLib_ReleaseWithCallback,"void __cdecl(int handle, cb)",verified,"pending: store cb at +0x1C; done: cb(handle, status, user) now; ~1060 calls/boot"
+0x006F75DD,FILESYS_waitop,int __cdecl(int handle),verified,"EA name (was FileLib_Wait). pumps timers+sleeps on the library thread (the game main thread), else waits on channel event; then GetStatus. round trip 200 x 0 mismatches; 53 calls/boot"
+0x006F767C,FILESYS_completeop64,u32 __cdecl(int handle),verified,"EA name (64-bit result (callers read EAX); was FileLib_Result). done list remove, vtable slot 2 (+8) result, handle=0, FreeRequest 0x6F7F14 under FileSys lock; ~1100 calls/boot. thunk 0x6F76E9"
+0x006F76F2,FILESYS_callbackop,"void __cdecl(int handle, cb)",verified,"EA name (was FileLib_ReleaseWithCallback). pending: store cb at +0x1C; done: cb(handle, status, user) now; ~1060 calls/boot"

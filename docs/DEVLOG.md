@@ -810,4 +810,11 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   callbacks (+14 count free, +18 largest). Tested on two identical private heaps in slot 7 (first run: 110
   "mismatches" were the test's own heaps growing into OS blocks at unrelated addresses; allocations now stay
   inside the arena) + the live pools read-only + a fake external allocator. 0 mismatches. 768 verified.
+- `bware/speedscript.cpp` (15): EA's text-config parser (Init, ParseNextWord, the command/argument walkers, typed
+  argument getters, Error, GetPositionName, ResizeEntryTable, text constructor, destructor). Several knowledge.db
+  names were wrong (AddEntry = ResizeEntryTable, InitFromFile = the text constructor, 0x440840 "bMemSet" = the file
+  constructor, 0x40C840 "bMemCpy" = a piecewise-linear table lookup, 0x402000 "bScaleAdd" = a timer): noted in
+  symbols.csv. New `NFSU2_REWRITE_STD` stub (stdcall: ParseNextWord). The original crashes on
+  GetNextArgumentFloat without an argument (bStrToFloat(NULL)); the test avoids that. Not done: the file
+  constructor and HandleIncludeScript (they read files).
 

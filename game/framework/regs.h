@@ -112,6 +112,18 @@ extern "C" volatile long nfsu2_inflight;
     static ::game::Registrar g_reg_##fn(addr, #fn, sig, reinterpret_cast<void*>(&nfsu2_entry_##fn), \
                                         reinterpret_cast<void**>(&original), __FILE__, &g_calls_##fn)
 
+// ---- __stdcall entry stub: like NFSU2_REWRITE_N, but the callee pops its N stack args (`ret 4*N`). Our
+// implementation is a plain cdecl function. Test with check_regs_this (it measures what the callee pops).
+#define NFSU2_REWRITE_STD(addr, fn, nargs, sig, original)                                   \
+    static void* const g_impl_##fn = reinterpret_cast<void*>(&fn);                          \
+    static volatile uint32_t g_calls_##fn = 0;                                              \
+    extern "C" __declspec(naked) void nfsu2_entry_##fn() {                                  \
+        __asm lock inc dword ptr [g_calls_##fn] __asm lock inc dword ptr [nfsu2_inflight] __asm push ecx __asm push edx NFSU2_PUSH_ARGS_##nargs __asm call dword ptr [g_impl_##fn] \
+            __asm add esp, 4 * nargs __asm pop edx __asm pop ecx __asm lock dec dword ptr [nfsu2_inflight] __asm ret 4 * nargs \
+    }                                                                                       \
+    static ::game::Registrar g_reg_##fn(addr, #fn, sig, reinterpret_cast<void*>(&nfsu2_entry_##fn), \
+                                        reinterpret_cast<void**>(&original), __FILE__, &g_calls_##fn)
+
 // ---- __thiscall entry stub: `this` arrives in ECX, callee pops its N stack args. Our implementation is a plain
 // cdecl function taking `this` as its FIRST argument: R __cdecl fn(T* self, args...).
 #define NFSU2_PUSH_ARGS_0

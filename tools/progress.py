@@ -36,7 +36,7 @@ MILESTONES = [
 # per-system estimate). Rendering is the GameCube platform layer: a rough estimate only (PC uses Direct3D).
 SYSTEMS = [
     ("Core utilities", ["bstring", "bmath", "memory", "bware"], "strings, maths, memory, lists, slot pools", 216, "zBWare"),
-    ("Files & data loading", ["file", "resource", "bchunk"], "file system, resource files, chunks (+ misc helpers)", 629,
+    ("Files & data loading", ["file", "resource", "bchunk", "misc"], "file system, resource files, chunks (+ misc helpers)", 629,
      "filesys, syncfile, FSasync, zMisc"),
     ("Frontend / menus", ["frontend"], "menus, shops, career screens", 3826, "zFe, zFe2"),
     ("Camera", ["camera"], "chase / bumper / photo cameras", 322, "zCamera"),

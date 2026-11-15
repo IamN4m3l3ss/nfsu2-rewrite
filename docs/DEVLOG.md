@@ -619,3 +619,16 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   corruption in a live game.
 - Live: 3 boots, ~370 reads / 365 closes / 1080 completeops per boot through our code, heap clean, no errors.
   99 verified.
+
+## 2026-11-15 — FILEOPERATION allocation, ids, constructor, request lists (12)
+
+- `game/systems/file/fileops.cpp`: ListSingle<FILEOPERATION> AddTail/AddHead/RemoveHead/InsertAfter/Remove,
+  ListSingle AddHead/AddTail, LinkedList Clear/PopFirst, FILEOPERATION::operator_new, iGetNextOpId, constructor.
+  PC vs GameCube differences: operator_new ignores its size; iStartDevice gets the device in ESI; Remove ignores
+  its second argument and finds the predecessor itself.
+- Tests: list operations on fake node pools (every link and head/tail/count compared); operator_new /
+  iGetNextOpId / constructor against the real FILESYSINFO **while holding the lock each function takes**, with the
+  state restored after each run (other threads never see the intermediate state). Mutations caught (Remove
+  without tail fix-up 172, ctor without status clear 3314).
+- Live: 3 boots, ~1100 operations allocated/constructed and ~2200 queue pops per boot through our code; FILESYS
+  front-end real-read test still 150/150 on top of our internals; heap clean. 111 verified.

@@ -139,3 +139,15 @@ addr,name,signature,status,notes
 0x006F87EA,FILESYS_existssync,"bool32 __cdecl(const char* name, int priority)",verified,game/systems/file/filesys.cpp; EA name. result != 0. FileSysFrontEnd real-read diff 150 x 0 mismatches
 0x006F782C,FILESYS_write,"int __cdecl(int filehandle, int offset, void* buffer, int bytes, int priority, void* userdata)",named,db says bFile::Write (wrong by pattern); ctor 0x6F852D. Needs a safe write test (scratch file) - not done
 0x006F876C,FILESYS_writesync,"int __cdecl(int filehandle, int offset, void* buffer, int bytes, int priority)",named,db says bWrite; write + waitop + completeop
+0x006F7F14,ListSingle<FILEOPERATION>::AddTail,void __thiscall(FILEOPERATION*),verified,game/systems/file/fileops.cpp; EA name. ~1200/boot. FileOpLists/FileOpAlloc diff 10k x 0
+0x006F7EEC,ListSingle<FILEOPERATION>::AddHead,void __thiscall(FILEOPERATION*),verified,game/systems/file/fileops.cpp; EA name. ~2100/boot. FileOpLists/FileOpAlloc diff 10k x 0
+0x006F7F44,ListSingle<FILEOPERATION>::RemoveHead,FILEOPERATION* __thiscall(),verified,game/systems/file/fileops.cpp; EA name. ~2200/boot. FileOpLists/FileOpAlloc diff 10k x 0
+0x006F7F70,ListSingle<FILEOPERATION>::InsertAfter,"void __thiscall(prev, op)",verified,game/systems/file/fileops.cpp; EA name. prev null -> AddHead. FileOpLists/FileOpAlloc diff 10k x 0
+0x006F7FA4,ListSingle<FILEOPERATION>::Remove,"bool __thiscall(op, unused)",verified,game/systems/file/fileops.cpp; EA name. finds predecessor itself; callers test AL. FileOpLists/FileOpAlloc diff 10k x 0
+0x006F8041,ListSingle::AddHead,void __thiscall(ListNodeS*),verified,game/systems/file/fileops.cpp; EA name. links at +0. FileOpLists/FileOpAlloc diff 10k x 0
+0x006F805C,ListSingle::AddTail,void __thiscall(ListNodeS*),verified,game/systems/file/fileops.cpp; EA name. links at +0; 12 callers. FileOpLists/FileOpAlloc diff 10k x 0
+0x006F6B35,LinkedList::Clear,void __thiscall(),verified,game/systems/file/fileops.cpp; EA name. not called during boot. FileOpLists/FileOpAlloc diff 10k x 0
+0x006F6B56,LinkedList::PopFirst,ListNodeS* __thiscall(),verified,game/systems/file/fileops.cpp; EA name. . FileOpLists/FileOpAlloc diff 10k x 0
+0x006F70AC,FILEOPERATION::operator_new,FILEOPERATION* __cdecl(unsigned),verified,"game/systems/file/fileops.cpp; EA name. size ignored; FreeOps at FILESYSINFO+0, lock +0xC. FileOpLists/FileOpAlloc diff 10k x 0"
+0x006F6C66,FILEOPERATION::iGetNextOpId,int __thiscall(FILEDEVICE*),verified,"game/systems/file/fileops.cpp; EA name. NextOp +0x50 (lock +0x54), wraps 0x10000->1; id = n<<8 | device index. FileOpLists/FileOpAlloc diff 10k x 0"
+0x006F7416,FILEOPERATION::FILEOPERATION,"FILEOPERATION* __thiscall(int priority, void* userdata, FILEDEVICE*)",verified,"game/systems/file/fileops.cpp; EA name. vtable 0x7C2EC0, default callback 0x6F6C46, iStartDevice 0x6F7388 (ESI=device) if not running. FileOpLists/FileOpAlloc diff 10k x 0"

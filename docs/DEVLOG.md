@@ -791,3 +791,15 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   installed): identical, 13 ran -> verified. Leaving Customize Car Select asks "overwrite previously saved game?":
   walks never answer it (the next boot closes the game; nothing is saved). 748 verified, 747 on, 382 UNVERIFIED.
 
+## 2026-11-15 — Back to the core: bounding boxes (9)
+
+**Changed**
+- `game/systems/bmath/bbox.cpp`: the remaining bInitializeBoundingBox / bExpandBoundingBox / bBoundingBoxIsInside /
+  bBoundingBoxOverlapping overloads (0x43D470..0x43D820), written from the machine code. knowledge.db had two of
+  them as 3D: 0x43D470/0x43D4C0 are 2D box-vs-box tests. The 3D expand updates an axis only on a strict, ordered
+  compare (NaN never written), unlike the 2D expand; the 3D IsInside lets unordered compares PASS.
+
+**Verified**
+- Diff test 10,000 cases (ties, +-0, inf, NaN, aliasing) 0 mismatches; register test (EAX = result / max pointer);
+  `bBoundingBox_BROKEN` (NaN rule flipped) caught 230 times. Enabled live. Core utilities 104/216, 757 verified.
+

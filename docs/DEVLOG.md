@@ -802,4 +802,12 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
 **Verified**
 - Diff test 10,000 cases (ties, +-0, inf, NaN, aliasing) 0 mismatches; register test (EAX = result / max pointer);
   `bBoundingBox_BROKEN` (NaN rule flipped) caught 230 times. Enabled live. Core utilities 104/216, 757 verified.
+- `bware/btime.cpp` (5): bGetTicker (QPC >> shift), both bGetTickerDifference, bSetRandomSeed,
+  bSetMemoryPoolOverrideInfo. Tests also run other ticker shift/scale values (restored); time-dependent ones are
+  checked for ordering (original <= ours <= original). 0 mismatches; _BROKEN (no clamp) caught.
+- `memory/poolstats.cpp` (6): GetAmountFree, GetLargestFreeBlock, bCountFreeMemory, bLargestMalloc (pool 0 ->
+  0x6300000, else largest - 0xDC), bAddToMemoryPool, bVerifyPoolIntegrity. External allocators have two more
+  callbacks (+14 count free, +18 largest). Tested on two identical private heaps in slot 7 (first run: 110
+  "mismatches" were the test's own heaps growing into OS blocks at unrelated addresses; allocations now stay
+  inside the arena) + the live pools read-only + a fake external allocator. 0 mismatches. 768 verified.
 

@@ -141,6 +141,73 @@ bool walk_guarded(uint64_t* h, uint32_t* objs, uint32_t* pkgs, uint32_t* pn, uin
     }
 }
 
+// ---- per-object fingerprints (checkpoint A/B: objects that vary between two runs of the original get masked)
+struct ObjEntry {
+    uint32_t pkg;       // package name hash
+    int32_t parent;     // entry index of the parent group, -1 = package top level
+    uint32_t index;     // position in the parent's list
+    uint32_t name;      // object name hash
+    uint32_t type;
+    uint64_t hash;      // this object's own state (not its children)
+};
+constexpr uint32_t kMaxEntries = 8192;
+ObjEntry g_entries[kMaxEntries];
+uint32_t g_nentries = 0;
+
+void list_objects(uint32_t pkg, const uint8_t* o, uint32_t n, int32_t parent, int depth) {
+    for (uint32_t i = 0; o && i < n && i < 4096 && g_nentries < kMaxEntries; ++i, o = rd<const uint8_t*>(o, 4)) {
+        Fnv f;
+        uint32_t dummy = 0;
+        const uint32_t type = rd<uint32_t>(o, 0x18);
+        // own fields only: hash_object without recursing (groups get their children as separate entries)
+        f.u32(rd<uint32_t>(o, 0x10));
+        f.u32(type);
+        f.u32(rd<uint32_t>(o, 0x1C));
+        const uint8_t* data = rd<const uint8_t*>(o, 0x2C);
+        const uint32_t size = rd<uint32_t>(o, 0x30);
+        if (data && size && size <= 4096) f.bytes(data, size);
+        if (type == 2) {
+            const uint16_t* s = rd<const uint16_t*>(o, 0x64);
+            const uint32_t cap = rd<uint32_t>(o, 0x68);
+            for (uint32_t c = 0; s && c < cap && c < 1024 && s[c]; ++c) f.bytes(&s[c], 2);
+        }
+        (void)dummy;
+        const int32_t me = static_cast<int32_t>(g_nentries);
+        g_entries[g_nentries++] = {pkg, parent, i, rd<uint32_t>(o, 0x10), type, f.h};
+        if (type == 5 && depth < 16) list_objects(pkg, rd<const uint8_t*>(o, 0x64), rd<uint32_t>(o, 0x60), me, depth + 1);
+    }
+}
+
+bool list_all() {
+    g_nentries = 0;
+    const uint8_t* cfeng = *reinterpret_cast<const uint8_t* const*>(0x008384C4);
+    if (!cfeng) return false;
+    const uint8_t* eng = rd<const uint8_t*>(cfeng, 0x08);
+    if (!eng) return false;
+    const uint32_t n = rd<uint32_t>(eng, 0xE0);
+    const uint8_t* pkg = rd<const uint8_t*>(eng, 0xE4);
+    for (uint32_t k = 0; pkg && k < n && k < 64 && g_nentries < kMaxEntries; ++k, pkg = rd<const uint8_t*>(pkg, 4)) {
+        const uint32_t ph = rd<uint32_t>(pkg, 0x10);
+        Fnv f;  // the package's own state as a pseudo-object (type 0xFFFFFFFF)
+        f.u32(rd<uint32_t>(pkg, 0x18));
+        f.u32(rd<uint32_t>(pkg, 0x1C));
+        f.u32(rd<uint32_t>(pkg, 0x24));
+        const uint8_t* btn = rd<const uint8_t*>(pkg, 0x8C);
+        f.u32(btn ? rd<uint32_t>(btn, 0x10) : 0);
+        g_entries[g_nentries++] = {ph, -1, 0xFFFFFFFFu, ph, 0xFFFFFFFFu, f.h};
+        list_objects(ph, rd<const uint8_t*>(pkg, 0x4C), rd<uint32_t>(pkg, 0x48), -1, 0);
+    }
+    return true;
+}
+
+bool list_all_guarded() {
+    __try {
+        return list_all();
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+
 }  // namespace
 
 bool fe_state_hash(uint64_t& hash, uint32_t& objects, uint32_t& packages, uint32_t* pk_names, uint64_t* pk_hashes,
@@ -152,7 +219,26 @@ bool fe_state_hash(uint64_t& hash, uint32_t& objects, uint32_t& packages, uint32
     return walk_guarded(&hash, &objects, &packages, pk_names ? pk_names : dn, pk_hashes ? pk_hashes : dh, pk_names ? pk_max : 0);
 }
 
-json fe_state() {
+json fe_state(const json& p) {
+    if (p.value("objects", false))
+        return run_on_main(
+            [] {
+                const bool ok = list_all_guarded();
+                json arr = json::array();
+                for (uint32_t i = 0; i < g_nentries; ++i) {
+                    // path: package/index/index/... (stable across runs as long as the object lists match)
+                    std::string path;
+                    for (int32_t e = static_cast<int32_t>(i); e >= 0; e = g_entries[e].parent)
+                        path = "/" + std::to_string(static_cast<int32_t>(g_entries[e].index)) + path;
+                    char pk[12], nm[12], h[24];
+                    snprintf(pk, sizeof pk, "%08x", g_entries[i].pkg);
+                    snprintf(nm, sizeof nm, "%08x", g_entries[i].name);
+                    snprintf(h, sizeof h, "%016llx", static_cast<unsigned long long>(g_entries[i].hash));
+                    arr.push_back(json::array({std::string(pk) + path, nm, g_entries[i].type, h}));
+                }
+                return json{{"ok", ok}, {"objects", arr}};
+            },
+            4000);
     return run_on_main(
         [] {
             uint64_t h;

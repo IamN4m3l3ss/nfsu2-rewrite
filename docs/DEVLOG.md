@@ -740,3 +740,23 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
 - Exclusions now 232 of 1,206 (5 new). The other 71 of the 74: HUD and pause menu screenshots match the original ->
   verified (610 verified, 609 on, 520 UNVERIFIED left).
 
+## 2026-11-15 — Checkpoint A/B over boot and menu walks: 83 more menu functions verified
+
+**Changed**
+- Probe `fe_state {"objects": true}`: fingerprint of every FEng object (own fields: name, type, flags, data block,
+  string text), addressed by package/list path.
+- `boot_freeroam.py`: `NFSU2_FE_DUMP` saves all objects at every confirmed screen (+ free roam);
+  `BOOT_STOP_AT=main` stops at the main menu.
+- `tools/game/fe_boot_ab.py`: 2 boots with the original (noise mask, kept across runs in work/fe_ab/noise_*.json)
+  + 1 boot with the UNVERIFIED rewrites enabled from the first frame (out/rewrites_enabled.json, restored after).
+  `--walk quickrace`: main -> mode select -> track select -> game options -> car select and back (all settings
+  restored). HUD screenshot after pause/unpause per run. Free roam minimap markers (positioned relative to where the
+  car settles) are noise; neighbours of noisy objects in free roam are reported as "likely noise".
+- `tools/re/gcpc_promote.py` moves A/B-proven addresses to the allowlist + symbols.csv.
+
+**Verified**
+- Boot (2 runs): 7 screens identical, free roam differences only in minimap markers; HUD + pause screenshots match.
+  52 rewrites ran -> verified.
+- Quick race walk: 28 checkpoints identical (noise 0-2 per screen); 31 ran -> verified.
+- 693 verified, 692 on; 437 UNVERIFIED left (customize, options, career screens, post-race, online-only).
+

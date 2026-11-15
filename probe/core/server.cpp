@@ -77,7 +77,7 @@ json dispatch(const std::string& method, const json& p) {
     if (method == "release_all") return input_release_all();
     if (method == "input_state") return input_state();
     if (method == "car_state") return car_state();
-    if (method == "fe_state") return fe_state();
+    if (method == "fe_state") return fe_state(p);
     if (method == "fixed_dt") return fixed_dt(p);
     if (method == "fpu_state") {  // x87 control word + MXCSR as seen by game code on the render thread
         return run_on_main(

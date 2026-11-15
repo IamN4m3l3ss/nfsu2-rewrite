@@ -11,8 +11,12 @@ Game state int at 0x008654A4 (verified live 2026-11-13):
 3 = frontend, 4 = loading started (after "Yes"), 5 = loading, 6 = in game / free roam.
 Timing knobs below; env BOOT_LEFT_WAIT / BOOT_RETRY override them for experiments.
 Exit code 0 = in free roam; prints the elapsed time.
+Env NFSU2_FE_DUMP=<file.json>: at every confirmed screen (and in free roam) wait for it to settle, then save every menu
+object's fingerprint (probe fe_state objects) -> checkpoint A/B of menu rewrites (tools/game/fe_boot_ab.py).
+Env BOOT_STOP_AT=<screen> (e.g. main): stop once that screen is confirmed (exit 0, prints "stopped at <screen>").
 """
 import io
+import json
 import os
 import struct
 import sys
@@ -70,6 +74,18 @@ def classify(img: Image.Image) -> tuple[str, float]:
     return best
 
 
+FE_DUMP = os.environ.get("NFSU2_FE_DUMP")
+_dumps: dict[str, list] = {}
+
+
+def checkpoint(name: str, settle: float = 1.5) -> None:
+    if not FE_DUMP:
+        return
+    time.sleep(settle)
+    _dumps[name] = pc.call("fe_state", {"objects": True}, timeout=10)["objects"]
+    Path(FE_DUMP).write_text(json.dumps(_dumps))
+
+
 def wait_for(cls: str, timeout: float, max_dist: float = 15.0) -> float:
     """Wait until two consecutive frames classify as `cls` (a fading/half-drawn frame matches nothing)."""
     end = time.monotonic() + timeout
@@ -108,6 +124,7 @@ def main() -> int:
         pc.wait_frames(60)
         step = "title"
         wait_for("title", 30)
+        checkpoint("title")
         # The title ignores Enter for a few seconds. Re-press only while it is still showing the title, so a
         # late-reacting first press can't be followed by a second Enter on the next screen.
         prev = "title"
@@ -120,6 +137,10 @@ def main() -> int:
                 continue
             dist = step_enter(prev, expect, timeout=20 if prev == "title" else 8)
             log(f"  {el()} {expect} (dist {dist:.1f})")
+            checkpoint(expect)
+            if expect == os.environ.get("BOOT_STOP_AT"):
+                print(f"stopped at {expect} after {time.monotonic() - t0:.1f}s")
+                return 0
             prev = expect
         # Never press the last Enter blindly: anywhere else it starts a race instead of free roam.
         step = "Yes -> LOADING"
@@ -142,6 +163,7 @@ def main() -> int:
             if time.monotonic() > end:
                 raise pc.ProbeError(f"game state {game_state()} after 40 s of loading")
             time.sleep(0.1)
+        checkpoint("freeroam", 3.0)
         _, meta, path = pc.screenshot_png(4)
     except pc.ProbeError as e:
         print(f"FAIL at step '{step}' after {time.monotonic() - t0:.1f}s: {e}", file=sys.stderr)

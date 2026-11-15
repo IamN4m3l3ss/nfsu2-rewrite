@@ -28,6 +28,12 @@ namespace {
 const uint32_t kAllow[] = {
 #include "gcpc_allow.inc"
 };
+// nfsu2-gcpc status "hooked": in the game in their builds but never compared side by side (they need live game state,
+// their referee only covers self-contained functions). Registered OFF and labelled unverified until our menu A/B test
+// (draw-list comparison) covers them.
+const uint32_t kUnverified[] = {
+#include "gcpc_hooked.inc"
+};
 // Never registered: the user's required mods (WidescreenFix, HD UI support) patch code INSIDE these functions;
 // replacing them undid the mods (garbled menu text, 4:3 HUD - user report 2026-11-15). Found by comparing every
 // byte of each function in memory with the exe on disk.
@@ -100,6 +106,8 @@ void gcpc_register() {
     if (done) return;
     done = true;
     std::set<uint32_t> allow(std::begin(kAllow), std::end(kAllow));
+    const std::set<uint32_t> unverified(std::begin(kUnverified), std::end(kUnverified));
+    allow.insert(unverified.begin(), unverified.end());
     for (uint32_t a : kModPatched) allow.erase(a);
     std::vector<const hook::Replacement*> picked;
     for (size_t i = 0; i < hook::kReplacementCount; ++i)
@@ -113,7 +121,8 @@ void gcpc_register() {
         const hook::Replacement& r = *picked[i];
         if (r.preserve && (r.argBytes / 4u) * 7u + 40u > kSlot) continue;  // (never: largest argBytes is small)
         g_names[i] = r.name;
-        g_sigs[i] = std::string("nfsu2-gcpc rewrite") + (r.preserve ? " (ECX/EDX preserved)" : "");
+        g_sigs[i] = std::string(unverified.count(r.addr) ? "UNVERIFIED nfsu2-gcpc rewrite" : "nfsu2-gcpc rewrite") +
+                    (r.preserve ? " (ECX/EDX preserved)" : "");
         const void* thunk = make_thunk(i, r, &g_calls[i]);
         registry().push_back({r.addr, g_names[i].c_str(), g_sigs[i].c_str(), const_cast<void*>(thunk), &g_originals[i],
                               "game/systems/frontend/gcpc_hooks.cpp", &g_calls[i]});

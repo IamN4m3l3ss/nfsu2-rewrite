@@ -70,8 +70,19 @@ struct CarSample {
     float engine_rad_s = 0;
     uint32_t watch[8]{};  // raw dwords of the trace's watch addresses
     uint8_t nwatch = 0;
+    uint64_t fe_hash = 0;  // menu-engine fingerprint (trace with "fe": true)
+    uint32_t fe_objects = 0;
+    uint8_t fe_npk = 0;  // per package: name hash + fingerprint (first 8 active packages)
+    uint32_t fe_pk_name[8]{};
+    uint64_t fe_pk_hash[8]{};
 };
 bool car_read(CarSample& s);  // false if not in game / chain invalid
+// ---- festate.cpp: menu-engine (FEng) fingerprint for A/B tests of menu rewrites (main thread)
+bool fe_state_hash(uint64_t& hash, uint32_t& objects, uint32_t& packages, uint32_t* pk_names = nullptr,
+                   uint64_t* pk_hashes = nullptr, uint32_t pk_max = 0);
+json fe_state();
+bool fe_fixed_dt(bool on, float dt);  // pin RealTimeElapsed (0x865198) per frame; main thread
+json fixed_dt(const json& p);
 json car_sample_json(const CarSample& s);
 json car_state();
 

@@ -97,6 +97,12 @@ separate optional layer on top (user wants a "Mods" tab in the panel), never ins
 registered at run time by `game/systems/frontend/gcpc_hooks.cpp` from their replacement table + an allowlist
 (their verified frontend/camera entries) minus the mod-conflict list. Their referee, built with our toolchain and
 run in 8 Wine shards against a copy of the exe: 1,672,945 checks, 0 mismatches.
+Their other ~600 menu rewrites (status "hooked": never compared side by side) register OFF as `UNVERIFIED`
+(`gcpc_hooked.inc`); `tools/re/modcheck.py exclude` regenerates both lists' mod exclusions (run it over the union).
+They get proven by **menu A/B walks** (`tools/game/fe_ab.py`): fresh boot, probe `fixed_dt` pins the frame time
+(RealTimeElapsed 0x865198 via a wrapper on 0x57EAD0; without it frame hitches shift menu animations), scripted keys,
+per-package FEng fingerprint every frame (`fe_state`; HUD packages ignored). Run `baseline` first (original vs
+original must be IDENTICAL), then `test`; only rewrites that actually ran in an identical walk move to the allowlist.
 
 **RE kit (15 Nov 2026):** EA names + Ghidra decompilations of the GameCube and PC builds live outside the repo
 (`.env.local`: `KNOWLEDGE_DB`, `GC_DECOMP`, `PC_DECOMP`). `tools/re/kb.py ADDR [--pc] [--gc]` shows everything for an

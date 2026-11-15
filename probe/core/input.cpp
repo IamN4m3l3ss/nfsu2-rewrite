@@ -104,6 +104,7 @@ bool g_trace_active = false;
 uint64_t g_trace_base = 0, g_trace_every = 30;
 std::vector<CarSample> g_trace;
 std::vector<uintptr_t> g_trace_watch;  // extra addresses sampled with every trace sample (max 8)
+bool g_trace_fe = false;               // also fingerprint the menu engine every sample
 
 const char* kind_name(Kind k) { return k == Kind::Keyboard ? "keyboard" : k == Kind::Mouse ? "mouse" : "other"; }
 
@@ -507,7 +508,12 @@ void input_frame_tick(uint64_t frame) {
         const bool ok = car_read(cs);
         cs.nwatch = static_cast<uint8_t>(std::min<size_t>(8, g_trace_watch.size()));
         for (uint8_t i = 0; i < cs.nwatch; ++i) mem_read(g_trace_watch[i], &cs.watch[i], 4);
-        if (ok || cs.nwatch) g_trace.push_back(cs);
+        if (g_trace_fe) {
+            uint32_t pk = 0;
+            fe_state_hash(cs.fe_hash, cs.fe_objects, pk, cs.fe_pk_name, cs.fe_pk_hash, 8);
+            cs.fe_npk = static_cast<uint8_t>(pk < 8 ? pk : 8);
+        }
+        if (ok || cs.nwatch || g_trace_fe) g_trace.push_back(cs);
     }
 }
 
@@ -528,6 +534,8 @@ json input_schedule(const json& p) {
         g_trace.clear();
         g_trace_every = std::max<uint64_t>(1, p["trace_every"].get<uint64_t>());
         g_trace_base = g_sched_base;
+        g_trace_fe = p.value("fe", false);
+        g_trace_watch.clear();
         g_trace_active = true;
     }
     logf("schedule: %zu events from frame %llu", g_sched.size(), static_cast<unsigned long long>(g_sched_base));
@@ -549,6 +557,7 @@ json trace_start(const json& p) {
     g_trace_watch.clear();
     if (p.contains("watch"))
         for (const json& a : p["watch"]) g_trace_watch.push_back(static_cast<uintptr_t>(a.get<uint64_t>()));
+    g_trace_fe = p.value("fe", false);
     g_trace_base = current_frame() + 1;
     g_trace_active = true;
     return {{"base_frame", g_trace_base}, {"every", g_trace_every}};
@@ -564,6 +573,21 @@ json trace_stop() {
             json w = json::array();
             for (uint8_t i = 0; i < cs.nwatch; ++i) w.push_back(cs.watch[i]);
             j["watch"] = w;
+        }
+        if (g_trace_fe) {
+            char b[24];
+            snprintf(b, sizeof b, "%016llx", static_cast<unsigned long long>(cs.fe_hash));
+            j["fe"] = b;
+            j["fe_objects"] = cs.fe_objects;
+            json pk = json::object();
+            for (uint8_t i = 0; i < cs.fe_npk; ++i) {
+                char n[12], hh[24];
+                snprintf(n, sizeof n, "%08x", cs.fe_pk_name[i]);
+                snprintf(hh, sizeof hh, "%016llx", static_cast<unsigned long long>(cs.fe_pk_hash[i]));
+                pk[n] = hh;
+            }
+            j["fe_pk"] = pk;
+            j["frame"] = cs.frame;
         }
         arr.push_back(j);
     }

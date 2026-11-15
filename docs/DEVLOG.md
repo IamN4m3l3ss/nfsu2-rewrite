@@ -698,3 +698,25 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   transitively: 36 excluded, 385 enabled. User: "All normal" (pause menu, email, HUD). Boot fine, heap clean.
   Limitation: virtual calls aren't in that call graph - watch for reports.
 - User wants: rewrites stay byte-for-byte faithful; mod features later as a separate optional layer ("Mods" tab).
+
+## 2026-11-15 — Menu A/B walks: 74 more nfsu2-gcpc menu functions verified
+
+**Changed**
+- Read nfsu2-gcpc's AGENTS.md / FINDINGS.md traps; our import already covers them (ECX/EDX-preserving thunks for
+  their flagged hooks, x87 via `-mlong-double-80`, referee rebuilt with our toolchain).
+- Their 595 "hooked" (never side-by-side tested) rewrites now register OFF, labelled `UNVERIFIED`
+  (`game/systems/frontend/gcpc_hooked.inc`). `tools/re/modcheck.py` (new) regenerates the mod-conflict exclusions
+  over all 1,206 candidates: 227 excluded.
+- Probe: `fe_state` (FEng fingerprint: packages, objects, data blocks, string text) and `"fe": true` traces;
+  `fixed_dt` pins RealTimeElapsed (0x865198, written once per frame by 0x57EAD0 from MainLoop) through a
+  register-neutral wrapper. `tools/game/fe_ab.py` runs a frame-locked pause-menu walk from a fresh boot.
+
+**Verified**
+- Without `fixed_dt`, two runs of the ORIGINAL diverged at frame 778 (pause highlight pulse: FEng scripts run on
+  real time). With it: original vs original IDENTICAL over 811 frames (107 distinct menu states).
+- Original vs the 595 UNVERIFIED switched on: IDENTICAL, 811 frames; 74 of them ran -> moved to the allowlist and
+  marked verified (scenario A/B, noted per function). 614 verified (613 on), game normal afterwards.
+
+**Open**
+- 521 UNVERIFIED not reached by the pause walk: needs walks through the main menu (quick race, customize, career);
+  loads vary in length, so those walks must wait on menu state, not fixed frames.

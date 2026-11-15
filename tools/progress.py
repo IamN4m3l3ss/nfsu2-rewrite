@@ -246,6 +246,13 @@ def main():
     else:
         named_not_done = len(rewritten) + len(named)
     (ROOT / "docs" / "progress.svg").write_text(make_svg(len(verified), named_not_done, per_system, counts))
+    # cache-buster: GitHub/browsers cache README images, so the link changes whenever the numbers do
+    readme = ROOT / "README.md"
+    tag = f"{len(verified)}-{datetime.date.today().isoformat()}"
+    text = readme.read_text()
+    new = re.sub(r"!\[progress\]\(docs/progress\.svg(\?v=[^)]*)?\)", f"![progress](docs/progress.svg?v={tag})", text)
+    if new != text:
+        readme.write_text(new)
 
     pct = 100.0 * len(verified) / TOTAL_FUNCTIONS
     blocks = round(pct / 5)  # 20-char text bar (every block = 5 %), at least one sliver when > 0

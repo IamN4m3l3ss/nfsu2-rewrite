@@ -164,7 +164,7 @@ void tab_rewrites() {
     std::map<std::string, std::vector<RewriteInfo>> by;
     for (auto& r : list) by[r.system].push_back(r);
     static const std::map<std::string, std::string> label = {
-        {"bstring", "Strings"}, {"bmath", "Maths"}, {"memory", "Memory"}, {"bchunk", "Chunks"},
+        {"bstring", "Strings"}, {"bmath", "Maths"}, {"memory", "Memory"}, {"bware", "Lists & slot pools"}, {"bchunk", "Chunks"},
         {"resource", "Resource files"}, {"file", "File layer"}};
     for (auto& [sys, rows] : by) {
         int son = 0;

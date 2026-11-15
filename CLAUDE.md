@@ -28,8 +28,9 @@ that the automation can't cover yet. Give them one exact command and what to loo
    The user has lost hours to that before. If something can't be verified, say so.
 2. **Automate verification.** Every milestone has a check you run yourself (MCP queries, logs, screenshots, exit codes).
 3. **The original game is the oracle.** When in doubt about behaviour, measure the original through the MCP.
-4. **Never commit** `SPEED2.EXE`, game data, saves, or other people's binaries. Reading other projects' code and
-   docs for knowledge is fine; all code in this repo is written by us.
+4. **Never commit** `SPEED2.EXE`, game data, saves, or other people's binaries. Code from nfsu2-gcpc (CC0) may be
+   adapted (user decision, 15 Nov 2026): credit it in the file header, re-check the PC ABI against the exe, and it
+   only counts once OUR diff test proves it. All other code in this repo is written by us.
 5. Small commits. Keep `docs/DEVLOG.md` (date, what changed, what was verified, what broke).
 6. Stuck on the same problem after ~3 attempts: stop, write down what you tried, propose options to the user.
 

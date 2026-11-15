@@ -151,3 +151,23 @@ addr,name,signature,status,notes
 0x006F70AC,FILEOPERATION::operator_new,FILEOPERATION* __cdecl(unsigned),verified,"game/systems/file/fileops.cpp; EA name. size ignored; FreeOps at FILESYSINFO+0, lock +0xC. FileOpLists/FileOpAlloc diff 10k x 0"
 0x006F6C66,FILEOPERATION::iGetNextOpId,int __thiscall(FILEDEVICE*),verified,"game/systems/file/fileops.cpp; EA name. NextOp +0x50 (lock +0x54), wraps 0x10000->1; id = n<<8 | device index. FileOpLists/FileOpAlloc diff 10k x 0"
 0x006F7416,FILEOPERATION::FILEOPERATION,"FILEOPERATION* __thiscall(int priority, void* userdata, FILEDEVICE*)",verified,"game/systems/file/fileops.cpp; EA name. vtable 0x7C2EC0, default callback 0x6F6C46, iStartDevice 0x6F7388 (ESI=device) if not running. FileOpLists/FileOpAlloc diff 10k x 0"
+0x0043BCD0,bCalculateCrc32,"uint32 __cdecl(const void* data, int length, uint32 seed)",verified,adapted from nfsu2-gcpc (CC0); bware/blist.cpp; MSB-first CRC-32 + length bytes. Our diff tests: bList/bCalculateCrc32/SlotPoolMemory/SlotPoolAlloc 10k x 0
+0x0043BE80,bList::TraversebList,int __thiscall(bNode*),verified,adapted from nfsu2-gcpc (CC0); 57 callers. Our diff tests: bList/bCalculateCrc32/SlotPoolMemory/SlotPoolAlloc 10k x 0
+0x0043BEB0,bList::AddTail,void __thiscall(bList* other),verified,adapted from nfsu2-gcpc (CC0); moves all nodes of other. Our diff tests: bList/bCalculateCrc32/SlotPoolMemory/SlotPoolAlloc 10k x 0
+0x0043BEE0,bList::AddSorted,"bNode* __thiscall(cmp, bNode*)",verified,"adapted from nfsu2-gcpc (CC0); stops at first cmp(node, it) == 0 (checked in PC code). Our diff tests: bList/bCalculateCrc32/SlotPoolMemory/SlotPoolAlloc 10k x 0"
+0x0043BF40,bList::MergeSort,void __thiscall(cmp),verified,adapted from nfsu2-gcpc (CC0); bottom-up merge sort. Our diff tests: bList/bCalculateCrc32/SlotPoolMemory/SlotPoolAlloc 10k x 0
+0x0043E650,bList::Sort,void __thiscall(cmp),verified,adapted from nfsu2-gcpc (CC0); ~260k calls per boot. Our diff tests: bList/bCalculateCrc32/SlotPoolMemory/SlotPoolAlloc 10k x 0
+0x0043CD10,bIsSlotPoolFull,int __cdecl(SlotPool*),verified,adapted from nfsu2-gcpc (CC0); bware/slotpool.cpp. Our diff tests: bList/bCalculateCrc32/SlotPoolMemory/SlotPoolAlloc 10k x 0
+0x0043CD20,bCountFreeSlots,int __cdecl(SlotPool*),verified,adapted from nfsu2-gcpc (CC0); . Our diff tests: bList/bCalculateCrc32/SlotPoolMemory/SlotPoolAlloc 10k x 0
+0x0043CD30,bCountTotalSlots,int __cdecl(SlotPool*),verified,adapted from nfsu2-gcpc (CC0); . Our diff tests: bList/bCalculateCrc32/SlotPoolMemory/SlotPoolAlloc 10k x 0
+0x0043CD40,SlotPool::FlushSlotPool,void __thiscall() (this may be null),verified,adapted from nfsu2-gcpc (CC0); . Our diff tests: bList/bCalculateCrc32/SlotPoolMemory/SlotPoolAlloc 10k x 0
+0x0043CD80,SlotPool::GetSlotNumber,int __thiscall(void* slot),verified,"adapted from nfsu2-gcpc (CC0); first pool slot size for all pools, unsigned divide. Our diff tests: bList/bCalculateCrc32/SlotPoolMemory/SlotPoolAlloc 10k x 0"
+0x0043CDD0,SlotPool::FastMalloc,void* __thiscall(),verified,adapted from nfsu2-gcpc (CC0); ~62k/boot. Our diff tests: bList/bCalculateCrc32/SlotPoolMemory/SlotPoolAlloc 10k x 0
+0x0043CDF0,SlotPool::Free,void __thiscall(void* slot),verified,adapted from nfsu2-gcpc (CC0); . Our diff tests: bList/bCalculateCrc32/SlotPoolMemory/SlotPoolAlloc 10k x 0
+0x0043F8F0,bOMalloc,void* __cdecl(SlotPool*),verified,adapted from nfsu2-gcpc (CC0); FastMalloc inlined. Our diff tests: bList/bCalculateCrc32/SlotPoolMemory/SlotPoolAlloc 10k x 0
+0x0043F920,bFree,"void __cdecl(SlotPool*, void* slot)",verified,adapted from nfsu2-gcpc (CC0); slot-pool bFree (218 callers; Free inlined). Our diff tests: bList/bCalculateCrc32/SlotPoolMemory/SlotPoolAlloc 10k x 0
+0x00440B40,SlotPool::NewSlotPool,"SlotPool* __cdecl(u32 size, int n, const char* name, u32 memflags)",verified,"adapted from nfsu2-gcpc (CC0); bWareMalloc, flags 0xB. Our diff tests: bList/bCalculateCrc32/SlotPoolMemory/SlotPoolAlloc 10k x 0"
+0x00440BB0,SlotPool::ExpandSlotPool,void __thiscall(int n),verified,adapted from nfsu2-gcpc (CC0); . Our diff tests: bList/bCalculateCrc32/SlotPoolMemory/SlotPoolAlloc 10k x 0
+0x00440D40,SlotPool::Malloc,void* __thiscall(),verified,"adapted from nfsu2-gcpc (CC0); expands (n/4+1) when empty + flag 1, zeroes with flag 2. Our diff tests: bList/bCalculateCrc32/SlotPoolMemory/SlotPoolAlloc 10k x 0"
+0x00440E50,bMalloc,void* __cdecl(SlotPool*),verified,"adapted from nfsu2-gcpc (CC0); slot-pool bMalloc, 225 callers; jmp SlotPool::Malloc. Our diff tests: bList/bCalculateCrc32/SlotPoolMemory/SlotPoolAlloc 10k x 0"
+0x00440C30,SlotPool::GetAllocatedSlot,void* __thiscall(int n),verified,adapted from nfsu2-gcpc (CC0); byte map from bWareMalloc. Our diff tests: bList/bCalculateCrc32/SlotPoolMemory/SlotPoolAlloc 10k x 0

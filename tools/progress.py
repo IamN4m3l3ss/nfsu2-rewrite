@@ -32,7 +32,7 @@ MILESTONES = [
 
 # Planned systems in order (CLAUDE.md M8+). Each groups one or more folders under game/systems/.
 SYSTEMS = [
-    ("Core utilities", ["bstring", "bmath", "memory"], "strings, maths, memory allocator"),
+    ("Core utilities", ["bstring", "bmath", "memory", "bware"], "strings, maths, memory, lists, slot pools"),
     ("Files & data loading", ["file", "resource", "bchunk"], "file layer, resource files, chunk bundles"),
     ("Frontend / menus", ["frontend"], "menus, shops, career screens"),
     ("Camera", ["camera"], "chase / bumper / photo cameras"),
@@ -42,7 +42,7 @@ SYSTEMS = [
     ("Audio", ["audio"], "engine sounds, music, effects"),
     ("Rendering", ["render"], "last: the future port boundary"),
 ]
-FOLDER_LABEL = {"bstring": "Strings", "bmath": "Maths", "memory": "Memory",
+FOLDER_LABEL = {"bstring": "Strings", "bmath": "Maths", "memory": "Memory", "bware": "Lists & slot pools",
                 "bchunk": "Chunks", "resource": "Resource files", "file": "File layer"}
 
 STATUS_ORDER = {"verified": 0, "rewritten": 1, "named": 2, "unknown": 3}

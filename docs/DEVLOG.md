@@ -642,3 +642,21 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
 - Tracker: the amber part now counts game functions with a known EA name from the PC decompilation (7,199 not yet
   rewritten), instead of only our own named rows (needs the RE kit locally; falls back to our rows otherwise).
 - F8 panel: labels for the memory / resource / file systems.
+
+## 2026-11-15 — First rewrites adopted from nfsu2-gcpc (20): bList, CRC, slot pool
+
+- User decision: adopt nfsu2-gcpc's rewritten code (CC0) where useful; CLAUDE.md rule 4 updated. Their code is
+  platform-neutral C++ plus a "bridge"; the menu engine (488 verified there) needs their whole class library -
+  separate decision. Done now: core utilities, adapted into `game/systems/bware/` (credited per file).
+- bCalculateCrc32, bList TraversebList/AddTail/AddSorted/MergeSort/Sort, slot pool counters/Flush/GetSlotNumber/
+  FastMalloc/Free/bOMalloc/bFree/NewSlotPool/ExpandSlotPool/Malloc/bMalloc/GetAllocatedSlot. PC ABI re-checked
+  (ret sizes, register contracts); their notes matched. I briefly mis-transcribed AddSorted's loop condition; the
+  PC disassembly settled it (theirs was right).
+- Tests: bList on fake lists with three comparators; slot pool pure-memory ops on ONE buffer (orig, snapshot,
+  restore, ours -> byte-identical incl. pointers); allocating ops on two identical test heaps.
+- Mistakes: (1) a test buffer was sized with the base slot size while later pools used +4 -> heap overrun ->
+  Wine process-heap deadlock; game restarted (user not playing). (2) The first allocating test didn't look inside
+  returned slots and missed a deliberate half-zeroing bug; now compares slot contents (first word as a heap offset)
+  and catches it (4375).
+- Live: 3 boots, bList::Sort ~260k, FastMalloc ~62k, bMalloc(pool) ~41k, bFree(pool) ~37k calls per boot; heap
+  clean, no errors. 131 verified.

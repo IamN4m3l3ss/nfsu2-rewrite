@@ -10,7 +10,7 @@ constexpr uint32_t kGameApiVersion = 5;  // v3: GameRewrite.file, v4: GameRewrit
 
 struct GameRewrite {
     uintptr_t addr;         // original function in SPEED2.EXE (NA v1.2)
-    const char* name;       // e.g. "UpdateFrameTime"
+    const char* name;       // e.g. "bStrLen"
     const char* signature;  // e.g. "void __cdecl(float real_dt)"
     void* replacement;      // our function, same calling convention and signature
     void** original;        // filled by the core: call this to run the original

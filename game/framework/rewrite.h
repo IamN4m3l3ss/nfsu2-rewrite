@@ -2,9 +2,9 @@
 // switched between original and rewrite at runtime (MCP rewrite_enable/disable).
 //
 //   using Fn = void(__cdecl*)(float);
-//   static Fn o_UpdateFrameTime;                      // the original, filled in by the core
-//   static void __cdecl UpdateFrameTime(float dt) { ... o_UpdateFrameTime(dt); ... }
-//   NFSU2_REWRITE(0x0057EAD0, UpdateFrameTime, "void __cdecl(float real_dt)", o_UpdateFrameTime);
+//   static Fn o_bStrLen;                              // the original, filled in by the core
+//   static int __cdecl bStrLen(const char* s) { ... }
+//   NFSU2_REWRITE_N(0x0043DBB0, bStrLen, 1, "int __cdecl(const char*)", o_bStrLen);
 //
 // Game addresses stay integers until the moment they're called (see CLAUDE.md: never cast our own functions to game
 // signatures; clang may treat a provably mismatched call as UB).

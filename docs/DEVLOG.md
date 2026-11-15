@@ -126,7 +126,7 @@
 - Second half of M4: find the frontend state machine / save-load path and boot directly into free roam without
   menu input.
 
-## 2026-11-14 — M4: faster, verified boot (~13 s); Camera Toolkit workspace as reference
+## 2026-11-14 — M4: faster, verified boot (~13 s); user's reference notes
 
 **Changed**
 - `tools/boot_freeroam.py` rewritten around screen classification: each step waits until two consecutive frames
@@ -134,8 +134,7 @@
   are game imagery). The title Enter is re-pressed only while the title is still showing. The final Enter is only
   pressed when the Explore dialog shows Yes selected (Yes/No decided on the button strip only: 7.1 vs 20.0).
   Loading/in-game from the game state int `0x008654A4` (3 frontend, 4 loading started, 5 loading, 6 in game).
-- Reference workspace from the user: `/mnt/m2drive/waah/games/NFSU2 Mod/` (Camera Toolkit fork + notes, CE table,
-  two full-memory dumps, ZMenu, analysis scripts). Verified live from it: game state `0x8654A4`, frame time
+- Reference notes from the user (memory dumps, analysis scripts). Verified live from it: game state `0x8654A4`, frame time
   `0x865198` (1/60), time scale `0x7A5730` (1.0), player car `*(CarState**)0x89CCF8` → `+0x34` → `+0x20` = RigidBody
   (vtable `0x7A20C4`, tag `'Rigi'`, position at `+0x20`).
 
@@ -575,7 +574,7 @@ requests are recycled; finished requests keep handle 0 in the done lists. Not kn
 garbage (the original or ours), whether driving the library from inside Present is safe at all, what
 0x5755D0 and the request vtables do.
 Options: (a) verify these three live only (enable + 3 boots + play; boots call them hundreds of times), reverting
-on any problem; (b) debug the round trip offline with the game paused / under a debugger (x64dbg MCP), not in the
+on any problem; (b) debug the round trip offline with the game paused / under a debugger, not in the
 user's session; (c) move on to another system and come back later. The test is #if 0'd.
 
 ## 2026-11-14 — Round trip debugged offline: the bug was in our Result
@@ -603,7 +602,7 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   bInitFileSystem inlined; 0x4022C0 is one empty function shared by many (identical-code folding:
   eWaitUntilRenderingDone, UIWidgetMenu::Setup, ...). LoadChunks/UnloadChunks: GC has a 3rd `name` arg, unused on PC.
 - Denominator: 14,450 game functions (Ghidra, below 0x75BBFA where Winsock stubs + MSVC runtime start) instead of
-  NFSU2Recomp's 23,278. 87 verified = 0.60%.
+  the earlier 23,278 (which counted runtime/D3DX code and fragments too). 87 verified = 0.60%.
 
 ## 2026-11-15 — FILESYS front end (12) with EA names from the start
 
@@ -632,3 +631,14 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   without tail fix-up 172, ctor without status clear 3314).
 - Live: 3 boots, ~1100 operations allocated/constructed and ~2200 queue pops per boot through our code; FILESYS
   front-end real-read test still 150/150 on top of our internals; heap clean. 111 verified.
+
+## 2026-11-15 — Cleanup (user request)
+
+- Removed: unused drive recordings (live_probe.json 1 MB, user_route1.json, straight.script.trace.json), the M6
+  frame-time demo rewrite (never verified, always off), local caches. Docs merged: GUIDE.md -> README.md, the three
+  struct notes -> docs/structs.md.
+- Credits: README credits nfsu2-gcpc (and the three vendored libraries); all mentions of other projects removed from
+  the repo (user decision: only nfsu2-gcpc is credited).
+- Tracker: the amber part now counts game functions with a known EA name from the PC decompilation (7,199 not yet
+  rewritten), instead of only our own named rows (needs the RE kit locally; falls back to our rows otherwise).
+- F8 panel: labels for the memory / resource / file systems.

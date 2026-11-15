@@ -146,7 +146,7 @@ void tab_rewrites() {
     ImGui::TextColored(kGrey, "Untick a function to put the game's original code back. Changes apply instantly.");
     if (ImGui::Button("All on"))
         for (auto& r : list)
-            if (!r.enabled && r.name != "UpdateFrameTime") rewrite_set(r.name, true);
+            if (!r.enabled) rewrite_set(r.name, true);
     ImGui::SameLine();
     if (ImGui::Button("All off (original game)"))
         for (auto& r : list)
@@ -164,7 +164,8 @@ void tab_rewrites() {
     std::map<std::string, std::vector<RewriteInfo>> by;
     for (auto& r : list) by[r.system].push_back(r);
     static const std::map<std::string, std::string> label = {
-        {"bstring", "Strings"}, {"bmath", "Maths"}, {"bchunk", "File & chunk loading"}, {"time", "Frame time"}};
+        {"bstring", "Strings"}, {"bmath", "Maths"}, {"memory", "Memory"}, {"bchunk", "Chunks"},
+        {"resource", "Resource files"}, {"file", "File layer"}};
     for (auto& [sys, rows] : by) {
         int son = 0;
         for (auto& r : rows) son += r.enabled;

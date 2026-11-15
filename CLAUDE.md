@@ -7,7 +7,7 @@ Private, personal project. Read this whole file before doing anything.
 Remake Need for Speed: Underground 2 (PC, 2004) as our own C++ source code, written from scratch, behaving the same
 as the original. **Game first, everything else later.**
 
-Method (re3/reVC style — "hook and replace"):
+Method ("hook and replace"):
 1. An ASI plugin loaded into the original game exposes it to Claude Code through an MCP server: read/write memory,
    hook and log functions, inject input, take screenshots. Claude uses it to map the game live.
 2. Our rewritten code lives in a separate DLL that the ASI loads and can **hot-reload**. Each rewritten function is
@@ -37,7 +37,6 @@ that the automation can't cover yet. Give them one exact command and what to loo
 
 - `GAME_DIR=` — the game folder (contains `SPEED2.EXE`)
 - `WINEPREFIX=` / Proton setup used to run it
-- `CAMTK_SRC=` — optional: the user's private fork of Archie's NFSU2 Camera ToolKit (C++ ASI; knows camera structs)
 
 ## Known facts (verified 12 Nov 2026 — don't re-derive)
 
@@ -83,8 +82,7 @@ Cars: `CARS/<NAME>/GEOMETRY.BIN, TEXTURES.BIN, VINYLS.BIN`. The exe loads tracks
 `TRACKS\%s.BUN`, `TRACKS\STREAM%s.BUN`, `Tracks\Routes%s\Paths%d.bin`.
 
 **Scale (measured 15 Nov 2026):** 14,450 game functions in the exe (Ghidra 12.2, below `0x75BBFA` where the Winsock
-stubs and MSVC runtime start; GameCube build: 14,666). Use it to track coverage. (NFSU2Recomp's 23,278 counts runtime,
-D3DX and fragments too.)
+stubs and MSVC runtime start; GameCube build: 14,666). Use it to track coverage.
 
 **RE kit (15 Nov 2026):** EA names + Ghidra decompilations of the GameCube and PC builds live outside the repo
 (`.env.local`: `KNOWLEDGE_DB`, `GC_DECOMP`, `PC_DECOMP`). `tools/re/kb.py ADDR [--pc] [--gc]` shows everything for an
@@ -129,13 +127,13 @@ addresses opaque (integers / volatile), never cast our own functions to game sig
 
 ## Repository layout
 
-See `docs/GUIDE.md` (written for the user — keep it current). Entry point: `./nfsu2` (run, freeroam, build, status,
+See `README.md` (written for the user — keep it current; it is the only guide). Entry point: `./nfsu2` (run, freeroam, build, status,
 rewrites, on/off, all-on/all-off, test, progress, push).
 
 ```
 nfsu2-rewrite/
   nfsu2  README.md  PROGRESS.md  CLAUDE.md
-  docs/            GUIDE.md  DEVLOG.md  symbols.csv  structs/  progress.svg
+  docs/            DEVLOG.md  symbols.csv  structs.md  progress.svg
   probe/loader/    stable loader (nfsu2_probe.asi)        probe/core/   hot-reloadable core (nfsu2_core.dll)
   probe/common/    loader<->core<->game interfaces
   game/framework/  rewrite registration, register stubs, diff harness, lift helpers
@@ -193,8 +191,8 @@ AI racers/traffic → audio → rendering last (renderer is the future port boun
 - Standalone exe once the original isn't needed; then port: render abstraction with DX12 (Windows, Linux via
   Proton) and/or Vulkan (also for mobile). User leans DX12 for PC; decide at port time.
 - Photo mode (camera system is an early RE target anyway), renderer upgrades incl. ray tracing.
-- Launcher with mod toggles: Unlimiter, HD reflections (Aero_'s NFS HD Reflections), rain droplets (ThirteenAG's
-  FusionRainDroplets), Extra Options, Widescreen Fix — re-implemented natively in the rewrite.
+- Launcher with mod toggles (extra unlocks, HD reflections, rain droplets, extra options, widescreen fix) —
+  re-implemented natively in the rewrite.
 - TexMod packs: `.tpf` = every little-endian u32 XORed with `0x3FA43FA4` → ZipCrypto ZIP with TexMod's fixed
   42-byte password → `texmod.def` lines `0xHASH|file`; hash = `~crc32()` (zlib) over mip level 0 bytes as the
   game uploaded them. Loose `*_0xHASH.dds` packs too.
@@ -213,10 +211,5 @@ AI racers/traffic → audio → rendering last (renderer is the future port boun
 
 ## References (read for knowledge; write our own code)
 
-- NFSU2Recomp docs (the user has the zip): `PROJECT.md` (boot sequence, CRT, threads, D3DX effect findings, run-time
-  generated code), `D3DX_HLE.md`, `GRAPHICS_RESEARCH.md` — github.com/TalhaMudo/NFSU2Recomp
-- re3/reVC (GTA III/VC rewrites) — the hook-and-replace workflow this project copies
-- Names/structs for NA v1.2: nlgxzef/NFSU2Unlimiter, ExOptsTeam/NFSU2ExOpts, ThirteenAG/WidescreenFixesPack,
-  xan1242/NFSU-XtendedInput, the user's Camera ToolKit fork
-- Formats: whoismept/OpenUG2 `docs/FORMATS.md`, bdrtr/PryHUB (gizmo-nfs), NFSTools/GlobalLib, NFSTools/Binary
-- Tools: x64dbg MCP servers (e.g. bromoket/x64dbg_mcp), Cheat Engine MCP bridges — usable alongside the probe
+- nfsu2-gcpc (CC0, github.com/octavioCuatrochio/nfsu2-gcpc) — EA names and Ghidra decompilations via the RE kit
+  (see "RE kit" above). The only project credited in the README; don't add mentions of other projects to the repo.

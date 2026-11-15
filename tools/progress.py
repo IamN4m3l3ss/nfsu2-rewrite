@@ -14,8 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 # Game functions in SPEED2.EXE: Ghidra 12.2 functions below 0x75BBFA, where the Winsock import stubs and the MSVC
-# runtime start (counted 2026-11-15 from our PC export; the GameCube build has 14,666). NFSU2Recomp's 23,278 counted
-# every lifted entry point incl. runtime/D3DX and fragments - too high.
+# runtime start (counted 2026-11-15 from our PC export; the GameCube build has 14,666).
 TOTAL_FUNCTIONS = 14450
 
 # Milestones from CLAUDE.md, with their state. Update when one completes.
@@ -33,7 +32,7 @@ MILESTONES = [
 
 # Planned systems in order (CLAUDE.md M8+). Each groups one or more folders under game/systems/.
 SYSTEMS = [
-    ("Core utilities", ["bstring", "bmath", "memory", "time"], "strings, maths, memory allocator"),
+    ("Core utilities", ["bstring", "bmath", "memory"], "strings, maths, memory allocator"),
     ("Files & data loading", ["file", "resource", "bchunk"], "file layer, resource files, chunk bundles"),
     ("Frontend / menus", ["frontend"], "menus, shops, career screens"),
     ("Camera", ["camera"], "chase / bumper / photo cameras"),
@@ -43,7 +42,7 @@ SYSTEMS = [
     ("Audio", ["audio"], "engine sounds, music, effects"),
     ("Rendering", ["render"], "last: the future port boundary"),
 ]
-FOLDER_LABEL = {"bstring": "Strings", "bmath": "Maths", "time": "Frame time", "memory": "Memory",
+FOLDER_LABEL = {"bstring": "Strings", "bmath": "Maths", "memory": "Memory",
                 "bchunk": "Chunks", "resource": "Resource files", "file": "File layer"}
 
 STATUS_ORDER = {"verified": 0, "rewritten": 1, "named": 2, "unknown": 3}
@@ -52,6 +51,30 @@ STATUS_ORDER = {"verified": 0, "rewritten": 1, "named": 2, "unknown": 3}
 BG, PANEL, LINE = "#0d1117", "#161b22", "#30363d"
 TXT, DIM, FAINT = "#e6edf3", "#8b949e", "#484f58"
 GREEN, AMBER, BLUE = "#3fb950", "#d29922", "#58a6ff"
+
+
+GAME_END = 0x75BBFA  # first non-game address (Winsock stubs, then the MSVC runtime)
+
+
+def ea_named():
+    """Game functions with an EA name in the PC decompilation (RE kit, local only): set of addresses, or None."""
+    env = {}
+    for line in (ROOT / ".env.local").read_text().splitlines() if (ROOT / ".env.local").exists() else []:
+        if "=" in line and not line.lstrip().startswith("#"):
+            k, v = line.split("=", 1)
+            env[k.strip()] = v.strip().strip('"')
+    tsv = Path(env.get("PC_DECOMP", "/nonexistent")) / "functions.tsv"
+    if not tsv.exists():
+        return None
+    out = set()
+    with open(tsv) as f:
+        next(f)
+        for line in f:
+            a, _, name = line.rstrip("\n").split("\t")
+            addr = int(a, 16)
+            if addr < GAME_END and not re.match(r"^(thunk_)?FUN_[0-9a-f]+$", name):
+                out.add(addr)
+    return out
 
 
 def load_symbols():
@@ -141,9 +164,9 @@ def make_svg(verified, mapped, per_system, per_folder_counts):
     t.append(f'<rect x="{M}" y="{ly-10}" width="10" height="10" rx="2" fill="{GREEN}"/>'
              f'<text x="{M+16}" y="{ly}" font-size="12" fill="{TXT}">verified {verified} ({pct_v:.2f}%)</text>')
     t.append(f'<rect x="{M+190}" y="{ly-10}" width="10" height="10" rx="2" fill="{AMBER}"/>'
-             f'<text x="{M+206}" y="{ly}" font-size="12" fill="{TXT}">found &amp; named, not rewritten yet: {mapped}</text>')
-    t.append(f'<rect x="{M+500}" y="{ly-10}" width="10" height="10" rx="2" fill="{LINE}"/>'
-             f'<text x="{M+516}" y="{ly}" font-size="12" fill="{DIM}">still unexplored</text>')
+             f'<text x="{M+206}" y="{ly}" font-size="12" fill="{TXT}">EA name known, not rewritten yet: {mapped:,}</text>')
+    t.append(f'<rect x="{M+470}" y="{ly-10}" width="10" height="10" rx="2" fill="{LINE}"/>'
+             f'<text x="{M+486}" y="{ly}" font-size="12" fill="{DIM}">no name yet</text>')
 
     # --- milestones (3 columns)
     y2 = ly + 40
@@ -197,7 +220,15 @@ def main():
     if unassigned:
         print("warning: verified but no rewrite registration found:", ", ".join(unassigned))
 
-    (ROOT / "docs" / "progress.svg").write_text(make_svg(len(verified), len(rewritten) + len(named), per_system, counts))
+    # amber: functions whose EA name is known (decompilation), not verified yet; without the RE kit: our own names
+    known = ea_named()
+    verified_addrs = {int(r["addr"], 16) for r in verified}
+    if known is not None:
+        known |= {int(r["addr"], 16) for r in rewritten + named if int(r["addr"], 16) < GAME_END}
+        named_not_done = len(known - verified_addrs)
+    else:
+        named_not_done = len(rewritten) + len(named)
+    (ROOT / "docs" / "progress.svg").write_text(make_svg(len(verified), named_not_done, per_system, counts))
 
     pct = 100.0 * len(verified) / TOTAL_FUNCTIONS
     blocks = round(pct / 5)  # 20-char text bar (every block = 5 %), at least one sliver when > 0
@@ -237,8 +268,10 @@ def main():
             sig = r["signature"].replace("|", "\\|")
             md.append(f"| `{r['addr']}` | **{r['name']}** | `{sig}` |")
         md.append("")
-    md += ["## Not done yet", "", "Functions we have found and named but not rewritten yet (everything else in the "
-           "exe is still unexplored).", "", "| Address | Name | Notes |", "|---|---|---|"]
+    known_txt = (f"About {named_not_done:,} more game functions have a known EA name (from the GameCube build, via "
+                 "nfsu2-gcpc) but aren't rewritten yet. " if known is not None else "")
+    md += ["## Not done yet", "", known_txt + "Below: the ones we have studied ourselves (notes, sometimes partly "
+           "rewritten).", "", "| Address | Name | Notes |", "|---|---|---|"]
     for r in sorted(rewritten + named, key=lambda r: (STATUS_ORDER[r["status"]], r["addr"])):
         notes = (r["notes"] or "").replace("|", "\\|")
         if len(notes) > 110:

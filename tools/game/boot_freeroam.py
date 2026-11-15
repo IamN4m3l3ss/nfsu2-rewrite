@@ -7,7 +7,7 @@ Key sequence (from the user, verified by screenshots in work/oracle/m4/):
   -Left-> Yes -Enter-> LOADING -> free roam
 Needs a save in the prefix (C:\\users\\<user>\\AppData\\Local\\NFS Underground 2\\<profile>).
 
-Game state int at 0x008654A4 (from the user's Camera Toolkit fork notes, verified live 2026-11-13):
+Game state int at 0x008654A4 (verified live 2026-11-13):
 3 = frontend, 4 = loading started (after "Yes"), 5 = loading, 6 = in game / free roam.
 Timing knobs below; env BOOT_LEFT_WAIT / BOOT_RETRY override them for experiments.
 Exit code 0 = in free roam; prints the elapsed time.

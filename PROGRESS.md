@@ -182,11 +182,10 @@ A function counts as **verified** only when our C++ replaces the original inside
 
 ## Not done yet
 
-Functions we have found and named but not rewritten yet (everything else in the exe is still unexplored).
+About 7,199 more game functions have a known EA name (from the GameCube build, via nfsu2-gcpc) but aren't rewritten yet. Below: the ones we have studied ourselves (notes, sometimes partly rewritten).
 
 | Address | Name | Notes |
 |---|---|---|
-| `0x0057EAD0` | UpdateFrameTime _(rewritten, not verified)_ | only caller 0x5812ED passes QPC delta; writes 0x865198 (not the sim step: halving it had no visible effect)… |
 | `0x004022C0` | nullsub_4022C0 | empty (ret); stripped debug hook |
 | `0x0043BD50` | bBreak | int3; ret (debug break left in release) |
 | `0x0043BDF0` | bGetTicker | QueryPerformanceCounter-based tick |
@@ -199,6 +198,7 @@ Functions we have found and named but not rewritten yet (everything else in the 
 | `0x00574530` | CompDecompress | COMP v1 LZ, decoder inline |
 | `0x00577C70` | LoadTempPermChunks | EA name (was LoadChunksAligned). measures with CopyChunksAligned; if realign needed: alloc (0x440820), copy… |
 | `0x0057CDE0` | ResourceFile::ResourceFile | 0xF0 object; file size via 0x57CA10 (file system) - next: file layer |
+| `0x0057EAD0` | UpdateFrameTime | only caller 0x5812ED passes QPC delta; writes 0x865198 (not the sim step). Demo rewrite (M6) removed 2026-1… |
 | `0x005B7EE0` | ResetControllerStates | called on WM_ACTIVATEAPP; resets per-device state blocks at 0x874C48/0x874FB8/0x875328 |
 | `0x005C1840` | InputDevice_ReadKeyboard | Poll + buffered GetDeviceData; sets/clears bit uAppData of this+0x08 (u64 held actions); see docs/structs/i… |
 | `0x005CCD60` | MainWndProc | registered by RegisterClassExA at 0x005D25E4; switch on msg; hooked by probe keep_active |

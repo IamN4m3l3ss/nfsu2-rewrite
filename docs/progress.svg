@@ -12,10 +12,10 @@
 <rect x="50" y="188" width="740" height="8" rx="4.0" fill="#30363d"/><rect x="50.0" y="188" width="570.4" height="8" rx="4.0" fill="#3fb950"/>
 <text x="28" y="234" font-size="14" font-weight="600" fill="#e6edf3">Whole game</text>
 <text x="812" y="234" font-size="12" fill="#8b949e" text-anchor="end">~14,450 game functions in SPEED2.EXE (runtime libraries not counted)</text>
-<rect x="28" y="244" width="784" height="14" rx="7.0" fill="#30363d"/><rect x="28.0" y="244" width="6.0" height="14" rx="3.0" fill="#3fb950"/><rect x="34.0" y="244" width="4.0" height="14" rx="2.0" fill="#d29922"/>
+<rect x="28" y="244" width="784" height="14" rx="7.0" fill="#30363d"/><rect x="28.0" y="244" width="6.0" height="14" rx="3.0" fill="#3fb950"/><rect x="34.0" y="244" width="390.6" height="14" rx="7.0" fill="#d29922"/>
 <rect x="28" y="268" width="10" height="10" rx="2" fill="#3fb950"/><text x="44" y="278" font-size="12" fill="#e6edf3">verified 111 (0.77%)</text>
-<rect x="218" y="268" width="10" height="10" rx="2" fill="#d29922"/><text x="234" y="278" font-size="12" fill="#e6edf3">found &amp; named, not rewritten yet: 39</text>
-<rect x="528" y="268" width="10" height="10" rx="2" fill="#30363d"/><text x="544" y="278" font-size="12" fill="#8b949e">still unexplored</text>
+<rect x="218" y="268" width="10" height="10" rx="2" fill="#d29922"/><text x="234" y="278" font-size="12" fill="#e6edf3">EA name known, not rewritten yet: 7,199</text>
+<rect x="498" y="268" width="10" height="10" rx="2" fill="#30363d"/><text x="514" y="278" font-size="12" fill="#8b949e">no name yet</text>
 <text x="28" y="318" font-size="14" font-weight="600" fill="#e6edf3">Milestones</text>
 <text x="812" y="318" font-size="12" fill="#8b949e" text-anchor="end">8 of 9 done · tools first (M0–M7), then the rewrite itself</text>
 <circle cx="37.0" cy="342" r="8" fill="#3fb950"/><path d="M33.0 342 l3 3 l5 -6" stroke="#0d1117" stroke-width="2" fill="none" stroke-linecap="round"/>

@@ -72,7 +72,7 @@ PYEOF
     progress) "$PY" tools/progress.py ;;
     push)
         "$PY" tools/progress.py
-        git add PROGRESS.md docs/progress.svg
+        git add PROGRESS.md docs/progress.svg README.md
         git diff --cached --quiet || git commit -q -m "Update progress tracker" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
         git push ;;
     ""|-h|--help|help) usage ;;

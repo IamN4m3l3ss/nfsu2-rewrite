@@ -720,3 +720,12 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
 **Open**
 - 521 UNVERIFIED not reached by the pause walk: needs walks through the main menu (quick race, customize, career);
   loads vary in length, so those walks must wait on menu state, not fixed frames.
+
+**Broke (same day) — reverted**
+- With the 74 on, the HUD went back to a centred 4:3 layout (empty minimap, N2O gauge shifted): the WidescreenFix
+  layout was skipped. The A/B walk could not see it: it ignored packages open at frame 0, i.e. the HUD. And
+  modcheck follows direct calls only, so the path to the mod-patched code (likely virtual) slipped through.
+  User screenshots: original and 540-verified set identical after pause/unpause; the 74 went back to UNVERIFIED.
+- Next for fe_ab: compare the HUD package too (object positions/sizes, excluding live minimap/gauge data), and after
+  every `test` take a pause/unpause screenshot vs the original before promoting anything.
+

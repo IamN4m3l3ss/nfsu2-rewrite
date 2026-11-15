@@ -103,6 +103,8 @@ They get proven by **menu A/B walks** (`tools/game/fe_ab.py`): fresh boot, probe
 (RealTimeElapsed 0x865198 via a wrapper on 0x57EAD0; without it frame hitches shift menu animations), scripted keys,
 per-package FEng fingerprint every frame (`fe_state`; HUD packages ignored). Run `baseline` first (original vs
 original must be IDENTICAL), then `test`; only rewrites that actually ran in an identical walk move to the allowlist.
+The walk does NOT yet compare the HUD: before promoting, pause/unpause in free roam and screenshot vs the original
+(74 promoted on 15 Nov broke the widescreen HUD and were reverted).
 
 **RE kit (15 Nov 2026):** EA names + Ghidra decompilations of the GameCube and PC builds live outside the repo
 (`.env.local`: `KNOWLEDGE_DB`, `GC_DECOMP`, `PC_DECOMP`). `tools/re/kb.py ADDR [--pc] [--gc]` shows everything for an

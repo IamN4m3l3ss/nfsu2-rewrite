@@ -4,17 +4,17 @@
 <text x="812" y="42" font-size="12" fill="#8b949e" text-anchor="end">updated 2026-11-15</text>
 <text x="28" y="64" font-size="13" fill="#8b949e">Our own C++ replacing the game one function at a time, each proven identical to the original before it counts.</text>
 <rect x="28" y="88" width="784" height="118" rx="10" fill="#161b22" stroke="#30363d"/>
-<text x="50" y="150" font-size="52" font-weight="800" fill="#3fb950">757</text>
+<text x="50" y="150" font-size="52" font-weight="800" fill="#3fb950">768</text>
 <text x="157" y="132" font-size="16" font-weight="600" fill="#e6edf3">functions rewritten &amp; verified</text>
 <text x="157" y="152" font-size="13" fill="#8b949e">running in the game right now, switchable back to the original</text>
 <text x="50" y="180" font-size="12" fill="#e6edf3">Next goal: 10% of the game (1,445 functions)</text>
-<text x="790" y="180" font-size="12" font-weight="700" fill="#3fb950" text-anchor="end">757 / 1445 · 52%</text>
-<rect x="50" y="188" width="740" height="8" rx="4.0" fill="#30363d"/><rect x="50.0" y="188" width="387.7" height="8" rx="4.0" fill="#3fb950"/>
+<text x="790" y="180" font-size="12" font-weight="700" fill="#3fb950" text-anchor="end">768 / 1445 · 53%</text>
+<rect x="50" y="188" width="740" height="8" rx="4.0" fill="#30363d"/><rect x="50.0" y="188" width="393.3" height="8" rx="4.0" fill="#3fb950"/>
 <text x="28" y="234" font-size="14" font-weight="600" fill="#e6edf3">Whole game</text>
 <text x="812" y="234" font-size="12" fill="#8b949e" text-anchor="end">~14,450 game functions in SPEED2.EXE (runtime libraries not counted)</text>
-<rect x="28" y="244" width="784" height="14" rx="7.0" fill="#30363d"/><rect x="28.0" y="244" width="41.1" height="14" rx="7.0" fill="#3fb950"/><rect x="69.1" y="244" width="358.3" height="14" rx="7.0" fill="#d29922"/>
-<rect x="28" y="268" width="10" height="10" rx="2" fill="#3fb950"/><text x="44" y="278" font-size="12" fill="#e6edf3">verified 757 (5.24%)</text>
-<rect x="218" y="268" width="10" height="10" rx="2" fill="#d29922"/><text x="234" y="278" font-size="12" fill="#e6edf3">EA name known, not rewritten yet: 6,603</text>
+<rect x="28" y="244" width="784" height="14" rx="7.0" fill="#30363d"/><rect x="28.0" y="244" width="41.7" height="14" rx="7.0" fill="#3fb950"/><rect x="69.7" y="244" width="357.7" height="14" rx="7.0" fill="#d29922"/>
+<rect x="28" y="268" width="10" height="10" rx="2" fill="#3fb950"/><text x="44" y="278" font-size="12" fill="#e6edf3">verified 768 (5.31%)</text>
+<rect x="218" y="268" width="10" height="10" rx="2" fill="#d29922"/><text x="234" y="278" font-size="12" fill="#e6edf3">EA name known, not rewritten yet: 6,592</text>
 <rect x="498" y="268" width="10" height="10" rx="2" fill="#30363d"/><text x="514" y="278" font-size="12" fill="#8b949e">no name yet</text>
 <text x="28" y="318" font-size="14" font-weight="600" fill="#e6edf3">Milestones</text>
 <text x="812" y="318" font-size="12" fill="#8b949e" text-anchor="end">8 of 9 done · tools first (M0–M7), then the rewrite itself</text>
@@ -40,10 +40,10 @@
 <text x="812" y="448" font-size="12" fill="#8b949e" text-anchor="end">verified / functions in that part of the game, in planned order</text>
 <rect x="28" y="462" width="784" height="38" rx="8" fill="#161b22" stroke="#30363d"/>
 <text x="42" y="479" font-size="13" font-weight="600" fill="#e6edf3">Core utilities</text>
-<text x="42" y="493" font-size="11" fill="#8b949e">Strings 16 · Maths 49 · Memory 9 · Lists &amp; pools 30</text>
-<rect x="308" y="477" width="254" height="8" rx="4.0" fill="#30363d"/><rect x="308.0" y="477" width="122.3" height="8" rx="4.0" fill="#3fb950"/>
-<text x="654" y="485" font-size="12.5" font-weight="700" fill="#e6edf3" text-anchor="end">104 / 216</text>
-<text x="694" y="485" font-size="11.5" fill="#8b949e" text-anchor="end">48%</text>
+<text x="42" y="493" font-size="11" fill="#8b949e">Strings 16 · Maths 49 · Memory 15 · Lists &amp; pools 35</text>
+<rect x="308" y="477" width="254" height="8" rx="4.0" fill="#30363d"/><rect x="308.0" y="477" width="135.2" height="8" rx="4.0" fill="#3fb950"/>
+<text x="654" y="485" font-size="12.5" font-weight="700" fill="#e6edf3" text-anchor="end">115 / 216</text>
+<text x="694" y="485" font-size="11.5" fill="#8b949e" text-anchor="end">53%</text>
 <rect x="718.4" y="473" width="81.6" height="18" rx="9" fill="#d29922" fill-opacity="0.15" stroke="#d29922" stroke-opacity="0.6"/><text x="759.2" y="486" font-size="11" font-weight="600" fill="#d29922" text-anchor="middle">in progress</text>
 <rect x="28" y="508" width="784" height="38" rx="8" fill="#161b22" stroke="#30363d"/>
 <text x="42" y="525" font-size="13" font-weight="600" fill="#e6edf3">Files &amp; data loading</text>

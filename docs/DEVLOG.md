@@ -766,3 +766,25 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
 - Main menu order (from Quick Race): Career (left); right: Online, LAN (network, never walked), Customize, Profile
   Manager (not walked: saves/deletes profiles), Options.
 
+## 2026-11-15 — Crash in Customize (verified nfsu2-gcpc code): register audit of all nfsu2-gcpc rewrites
+
+**Broke**
+- Main menu -> Customize -> car -> Enter crashed the game (with the normal verified set, no UNVERIFIED on):
+  page fault in nfsu2_game.dll = FEPlayerCarDB::GetStockCarByHandle (0x503550). The caller at 0x52A791 runs
+  IsCarStock (0x516360), AbleToAddNewTunedCar, GetStockCarByHandle, FindEmptyTunedCarSlot on ONE ECX loaded once:
+  the originals never touch ECX, the C++ versions do. nfsu2-gcpc's audit didn't flag them (implicit use as the next
+  thiscall's `this`, behind a `test al,al; je`).
+
+**Changed**
+- Probe logs every module's address range at core init (+ `modules` RPC): crash addresses can be attributed.
+- `tools/re/regcontract.py`: follows every path after the call (both sides of jcc, jmp) for 40 instructions; a
+  following direct call counts the registers its callee reads on entry; ignores write-only idioms (xor r,r;
+  or r,-1; and r,0), `lea r,[r]` padding and `push ecx/edx` slot reservations.
+- `tools/re/gcpc_regaudit.py`: audits all 974 registered nfsu2-gcpc rewrites -> `gcpc_preserve.inc` (ECX/EDX
+  preserving thunk, argument size from `ret N` / caller cleanup) and `gcpc_regexclude.inc` (unclear -> not
+  registered). Result: +9 preserve (FEPlayerCarDB lookups x6, IsCarStock, FindHighScore,
+  StorePrevNotification), 1 excluded (FEngTestForIntersection: callers clean 16 or 28 bytes).
+
+**Verified**
+- Customize -> Peugeot -> Car Shop opens; the same steps crashed before the fix (reproduced twice).
+

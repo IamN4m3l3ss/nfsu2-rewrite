@@ -34,6 +34,18 @@ const uint32_t kAllow[] = {
 const uint32_t kUnverified[] = {
 #include "gcpc_hooked.inc"
 };
+// Our register audit (tools/re/gcpc_regaudit.py) on top of nfsu2-gcpc's: callers that read ECX/EDX after the call
+// (also implicitly, as the next thiscall's `this`) get the preserving thunk; unclear contracts aren't registered.
+struct PreserveOverride {
+    uint32_t addr;
+    uint8_t argBytes, calleePops;
+};
+const PreserveOverride kPreserve[] = {
+#include "gcpc_preserve.inc"
+    {0, 0, 0}};
+const uint32_t kRegExclude[] = {
+#include "gcpc_regexclude.inc"
+    0};
 // Never registered: the user's required mods (WidescreenFix, HD UI support) patch code INSIDE these functions;
 // replacing them undid the mods (garbled menu text, 4:3 HUD - user report 2026-11-15). Found by comparing every
 // byte of each function in memory with the exe on disk.
@@ -109,9 +121,26 @@ void gcpc_register() {
     const std::set<uint32_t> unverified(std::begin(kUnverified), std::end(kUnverified));
     allow.insert(unverified.begin(), unverified.end());
     for (uint32_t a : kModPatched) allow.erase(a);
+    for (uint32_t a : kRegExclude) allow.erase(a);
+    static std::vector<hook::Replacement> patched;  // copies of table entries that get the preserving thunk
+    patched.reserve(std::size(kPreserve));
     std::vector<const hook::Replacement*> picked;
-    for (size_t i = 0; i < hook::kReplacementCount; ++i)
-        if (allow.count(hook::kReplacements[i].addr)) picked.push_back(&hook::kReplacements[i]);
+    for (size_t i = 0; i < hook::kReplacementCount; ++i) {
+        const hook::Replacement& r = hook::kReplacements[i];
+        if (!allow.count(r.addr)) continue;
+        const PreserveOverride* o = nullptr;
+        for (const PreserveOverride& p : kPreserve)
+            if (p.addr && p.addr == r.addr) o = &p;
+        if (o && !r.preserve) {
+            patched.push_back(r);
+            patched.back().preserve = 1;
+            patched.back().argBytes = o->argBytes;
+            patched.back().calleePops = o->calleePops;
+            picked.push_back(&patched.back());
+        } else {
+            picked.push_back(&r);
+        }
+    }
     g_thunks = static_cast<uint8_t*>(VirtualAlloc(nullptr, picked.size() * kSlot + 16, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
     g_originals.assign(picked.size(), nullptr);
     g_calls = new volatile uint32_t[picked.size() + 1]();

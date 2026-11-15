@@ -71,7 +71,9 @@ it). Compare floats with `game::same_float`. `tools/re/x87lift.py` lifts straigh
 **Register contract (learned 14 Nov 2026):** the exe was built with whole-program optimisation; callers rely on
 registers a small function doesn't touch (ECX live across bSin) and on pointers left in EAX by "void" functions
 (bScaleAdd's out). Rewrites go through `NFSU2_REWRITE_N` entry stubs (save ECX/EDX), return what the original leaves
-in EAX, and every diff test file includes a register test (`game/framework/regs.h`, `tools/re/regcontract.py`).
+in EAX, and every diff test file includes a register test (`game/framework/regs.h`, `tools/re/regcontract.py`). Callers also pass ECX on implicitly to the NEXT thiscall without reloading it (0x52A791: four FEPlayerCarDB calls
+on one ECX); regcontract follows paths and counts that. nfsu2-gcpc rewrites: rerun `tools/re/gcpc_regaudit.py` whenever
+their lists change (it writes gcpc_preserve.inc / gcpc_regexclude.inc).
 
 **Data:** EA chunk bundles (`u32 id, u32 size`; high bit `0x80000000` = container). `GLOBAL/GlobalB.lzc` and
 `FRONTEND/FrontB.lzc` are chunk containers (`0xB3300000`) — in this (HD repack) install they contain NO JDLZ blocks;

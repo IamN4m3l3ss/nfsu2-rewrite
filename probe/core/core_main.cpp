@@ -3,11 +3,32 @@
 
 #include <cstdio>
 #include <cstdlib>
+
+#include <tlhelp32.h>
 #include <stdexcept>
 
 #include "MinHook.h"
 
 namespace probe {
+
+// Every loaded module's address range: crash addresses in a DLL (ours, a mod, Wine) can be attributed afterwards.
+json modules(bool log) {
+    json arr = json::array();
+    HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, GetCurrentProcessId());
+    if (snap == INVALID_HANDLE_VALUE) return arr;
+    MODULEENTRY32W me{};
+    me.dwSize = sizeof me;
+    for (BOOL ok = Module32FirstW(snap, &me); ok; ok = Module32NextW(snap, &me)) {
+        char name[MAX_PATH];
+        WideCharToMultiByte(CP_UTF8, 0, me.szModule, -1, name, sizeof name, nullptr, nullptr);
+        const auto base = reinterpret_cast<uintptr_t>(me.modBaseAddr);
+        if (log) logf("module %08x-%08x %s", unsigned(base), unsigned(base + me.modBaseSize), name);
+        arr.push_back({{"name", name}, {"base", base}, {"size", me.modBaseSize}});
+    }
+    CloseHandle(snap);
+    return arr;
+}
+
 namespace {
 
 const LoaderApi* g_api = nullptr;
@@ -48,6 +69,7 @@ bool core_init(const LoaderApi* a, const char* state_json) {
                 no_traffic_apply_env();
             }
             rewrite_init(st);
+            modules(true);
         }
     }
     server_start(port);

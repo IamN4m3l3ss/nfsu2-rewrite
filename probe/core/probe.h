@@ -81,6 +81,7 @@ bool car_read(CarSample& s);  // false if not in game / chain invalid
 bool fe_state_hash(uint64_t& hash, uint32_t& objects, uint32_t& packages, uint32_t* pk_names = nullptr,
                    uint64_t* pk_hashes = nullptr, uint32_t pk_max = 0);
 json fe_state(const json& p);
+json modules(bool log);  // core_main.cpp: loaded modules (name, base, size)
 bool fe_fixed_dt(bool on, float dt);  // pin RealTimeElapsed (0x865198) per frame; main thread
 json fixed_dt(const json& p);
 json car_sample_json(const CarSample& s);

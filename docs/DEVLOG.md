@@ -604,3 +604,18 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   eWaitUntilRenderingDone, UIWidgetMenu::Setup, ...). LoadChunks/UnloadChunks: GC has a 3rd `name` arg, unused on PC.
 - Denominator: 14,450 game functions (Ghidra, below 0x75BBFA where Winsock stubs + MSVC runtime start) instead of
   NFSU2Recomp's 23,278. 87 verified = 0.60%.
+
+## 2026-11-15 — FILESYS front end (12) with EA names from the start
+
+- `game/systems/file/filesys.cpp`: FILESYS_priorityop, close, read, readlarge, size, exists, completeop (thunk),
+  opensync, readsync, closesync, sizesync, existssync. First batch mapped with the RE kit: EA names and parameter
+  meanings from the GameCube decompilation, argument order/ABI from the PC disassembly (the PC operation
+  constructors take arguments in a different order than the GameCube code sets fields).
+- Test FileSysFrontEnd: real reads of game files (exists, opensync, sizesync, readsync / read+wait+complete /
+  readlarge at random offsets, closesync), original vs ours, every byte compared; 150/150. Never opens for writing:
+  FILESYS_write / writesync stay unrewritten until there's a safe scratch-file test.
+- Mistake: my first mutation (swapping offset/bytes) made a read write MBs into a 4 KB buffer and hung the game -
+  restarted (user not playing). Used offset+1 instead: caught 46/60. Lesson: mutations must not create memory
+  corruption in a live game.
+- Live: 3 boots, ~370 reads / 365 closes / 1080 completeops per boot through our code, heap clean, no errors.
+  99 verified.

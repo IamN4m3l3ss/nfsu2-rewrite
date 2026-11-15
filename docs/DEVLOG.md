@@ -817,4 +817,8 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   symbols.csv. New `NFSU2_REWRITE_STD` stub (stdcall: ParseNextWord). The original crashes on
   GetNextArgumentFloat without an argument (bStrToFloat(NULL)); the test avoids that. Not done: the file
   constructor and HandleIncludeScript (they read files).
+- `bstring/bstrtofloat.cpp`: bStrToFloat, including the original's nudge (a nonzero fraction is rounded to float
+  and its bits incremented by one before it is added). float in the original operation order = the game's 24-bit
+  x87 while values stay in float range (strings leaving it, e.g. 40 digits then e-10, could differ; game data
+  has none). 0 mismatches. 784 verified; core utilities 130/216.
 

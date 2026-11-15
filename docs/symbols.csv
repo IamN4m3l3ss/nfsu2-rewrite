@@ -26,7 +26,7 @@ addr,name,signature,status,notes
 0x0043DDF0,bStrChr,"const char* __cdecl(const char*, int c)",verified,signed compare before terminator test; nullptr in -> nullptr
 0x0043DE20,bToUpper,char* __cdecl(char*),verified,EA name (manual match 1.00; was bStrUpr). in place; returns pointer to terminator
 0x0043DE50,bStrToLong,int __cdecl(const char*),verified,EA name (manual match 1.00; was bStrToInt). '0x' hex (lowercase x) or +/- decimal; stops at first invalid char; wraps
-0x0043DEF0,bStrToFloat,float __cdecl(const char*),named,x87 math (needs exact-x87 approach); uses bStrToInt for the exponent
+0x0043DEF0,bStrToFloat,float __cdecl bStrToFloat(const char*),verified,"bstring/bstrtofloat.cpp; written from the PC machine code (incl. the +1-bit nudge of the fraction); float in the original op order = x87 at 24-bit precision while values stay in float range; diff test 10,000 strings 0 mismatches + register test (st0) + _BROKEN (2026-11-15)"
 0x0043DFE0,bWStrLen,int __cdecl(const uint16_t*),verified,nullptr -> 0
 0x0043E000,bStrToWStr,"uint16_t* __cdecl(uint16_t* dst, const char*)",verified,SIGN-extends bytes (0xE9 -> 0xFFE9)
 0x0043E030,bStrNToWStr,"uint16_t* __cdecl(uint16_t* dst, const char*, int n)",verified,"bounded, sign-extending"

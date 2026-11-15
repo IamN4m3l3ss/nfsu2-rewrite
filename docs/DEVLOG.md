@@ -729,3 +729,14 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
 - Next for fe_ab: compare the HUD package too (object positions/sizes, excluding live minimap/gauge data), and after
   every `test` take a pause/unpause screenshot vs the original before promoting anything.
 
+**Found (same day): why the HUD broke, fixed in modcheck**
+- Bisected the 74 in the game (pause/unpause refreshes the HUD; 7 screenshot rounds): `cFEng::GenerateRenderContext`
+  (0x51C660) alone gives the 4:3 HUD. The original is `mov ecx,[ecx+0Ch]; jmp 0x51B7F0`, and 0x51B7F0 calls
+  MakeRenderMatrix (0x51B0B0, WidescreenFix-patched). modcheck only followed `call`; it now also follows
+  `jmp`/`jcc` that leave the function (tail calls).
+- WidescreenFix also patches .rdata constants: 320.0 -> 426.67 (0x797D50), 640.0 -> 853.33 (0x797D58),
+  1/320 (0x79AC10), 30 -> 60 (0x7A572C). modcheck now treats functions reading them as patched. That caught
+  `cFEng::GetMouseInfo` (0x50C860), which had been on since the first import; it's no longer verified/used.
+- Exclusions now 232 of 1,206 (5 new). The other 71 of the 74: HUD and pause menu screenshots match the original ->
+  verified (610 verified, 609 on, 520 UNVERIFIED left).
+

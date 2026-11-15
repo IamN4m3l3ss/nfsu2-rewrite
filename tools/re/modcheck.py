@@ -7,8 +7,10 @@ and would skip the mod (garbled menu text, 4:3 HUD - 2026-11-15).
 
   modcheck.py patched                 list the functions the mods patched (our own hook jumps excluded)
   modcheck.py exclude ADDR_FILE       read candidate addresses (hex, one per line or comma separated), print the ones
-                                      to exclude: patched themselves, or calling (transitively, direct calls only,
-                                      through other candidates) a patched function. Virtual calls are not followed.
+                                      to exclude: patched themselves, reading a constant the mods patched in .rdata
+                                      (e.g. WidescreenFix's 640/320), or reaching (transitively through other
+                                      candidates; calls AND tail jumps) a patched function. Virtual calls are not
+                                      followed: still screenshot the HUD/menus after enabling a batch.
 """
 import bisect
 import re
@@ -27,6 +29,46 @@ GAME_END = 0x75BBFA
 
 def function_starts():
     return sorted(kb.dump_index("pc"))
+
+
+def section(pe, name):
+    return [s for s in pe.sections if s.Name.rstrip(b"\0") == name][0]
+
+
+def mem_bytes(start, size):
+    return b"".join(bytes.fromhex(pc.call("read_mem", {"addr": hex(start + o), "size": min(0x10000, size - o)}, timeout=60)["hex"])
+                    for o in range(0, size, 0x10000))
+
+
+def patched_constants(pe):
+    """.rdata dwords the mods changed (the import table, filled in by the loader, excluded)."""
+    rd = section(pe, b".rdata")
+    start, size = 0x400000 + rd.VirtualAddress, min(rd.Misc_VirtualSize, rd.SizeOfRawData)
+    disk, mem = pe.get_data(rd.VirtualAddress, size), mem_bytes(start, size)
+    iat = pe.OPTIONAL_HEADER.DATA_DIRECTORY[12]  # IMAGE_DIRECTORY_ENTRY_IAT
+    iat_lo, iat_hi = 0x400000 + iat.VirtualAddress, 0x400000 + iat.VirtualAddress + iat.Size
+    out = set()
+    for i in range(0, size - 3, 4):
+        if disk[i:i + 4] != mem[i:i + 4] and not iat_lo <= start + i < iat_hi:
+            out.add(start + i)
+    return out
+
+
+def constant_readers(pe, consts):
+    """Functions whose code contains one of the constants' addresses (as a displacement/immediate)."""
+    text = section(pe, b".text")
+    code = pe.get_data(text.VirtualAddress, text.SizeOfRawData)
+    base = 0x400000 + text.VirtualAddress
+    idx = function_starts()
+    out = {}
+    for c in consts:
+        pat, i = c.to_bytes(4, "little"), 0
+        while (i := code.find(pat, i)) != -1:
+            k = bisect.bisect_right(idx, base + i) - 1
+            if k >= 0:
+                out.setdefault(idx[k], []).append((base + i, 4))
+            i += 1
+    return out
 
 
 def patched_functions():
@@ -52,6 +94,8 @@ def patched_functions():
             i = j
         else:
             i += 1
+    for f, spots in constant_readers(pe, patched_constants(pe)).items():
+        out.setdefault(f, []).extend(spots)
     return out
 
 
@@ -59,11 +103,17 @@ def callees(pe, nxt, a):
     size = min(nxt.get(a, a + 64) - a, 8192)
     b = pe.get_data(a - 0x400000, size)
     out = set()
+    end = a + size
     for i in range(len(b) - 4):
-        if b[i] == 0xE8:
+        t = None
+        if b[i] in (0xE8, 0xE9):  # call / jmp rel32
             t = a + i + 5 + struct.unpack("<i", b[i + 1:i + 5])[0]
-            if 0x401000 <= t < GAME_END:
-                out.add(t)
+        elif b[i] == 0x0F and 0x80 <= b[i + 1] <= 0x8F and i + 6 <= len(b):  # jcc rel32
+            t = a + i + 6 + struct.unpack("<i", b[i + 2:i + 6])[0]
+        if t is None or not 0x401000 <= t < GAME_END:
+            continue
+        if b[i] == 0xE8 or not a <= t < end:  # jumps count only when they leave the function (tail calls)
+            out.add(t)
     return out
 
 

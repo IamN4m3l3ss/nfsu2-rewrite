@@ -759,4 +759,10 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   52 rewrites ran -> verified.
 - Quick race walk: 28 checkpoints identical (noise 0-2 per screen); 31 ran -> verified.
 - 693 verified, 692 on; 437 UNVERIFIED left (customize, options, career screens, post-race, online-only).
+- Options walk (`--walk options`: Audio, Display, Gameplay, Player, Controls, EA Trax browsed, nothing changed):
+  all checkpoints identical except the EA Trax "now playing" banner (package 1f457265, fades on a real-time timer
+  after the boot; now in the tool's noise packages). 42 ran -> verified. 735 verified, 734 on, 395 UNVERIFIED;
+  free roam HUD after pause/unpause correct with everything on.
+- Main menu order (from Quick Race): Career (left); right: Online, LAN (network, never walked), Customize, Profile
+  Manager (not walked: saves/deletes profiles), Options.
 

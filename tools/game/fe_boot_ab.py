@@ -37,8 +37,17 @@ WALKS = {
                   ("right", 1.0), ("left", 1.0), ("enter", 3.5),                              # direction; -> car select
                   ("right", 3.5), ("left", 3.5),
                   ("esc", 2.5), ("esc", 2.5), ("esc", 2.5), ("esc", 2.5)],                   # back to the main menu
+    # Options (5x right of Quick Race): Audio, Display, Gameplay, Player (browse only), Controls, EA Trax; no Credits
+    "options": [("right", 1.2)] * 5 + [("enter", 2.5)]
+               + ([("enter", 2.5)] + [("down", 1.0)] * 3 + [("up", 1.0)] * 3 + [("esc", 2.5), ("right", 1.2)]) * 4
+               + [("enter", 2.5), ("esc", 2.5), ("right", 1.2)]
+               + [("enter", 2.5), ("down", 1.0), ("down", 1.0), ("up", 1.0), ("up", 1.0), ("esc", 2.5)]
+               + [("esc", 2.5)] + [("left", 1.2)] * 5,
 }
 WALK = None
+# Packages driven by real-time timers, never comparable: the EA Trax "now playing" banner (shown after the boot,
+# fades out a few seconds later; its phase depends on how long the boot took).
+NOISE_PACKAGES = {"1f457265"}
 
 
 def rewrites():
@@ -123,6 +132,7 @@ def main(argv):
     for cp in a:
         pa, pb, pt = by_path(a[cp]), by_path(b.get(cp, [])), by_path(t.get(cp, []))
         noise = {p for p in set(pa) | set(pb) if pa.get(p) != pb.get(p)} | set(known.get(cp, []))
+        noise |= {p for p in set(pa) | set(pb) | set(pt) if p.split("/")[0] in NOISE_PACKAGES}
         known[cp] = sorted(noise)
         diff = sorted(p for p in set(pa) | set(pt) if p not in noise and pa.get(p) != pt.get(p))
 

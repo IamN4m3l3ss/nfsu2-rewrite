@@ -171,3 +171,17 @@ addr,name,signature,status,notes
 0x00440D40,SlotPool::Malloc,void* __thiscall(),verified,"adapted from nfsu2-gcpc (CC0); expands (n/4+1) when empty + flag 1, zeroes with flag 2. Our diff tests: bList/bCalculateCrc32/SlotPoolMemory/SlotPoolAlloc 10k x 0"
 0x00440E50,bMalloc,void* __cdecl(SlotPool*),verified,"adapted from nfsu2-gcpc (CC0); slot-pool bMalloc, 225 callers; jmp SlotPool::Malloc. Our diff tests: bList/bCalculateCrc32/SlotPoolMemory/SlotPoolAlloc 10k x 0"
 0x00440C30,SlotPool::GetAllocatedSlot,void* __thiscall(int n),verified,adapted from nfsu2-gcpc (CC0); byte map from bWareMalloc. Our diff tests: bList/bCalculateCrc32/SlotPoolMemory/SlotPoolAlloc 10k x 0
+0x004013F0,eMulMatrix,"void __cdecl(bMatrix4* out, const bMatrix4* a, const bMatrix4* b)",verified,"bmath/bmath3.cpp; adapted from nfsu2-gcpc (CC0). out = a x b, original summation order; ~38k/boot. bMath3 diff 3x10k x 0 (realistic magnitudes)"
+0x0043C990,bMulMatrix,"void __cdecl(bMatrix4* out, const bMatrix4* a, const bMatrix4* b)",verified,"bmath/bmath3.cpp; adapted from nfsu2-gcpc (CC0). = eMulMatrix(out, b, a); 43 callers. bMath3 diff 3x10k x 0 (realistic magnitudes)"
+0x0043CBD0,bMatrixToQuaternion,"void __cdecl(bVector4* q, const bMatrix4* m)",verified,bmath/bmath3.cpp; adapted from nfsu2-gcpc (CC0). . bMath3 diff 3x10k x 0 (realistic magnitudes)
+0x0043C650,bFixATan,int __cdecl(int ratio16_16),verified,bmath/bmath3.cpp; adapted from nfsu2-gcpc (CC0). tables 0x7EB1C0 / 0x7EB2C8. bMath3 diff 3x10k x 0 (realistic magnitudes)
+0x0043C6F0,bFixATan,"int __cdecl(int x, int y)",verified,bmath/bmath3.cpp; adapted from nfsu2-gcpc (CC0). integer atan2. bMath3 diff 3x10k x 0 (realistic magnitudes)
+0x0043C170,bRandom,"float __cdecl(float range, uint32* seed)",verified,bmath/bmath3.cpp; adapted from nfsu2-gcpc (CC0). . bMath3 diff 3x10k x 0 (realistic magnitudes)
+0x0043D010,bNormalize,"void __cdecl(bVector4* out, const bVector4* in)",verified,"bmath/bmath3.cpp; adapted from nfsu2-gcpc (CC0). writes x,y,z only. bMath3 diff 3x10k x 0 (realistic magnitudes)"
+0x0043D150,bEqual,"int __cdecl(const bVector2*, const bVector2*, float eps)",verified,bmath/bmath3.cpp; adapted from nfsu2-gcpc (CC0). NaN counts as equal. bMath3 diff 3x10k x 0 (realistic magnitudes)
+0x0043D250,bInitializeBoundingBox,"void __cdecl(bVector2* min, bVector2* max, const bVector2* p)",verified,bmath/bmath3.cpp; adapted from nfsu2-gcpc (CC0). . bMath3 diff 3x10k x 0 (realistic magnitudes)
+0x0043D270,bExpandBoundingBox,"void __cdecl(min, max, const bVector2* p)",verified,bmath/bmath3.cpp; adapted from nfsu2-gcpc (CC0). . bMath3 diff 3x10k x 0 (realistic magnitudes)
+0x0043D2F0,bExpandBoundingBox,"void __cdecl(min, max, const bVector2* p, float r)",verified,bmath/bmath3.cpp; adapted from nfsu2-gcpc (CC0). . bMath3 diff 3x10k x 0 (realistic magnitudes)
+0x0043D380,bExpandBoundingBox,"void __cdecl(min, max, const bVector2* p, const bVector2* q)",verified,bmath/bmath3.cpp; adapted from nfsu2-gcpc (CC0). . bMath3 diff 3x10k x 0 (realistic magnitudes)
+0x00440F50,bTan,float __cdecl(uint16 angle),verified,bmath/bmath3.cpp; adapted from nfsu2-gcpc (CC0). out-of-line inline. bMath3 diff 3x10k x 0 (realistic magnitudes)
+0x00440F70,bLength,float __cdecl(const bVector3*),verified,bmath/bmath3.cpp; adapted from nfsu2-gcpc (CC0). out-of-line inline. bMath3 diff 3x10k x 0 (realistic magnitudes)

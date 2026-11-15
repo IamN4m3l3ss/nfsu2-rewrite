@@ -660,3 +660,14 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   and catches it (4375).
 - Live: 3 boots, bList::Sort ~260k, FastMalloc ~62k, bMalloc(pool) ~41k, bFree(pool) ~37k calls per boot; heap
   clean, no errors. 131 verified.
+
+## 2026-11-15 — More bMath from nfsu2-gcpc (14)
+
+- `game/systems/bmath/bmath3.cpp`: eMulMatrix, bMulMatrix(4x4), bMatrixToQuaternion, bFixATan x2, seeded float
+  bRandom, 4D bNormalize, 2D bEqual, bInitializeBoundingBox(point), bExpandBoundingBox x3, bTan, bLength. Their code
+  computes in 80-bit long double (MinGW); under our MSVC ABI long double is 64-bit, so these are written in float
+  with their operation order (the game's x87 runs at 24-bit precision).
+- First test run: 99 mismatches in bNormalize(4)/bLength from arbitrary bit-pattern inputs (x*x overflows a float
+  but not the x87's wider register exponent) - the documented limit of the float approach (bmath.cpp); inputs now
+  realistic magnitudes + 0/+-1/inf/NaN, 3x10k pass. Mutation (summation order in eMulMatrix) caught 143.
+- Live: 3 boots, eMulMatrix ~38k, bMatrixToQuaternion ~1.1k, 4D bNormalize ~2k calls/boot; heap clean. 145 verified.

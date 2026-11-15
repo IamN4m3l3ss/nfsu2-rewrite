@@ -30,19 +30,23 @@ MILESTONES = [
     ("M8", "System-by-system rewrite", "in progress"),
 ]
 
-# Planned systems in order (CLAUDE.md M8+). Each groups one or more folders under game/systems/.
+# Planned systems in order (CLAUDE.md M8+): (name, our game/systems folders, description, size, size source).
+# Sizes = function counts of EA's matching source files in the GameCube build (Speed.elf symbols via knowledge.db,
+# counted 2026-11-15; the GameCube build has 14,666 functions vs 14,450 game functions on PC, so it's a good
+# per-system estimate). Rendering is the GameCube platform layer: a rough estimate only (PC uses Direct3D).
 SYSTEMS = [
-    ("Core utilities", ["bstring", "bmath", "memory", "bware"], "strings, maths, memory, lists, slot pools"),
-    ("Files & data loading", ["file", "resource", "bchunk"], "file layer, resource files, chunk bundles"),
-    ("Frontend / menus", ["frontend"], "menus, shops, career screens"),
-    ("Camera", ["camera"], "chase / bumper / photo cameras"),
-    ("Car physics & handling", ["car", "physics"], "engine, tyres, suspension, collisions"),
-    ("World streaming", ["world"], "loading Bayview around the player"),
-    ("AI racers & traffic", ["ai"], "opponents, traffic cars"),
-    ("Audio", ["audio"], "engine sounds, music, effects"),
-    ("Rendering", ["render"], "last: the future port boundary"),
+    ("Core utilities", ["bstring", "bmath", "memory", "bware"], "strings, maths, memory, lists, slot pools", 216, "zBWare"),
+    ("Files & data loading", ["file", "resource", "bchunk"], "file system, resource files, chunks (+ misc helpers)", 629,
+     "filesys, syncfile, FSasync, zMisc"),
+    ("Frontend / menus", ["frontend"], "menus, shops, career screens", 3826, "zFe, zFe2"),
+    ("Camera", ["camera"], "chase / bumper / photo cameras", 322, "zCamera"),
+    ("Car physics & handling", ["car", "physics"], "engine, tyres, suspension, collisions", 738, "zPhysics"),
+    ("World streaming", ["world"], "loading Bayview around the player", 1494, "zWorld, zWorld2, zTrack"),
+    ("AI racers & traffic", ["ai"], "opponents, traffic cars", 1190, "zAI"),
+    ("Audio", ["audio"], "engine sounds, music, effects", 1808, "zEAXSound"),
+    ("Rendering", ["render"], "last: the future port boundary (size: rough estimate)", 305, "zPlatform (GameCube)"),
 ]
-FOLDER_LABEL = {"bstring": "Strings", "bmath": "Maths", "memory": "Memory", "bware": "Lists & slot pools",
+FOLDER_LABEL = {"bstring": "Strings", "bmath": "Maths", "memory": "Memory", "bware": "Lists & pools",
                 "bchunk": "Chunks", "resource": "Resource files", "file": "File layer"}
 
 STATUS_ORDER = {"verified": 0, "rewritten": 1, "named": 2, "unknown": 3}
@@ -131,7 +135,9 @@ def pill(x, y, text, col):
 
 def make_svg(verified, mapped, per_system, per_folder_counts):
     W, M = 840, 28
-    goal = round(TOTAL_FUNCTIONS * 0.01)  # first goal: 1 % of the exe
+    # next goal: the first step of the ladder not reached yet
+    goal_pct = next((g for g in (1, 2, 5, 10, 25, 50, 100) if verified < round(TOTAL_FUNCTIONS * g / 100)), 100)
+    goal = round(TOTAL_FUNCTIONS * goal_pct / 100)
     rows = len(per_system)
     H = 470 + rows * 46
     t = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" '
@@ -149,7 +155,7 @@ def make_svg(verified, mapped, per_system, per_folder_counts):
     t.append(f'<text x="{nx}" y="{y0+44}" font-size="16" font-weight="600" fill="{TXT}">functions rewritten &amp; verified</text>')
     t.append(f'<text x="{nx}" y="{y0+64}" font-size="13" fill="{DIM}">running in the game right now, switchable back to the original</text>')
     gx, gw = M + 22, W - 2 * M - 44
-    t.append(f'<text x="{gx}" y="{y0+92}" font-size="12" fill="{TXT}">Next goal: 1% of the game ({goal} functions)</text>')
+    t.append(f'<text x="{gx}" y="{y0+92}" font-size="12" fill="{TXT}">Next goal: {goal_pct}% of the game ({goal:,} functions)</text>')
     t.append(f'<text x="{gx+gw}" y="{y0+92}" font-size="12" font-weight="700" fill="{GREEN}" text-anchor="end">'
              f'{verified} / {goal} · {100*verified/goal:.0f}%</text>')
     t.append(bar(gx, y0 + 100, gw, 8, [(min(1, verified / goal), GREEN)]))
@@ -184,19 +190,24 @@ def make_svg(verified, mapped, per_system, per_folder_counts):
     # --- systems
     y3 = y2 + 28 + ((len(MILESTONES) + 2) // 3) * 28 + 18
     t.append(f'<text x="{M}" y="{y3}" font-size="14" font-weight="600" fill="{TXT}">Systems</text>')
-    t.append(f'<text x="{W-M}" y="{y3}" font-size="12" fill="{DIM}" text-anchor="end">verified functions per system, in planned order</text>')
+    t.append(f'<text x="{W-M}" y="{y3}" font-size="12" fill="{DIM}" text-anchor="end">verified / functions in that part of the game, in planned order</text>')
     y = y3 + 14
-    maxn = max([n for _, n, _, _ in per_system] + [1])
-    for sname, n, note, flds in per_system:
+    for sname, n, note, flds, total in per_system:
         t.append(f'<rect x="{M}" y="{y}" width="{W-2*M}" height="38" rx="8" fill="{PANEL}" stroke="{LINE}"/>')
         started = n > 0
         t.append(f'<text x="{M+14}" y="{y+17}" font-size="13" font-weight="600" fill="{TXT if started else DIM}">{esc(sname)}</text>')
         parts = " · ".join(f"{FOLDER_LABEL.get(f, f)} {per_folder_counts.get(f, 0)}" for f in flds if per_folder_counts.get(f, 0))
         t.append(f'<text x="{M+14}" y="{y+31}" font-size="11" fill="{DIM}">{esc(parts if parts else note)}</text>')
-        bx, bw = M + 300, W - 2 * M - 300 - 150
-        t.append(bar(bx, y + 15, bw, 8, [(n / maxn, GREEN if started else LINE)]))
-        t.append(f'<text x="{bx+bw+34}" y="{y+23}" font-size="14" font-weight="700" fill="{TXT if started else FAINT}" text-anchor="end">{n if started else "–"}</text>')
-        t.append(pill(W - M - 12, y + 24, "in progress" if started else "not started", AMBER if started else FAINT))
+        bx, bw = M + 280, W - 2 * M - 280 - 250
+        frac = n / total if total else 0
+        t.append(bar(bx, y + 15, bw, 8, [(frac, GREEN if started else LINE)]))
+        t.append(f'<text x="{bx+bw+92}" y="{y+23}" font-size="12.5" font-weight="700" fill="{TXT if started else FAINT}" '
+                 f'text-anchor="end">{n} / {total:,}</text>')
+        if started:
+            t.append(f'<text x="{bx+bw+132}" y="{y+23}" font-size="11.5" fill="{DIM}" text-anchor="end">{100*frac:.0f}%</text>')
+        done = total and n >= total
+        t.append(pill(W - M - 12, y + 24, "done" if done else ("in progress" if started else "not started"),
+                      GREEN if done else (AMBER if started else FAINT)))
         y += 46
     t.append("</svg>")
     return "\n".join(t)
@@ -214,8 +225,8 @@ def main():
         per_folder.setdefault(folders.get(int(r["addr"], 16), "misc"), []).append(r)
     counts = {f: len(v) for f, v in per_folder.items()}
     per_system = []
-    for sname, flds, note in SYSTEMS:
-        per_system.append((sname, sum(counts.get(f, 0) for f in flds), note, flds))
+    for sname, flds, note, total, _src in SYSTEMS:
+        per_system.append((sname, sum(counts.get(f, 0) for f in flds), note, flds, total))
     unassigned = [r["name"] for r in verified if folders.get(int(r["addr"], 16)) is None]
     if unassigned:
         print("warning: verified but no rewrite registration found:", ", ".join(unassigned))
@@ -255,11 +266,12 @@ def main():
     icon = {"done": "✅", "in progress": "🟡", "todo": "⬜"}
     for mid, name, st in MILESTONES:
         md.append(f"| {mid} | {name} | {icon.get(st, '⬜')} {st} |")
-    md += ["", "## Systems", "", "| System | Verified | Status |", "|---|---:|---|"]
-    for sname, n, note, flds in per_system:
-        st = "🟡 in progress" if n else "⬜ not started"
+    md += ["", "## Systems", "", "Size of each system = functions in EA's matching source files of the GameCube build "
+           "(an estimate for the PC exe).", "", "| System | Verified | Size | Done | Status |", "|---|---:|---:|---:|---|"]
+    for (sname, n, note, flds, total), (_, _, _, _, src) in zip(per_system, SYSTEMS):
+        st = "✅ done" if n >= total else ("🟡 in progress" if n else "⬜ not started")
         parts = ", ".join(f"{FOLDER_LABEL.get(f, f)} {counts.get(f, 0)}" for f in flds if counts.get(f, 0))
-        md.append(f"| **{sname}** — {parts if parts else note} | {n} | {st} |")
+        md.append(f"| **{sname}** — {parts if parts else note} | {n} | {total:,} ({src}) | {100*n/total:.0f}% | {st} |")
     md += ["", "## Done (verified)", ""]
     by_folder = sorted(per_folder.items(), key=lambda kv: kv[0])
     for fld, rows in by_folder:

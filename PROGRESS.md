@@ -25,17 +25,19 @@ A function counts as **verified** only when our C++ replaces the original inside
 
 ## Systems
 
-| System | Verified | Status |
-|---|---:|---|
-| **Core utilities** — Strings 16, Maths 40, Memory 9, Lists & slot pools 20 | 85 | 🟡 in progress |
-| **Files & data loading** — File layer 41, Resource files 12, Chunks 7 | 60 | 🟡 in progress |
-| **Frontend / menus** — menus, shops, career screens | 0 | ⬜ not started |
-| **Camera** — chase / bumper / photo cameras | 0 | ⬜ not started |
-| **Car physics & handling** — engine, tyres, suspension, collisions | 0 | ⬜ not started |
-| **World streaming** — loading Bayview around the player | 0 | ⬜ not started |
-| **AI racers & traffic** — opponents, traffic cars | 0 | ⬜ not started |
-| **Audio** — engine sounds, music, effects | 0 | ⬜ not started |
-| **Rendering** — last: the future port boundary | 0 | ⬜ not started |
+Size of each system = functions in EA's matching source files of the GameCube build (an estimate for the PC exe).
+
+| System | Verified | Size | Done | Status |
+|---|---:|---:|---:|---|
+| **Core utilities** — Strings 16, Maths 40, Memory 9, Lists & pools 20 | 85 | 216 (zBWare) | 39% | 🟡 in progress |
+| **Files & data loading** — File layer 41, Resource files 12, Chunks 7 | 60 | 629 (filesys, syncfile, FSasync, zMisc) | 10% | 🟡 in progress |
+| **Frontend / menus** — menus, shops, career screens | 0 | 3,826 (zFe, zFe2) | 0% | ⬜ not started |
+| **Camera** — chase / bumper / photo cameras | 0 | 322 (zCamera) | 0% | ⬜ not started |
+| **Car physics & handling** — engine, tyres, suspension, collisions | 0 | 738 (zPhysics) | 0% | ⬜ not started |
+| **World streaming** — loading Bayview around the player | 0 | 1,494 (zWorld, zWorld2, zTrack) | 0% | ⬜ not started |
+| **AI racers & traffic** — opponents, traffic cars | 0 | 1,190 (zAI) | 0% | ⬜ not started |
+| **Audio** — engine sounds, music, effects | 0 | 1,808 (zEAXSound) | 0% | ⬜ not started |
+| **Rendering** — last: the future port boundary (size: rough estimate) | 0 | 305 (zPlatform (GameCube)) | 0% | ⬜ not started |
 
 ## Done (verified)
 
@@ -117,7 +119,7 @@ A function counts as **verified** only when our C++ replaces the original inside
 | `0x0043E000` | **bStrToWStr** | `uint16_t* __cdecl(uint16_t* dst, const char*)` |
 | `0x0043E030` | **bStrNToWStr** | `uint16_t* __cdecl(uint16_t* dst, const char*, int n)` |
 
-### Lists & slot pools — 20
+### Lists & pools — 20
 
 | Address | Function | Signature |
 |---|---|---|

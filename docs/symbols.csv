@@ -86,7 +86,7 @@ addr,name,signature,status,notes
 0x0043FB80,bCloseMemoryPool,void __cdecl(int idx),verified,
 0x00828154,g_MemoryPools,bMemoryPool*[8],named,"0 Main Pool, 2 FEngMemoryPool, 3 Online, 4 Cars, 5 LanguageMemoryPool, 6 Audio Memory Pool; 1 external allocator; 7 unused (diff tests use it)"
 0x0082802C,g_ExternalAllocators,bExtAllocator*[8],named,"{ctx, base, size, alloc(ctx,size,name,line,flags), free(ctx,p)}"
-0x0043FEF0,MemoryPool::VerifyPoolIntegrity,void __thiscall(int),named,EA name (was bMemoryPool::Validate). called every *0x8284FC allocations (0 = never)
+0x0043FEF0,bMemoryPool::VerifyPoolIntegrity,void __thiscall(bool check_fill),verified,"memory/poolstats.cpp; written from the PC machine code (IsBadRead/WritePtr checks via the game IAT, magics, 0xEE fill check, corrupt flag 0x82853C, int3 on failure); tested on private heaps incl. fill check and the flag early exit, 0 mismatches (2026-11-15)"
 0x0075C6C8,operator_new,void* __cdecl(u32),named,CRT
 0x0075C6DA,crt_free,void __cdecl(void*),named,CRT
 0x00574630,LZValidHeader,int __cdecl(const u8* header),verified,"EA name (was IsCompressed). RAWW/HUFF/COMP v1, JDLZ v2. game/systems/resource/resource_file.cpp"
@@ -862,3 +862,4 @@ addr,name,signature,status,notes
 0x00440840,SpeedScript::SpeedScript,"thiscall(const char* file, int break_on_error)",named,loads the file + Init + bFree (knowledge.db: bMemSet)
 0x0040C840,Table::GetValue?,"thiscall(float* out, float x) piecewise-linear lookup",named,"{x,y} pairs at [this], count +4; calls 0x576740 to interpolate (knowledge.db: bMemCpy - wrong)"
 0x00402000,Timer::Elapsed?,float thiscall(),named,(now 0x86518C - start +4) * 0x784268 (knowledge.db: bScaleAdd - wrong)
+0x0043E6D0,bATan,"uint16 __cdecl bATan(float x, float y)",verified,"bmath/batan.cpp; written from the PC machine code (bASin of the smaller side / hypot, quadrant fold, EAX incl. the mov ax path); diff test 10,000 cases 0 mismatches + register test + _BROKEN (2026-11-15)"

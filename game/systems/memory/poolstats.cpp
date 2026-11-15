@@ -5,8 +5,15 @@
 //   bLargestMalloc(pool)              0x0043E910  pool 0 -> 0x6300000; pool -> largest - 0xDC (>= 0); else ext +18
 //   bAddToMemoryPool(pool, mem, size) 0x00440090  total += size, then AddFreeMemory (0x43FA50)
 //   bVerifyPoolIntegrity(pool)        0x004400B0  pool -> VerifyPoolIntegrity(1) (0x43FEF0)
+//   bMemoryPool::VerifyPoolIntegrity  0x0043FEF0  thiscall(check_fill): every free block / allocation and its
+//       neighbours must pass IsBadReadPtr||IsBadWritePtr (both bad = broken), free blocks carry 0x44443333,
+//       allocations 0x22 at +9; with check_fill and the pool's debug fill on, free bytes after the 0x10 header must
+//       be 0xEE (else flag 0x82853C = 1). Every failure is an int3 (a hard stop in the shipped game); a set flag
+//       ends the free-list walk early.
 // Pool layout: see pool.cpp. External allocator table 0x82802C[8]: {ctx, base, size, alloc, free, count_free (+14),
 // largest (+18)} - the last two are what these functions call (tail jump with the first argument replaced by ctx).
+#include <windows.h>
+
 #include <cstring>
 #include <string>
 #include <vector>
@@ -24,12 +31,21 @@ struct FreeBlock {
     int32_t size;
     uint32_t magic;
 };
+struct AllocNode {
+    AllocNode* next;
+    AllocNode* prev;
+    uint8_t pool, magic;  // magic 0x22 at +9
+};
 struct PoolHead {  // the part of bMemoryPool (0x58) these functions use
     const char* name;
     FreeBlock* free_next;  // +04 free list sentinel {next, prev}
     FreeBlock* free_prev;
-    uint8_t pad0c[0x24 - 0x0C];
+    AllocNode* alloc_next;  // +0C live allocations {next, prev}
+    AllocNode* alloc_prev;
+    uint8_t pad14[0x24 - 0x14];
     int32_t total;  // +24
+    uint8_t pad28[0x38 - 0x28];
+    uint8_t debug_fill;  // +38
 };
 struct ExtAllocator {
     void* ctx;
@@ -92,10 +108,51 @@ void __cdecl bAddToMemoryPool(uint32_t pool, uint8_t* mem, int32_t size) {
     p->total += size;
     game_fn<void(__thiscall*)(PoolHead*, uint8_t*, int32_t)>(0x0043FA50)(p, mem, size);  // AddFreeMemory
 }
+// ---------------------------------------------------------------- bMemoryPool::VerifyPoolIntegrity 0x0043FEF0
+volatile uint8_t* const kCorruptFlag = reinterpret_cast<volatile uint8_t*>(0x0082853C);
+// fails only when IsBadReadPtr AND IsBadWritePtr say so (the game's imports, called through its IAT)
+bool bad_ptr(const void* q) {
+    using Is_t = BOOL(__stdcall*)(const void*, UINT_PTR);
+    if (!game_var<Is_t>(0x00783110)(q, 1)) return false;   // IsBadReadPtr
+    return game_var<Is_t>(0x0078310C)(q, 1) != 0;           // IsBadWritePtr
+}
+using VerifyThis_t = void(__thiscall*)(PoolHead*, int32_t);
+VerifyThis_t o_PoolVerify = nullptr;
+void __cdecl PoolVerify(PoolHead* p, int32_t check_fill) {
+    cs_enter(p);
+    AllocNode* const asent = reinterpret_cast<AllocNode*>(&p->alloc_next);
+    for (FreeBlock* b = p->free_next; b != sentinel(p); b = b->next) {
+        if (bad_ptr(b) || bad_ptr(b->next) || bad_ptr(b->prev) || b->magic != 0x44443333u) goto free_failed;
+        if (*kCorruptFlag) break;
+        if (static_cast<uint8_t>(check_fill) && p->debug_fill) {
+            const uint8_t* const end = reinterpret_cast<const uint8_t*>(b) + b->size;
+            for (const uint8_t* c = reinterpret_cast<const uint8_t*>(b) + 0x10; c != end; ++c)
+                if (*c != 0xEE) {
+                    *kCorruptFlag = 1;
+                    goto free_failed;
+                }
+        }
+    }
+    for (AllocNode* a = p->alloc_next; a != asent; a = a->next)
+        if (bad_ptr(a) || bad_ptr(a->next) || bad_ptr(a->prev) || a->magic != 0x22) {
+            __debugbreak();
+            cs_leave(p);
+            return;
+        }
+    cs_leave(p);
+    return;
+free_failed:
+    __debugbreak();  // the original continues here only under a debugger: sort the allocations, walk them, unlock
+    game_fn<void(__thiscall*)(void*, uintptr_t)>(0x0043E650)(&p->alloc_next, 0x0043CAE0);  // bList::Sort
+    for (AllocNode* a = p->alloc_next; a != asent; a = a->next) {
+    }
+    cs_leave(p);
+}
+
 using Verify_t = void(__cdecl*)(uint32_t);
 Verify_t o_bVerifyPoolIntegrity = nullptr;
 void __cdecl bVerifyPoolIntegrity(uint32_t pool) {
-    if (PoolHead* p = pool_slot(pool)) game_fn<void(__thiscall*)(PoolHead*, int32_t)>(0x0043FEF0)(p, 1);
+    if (PoolHead* p = pool_slot(pool)) PoolVerify(p, 1);
 }
 
 }  // namespace
@@ -105,6 +162,7 @@ NFSU2_REWRITE_THIS(0x0043E8A0, PoolGetLargestFree, 0, "int bMemoryPool::GetLarge
 NFSU2_REWRITE_N(0x0043E8E0, bCountFreeMemory, 1, "int __cdecl bCountFreeMemory(int pool)", o_bCountFreeMemory);
 NFSU2_REWRITE_N(0x0043E910, bLargestMalloc, 1, "int __cdecl bLargestMalloc(int pool)", o_bLargestMalloc);
 NFSU2_REWRITE_N(0x00440090, bAddToMemoryPool, 3, "void __cdecl bAddToMemoryPool(int pool, void* mem, int size)", o_bAddToMemoryPool);
+NFSU2_REWRITE_THIS(0x0043FEF0, PoolVerify, 1, "void bMemoryPool::VerifyPoolIntegrity(bool check_fill)", o_PoolVerify);
 NFSU2_REWRITE_N(0x004400B0, bVerifyPoolIntegrity, 1, "void __cdecl bVerifyPoolIntegrity(int pool)", o_bVerifyPoolIntegrity);
 
 namespace {
@@ -191,6 +249,20 @@ NFSU2_DIFF_TEST(bMemoryStats) {
             v.push_back(ours ? bCountFreeMemory(7) : o_bCountFreeMemory(7));
             v.push_back(ours ? bLargestMalloc(7) : o_bLargestMalloc(7));
             (ours ? bVerifyPoolIntegrity : o_bVerifyPoolIntegrity)(7);
+            {  // VerifyPoolIntegrity directly: fill check with the free bytes made 0xEE, and the "flag set" early exit
+                PoolHead* ph = reinterpret_cast<PoolHead*>(h.pool);
+                const uint8_t old_fill = ph->debug_fill, old_flag = *kCorruptFlag;
+                game::ScopedUndo undo([=] { ph->debug_fill = old_fill; *kCorruptFlag = old_flag; });
+                for (FreeBlock* b = ph->free_next; b != sentinel(ph); b = b->next)
+                    if (b->size > 0x10) std::memset(reinterpret_cast<uint8_t*>(b) + 0x10, 0xEE, b->size - 0x10);
+                ph->debug_fill = 1;
+                if (ours) PoolVerify(ph, 1); else o_PoolVerify(ph, 1);
+                *kCorruptFlag = 1;
+                if (ours) PoolVerify(ph, 1); else o_PoolVerify(ph, 1);
+                *kCorruptFlag = old_flag;
+                if (ours) PoolVerify(ph, 0); else o_PoolVerify(ph, 0);
+                v.push_back(*kCorruptFlag);
+            }
             for (size_t i = 0; i < ptrs.size(); ++i)
                 if (!frees[i] && ptrs[i]) game_fn<void(__cdecl*)(void*)>(0x00440540)(ptrs[i]);
             h.uninstall();

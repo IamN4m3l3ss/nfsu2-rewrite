@@ -821,4 +821,8 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   and its bits incremented by one before it is added). float in the original operation order = the game's 24-bit
   x87 while values stay in float range (strings leaving it, e.g. 40 digits then e-10, could differ; game data
   has none). 0 mismatches. 784 verified; core utilities 130/216.
+- `bmath/batan.cpp`: bATan(x, y) = bASin(smaller side / hypot) folded into the quadrant; EAX mirrored incl. the
+  `mov ax, word` path (52 call sites read it). `memory/poolstats.cpp` + bMemoryPool::VerifyPoolIntegrity (every
+  failure is an int3 in the original too; only the healthy paths, the fill check and the "already flagged" exit
+  are testable). 0 mismatches. 786 verified.
 

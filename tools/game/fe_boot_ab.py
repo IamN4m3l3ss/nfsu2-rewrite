@@ -10,7 +10,7 @@ pause/unpause (work/fe_ab/<label>_hud.png): look at it, the fingerprint doesn't 
 
   fe_boot_ab.py [--walk NAME] [--only ADDR,ADDR,...]   (default: boot to free roam, all UNVERIFIED rewrites)
 --walk NAME: boot only to the main menu, then press the keys of WALKS[NAME] (each followed by a settle wait and a
-checkpoint); every walk puts all settings back the way it found them and ends on the main menu.
+checkpoint); every walk puts all settings back the way it found them and ends on a menu without saving.
 Restarts the game three times; leaves it in free roam with the normal enabled set.
 """
 import json
@@ -43,6 +43,14 @@ WALKS = {
                + [("enter", 2.5), ("esc", 2.5), ("right", 1.2)]
                + [("enter", 2.5), ("down", 1.0), ("down", 1.0), ("up", 1.0), ("up", 1.0), ("esc", 2.5)]
                + [("esc", 2.5)] + [("left", 1.2)] * 5,
+    # Customize (3x right): car -> Car Shop; browse Body (bumper list: preview only, never "Install Part"),
+    # Performance, Paint, Interiors; no Dyno. Ends on Customize Car Select: leaving it asks to overwrite the save, so
+    # the walk never does (the next boot just closes the game).
+    "customize": [("right", 1.2)] * 3 + [("enter", 3.5), ("enter", 4.0)]
+                 + [("enter", 3.0), ("right", 1.5), ("right", 1.5), ("left", 1.5), ("left", 1.5),
+                    ("enter", 3.5), ("down", 3.0), ("up", 3.0), ("esc", 3.0), ("esc", 3.0)]
+                 + ([("right", 1.5), ("enter", 3.0), ("right", 1.5), ("left", 1.5), ("esc", 3.0)]) * 3
+                 + [("left", 1.2)] * 3 + [("esc", 3.0)],
 }
 WALK = None
 # Packages driven by real-time timers, never comparable: the EA Trax "now playing" banner (shown after the boot,
@@ -94,7 +102,9 @@ def by_path(objs):
 def main(argv):
     OUT.mkdir(parents=True, exist_ok=True)
     backup = ENABLED.read_text() if ENABLED.exists() else "[]"
-    if subprocess.run([str(ROOT / "nfsu2"), "status"], capture_output=True).returncode != 0:
+    try:  # the rewrite list comes from the running game
+        pc.call("ping")
+    except pc.ProbeError:
         subprocess.run([str(ROOT / "nfsu2"), "freeroam"], capture_output=True)
     rl = rewrites()
     global WALK

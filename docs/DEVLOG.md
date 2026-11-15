@@ -787,4 +787,7 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
 
 **Verified**
 - Customize -> Peugeot -> Car Shop opens; the same steps crashed before the fix (reproduced twice).
+- Customize walk (`--walk customize`: Car Shop body/performance/paint/interiors browsed, bumper parts previewed, never
+  installed): identical, 13 ran -> verified. Leaving Customize Car Select asks "overwrite previously saved game?":
+  walks never answer it (the next boot closes the game; nothing is saved). 748 verified, 747 on, 382 UNVERIFIED.
 

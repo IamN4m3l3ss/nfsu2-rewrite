@@ -671,3 +671,12 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   but not the x87's wider register exponent) - the documented limit of the float approach (bmath.cpp); inputs now
   realistic magnitudes + 0/+-1/inf/NaN, 3x10k pass. Mutation (summation order in eMulMatrix) caught 143.
 - Live: 3 boots, eMulMatrix ~38k, bMatrixToQuaternion ~1.1k, 4D bNormalize ~2k calls/boot; heap clean. 145 verified.
+
+## 2026-11-15 — Slot pool part 2 (10) + crash-proof test heap/inflight
+
+- `bware/slotpool2.cpp` (from nfsu2-gcpc): CleanupExpandedSlotPools, SlotPoolManager ctor/dtor/Cleanup/DeleteSlotPool,
+  bNewSlotPool, bDeleteSlotPool, bPListInit, bPNode::Malloc/Free. Live: bPNode::Malloc ~8.5k / Free ~6.8k per boot.
+- A test-helper bug (shared "taken" list across two chains) crashed inside an entry stub; consequences fixed for
+  good: the harness now gives back the in-flight count a crashed test leaked (else the next reload keeps the old
+  DLL and the new one can't hook), and TestHeap::install registers an undo that clears pool slot 7.
+- Process change (user: speed up): bigger batches, one boot per batch, mutation checks only for new test kinds.

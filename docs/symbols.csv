@@ -185,3 +185,13 @@ addr,name,signature,status,notes
 0x0043D380,bExpandBoundingBox,"void __cdecl(min, max, const bVector2* p, const bVector2* q)",verified,bmath/bmath3.cpp; adapted from nfsu2-gcpc (CC0). . bMath3 diff 3x10k x 0 (realistic magnitudes)
 0x00440F50,bTan,float __cdecl(uint16 angle),verified,bmath/bmath3.cpp; adapted from nfsu2-gcpc (CC0). out-of-line inline. bMath3 diff 3x10k x 0 (realistic magnitudes)
 0x00440F70,bLength,float __cdecl(const bVector3*),verified,bmath/bmath3.cpp; adapted from nfsu2-gcpc (CC0). out-of-line inline. bMath3 diff 3x10k x 0 (realistic magnitudes)
+0x00440650,SlotPool::CleanupExpandedSlotPools,void __thiscall(),verified,bware/slotpool2.cpp; adapted from nfsu2-gcpc (CC0); SlotPoolCleanup/bNewDeleteSlotPool/bPNode diff tests
+0x004407B0,SlotPoolManager::SlotPoolManager,SlotPoolManager* __thiscall(),verified,bware/slotpool2.cpp; adapted from nfsu2-gcpc (CC0); SlotPoolCleanup/bNewDeleteSlotPool/bPNode diff tests
+0x004407D0,SlotPoolManager::~SlotPoolManager,void __thiscall(),verified,bware/slotpool2.cpp; adapted from nfsu2-gcpc (CC0); SlotPoolCleanup/bNewDeleteSlotPool/bPNode diff tests
+0x00440800,SlotPoolManager::CleanupExpandedSlotPools,void __thiscall(),verified,bware/slotpool2.cpp; adapted from nfsu2-gcpc (CC0); SlotPoolCleanup/bNewDeleteSlotPool/bPNode diff tests
+0x00440DA0,SlotPoolManager::DeleteSlotPool,void __thiscall(SlotPool*),verified,bware/slotpool2.cpp; adapted from nfsu2-gcpc (CC0); SlotPoolCleanup/bNewDeleteSlotPool/bPNode diff tests
+0x00440DF0,bNewSlotPool,"SlotPool* __cdecl(int size, int n, const char* name, u32 memflags)",verified,bware/slotpool2.cpp; adapted from nfsu2-gcpc (CC0); SlotPoolCleanup/bNewDeleteSlotPool/bPNode diff tests
+0x00440E40,bDeleteSlotPool,void __cdecl(SlotPool*),verified,bware/slotpool2.cpp; adapted from nfsu2-gcpc (CC0); SlotPoolCleanup/bNewDeleteSlotPool/bPNode diff tests
+0x00440E60,bPListInit,void __cdecl(int num_slots),verified,bware/slotpool2.cpp; adapted from nfsu2-gcpc (CC0); SlotPoolCleanup/bNewDeleteSlotPool/bPNode diff tests
+0x00440EC0,bPNode::Malloc,void* __cdecl(),verified,bware/slotpool2.cpp; adapted from nfsu2-gcpc (CC0); SlotPoolCleanup/bNewDeleteSlotPool/bPNode diff tests
+0x00440EF0,bPNode::Free,void __cdecl(void*),verified,bware/slotpool2.cpp; adapted from nfsu2-gcpc (CC0); SlotPoolCleanup/bNewDeleteSlotPool/bPNode diff tests

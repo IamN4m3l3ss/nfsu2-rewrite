@@ -144,8 +144,14 @@ json run_one(const DiffTestReg& t, const DiffCtx& ctx) {
     SehJob job{t.fn, &ctx, &r};
     uint32_t code = 0;
     uintptr_t where = 0;
+    const long inflight_before = nfsu2_inflight;
     if (seh_run(&job, &code, &where)) return result_json(r);
     const int undone = game::run_pending_undos();  // fixtures the crashed test left spliced into game structures
+    // a crash inside one of our entry stubs skips its "lock dec": give the leaked count back, or the next hot reload
+    // waits forever for 0 and keeps the old DLL (its hooks then block the new one). Other threads' calls in flight
+    // at the two samples may skew this by a little; they balance out when they return.
+    const long leaked = nfsu2_inflight - inflight_before;
+    if (leaked > 0) InterlockedExchangeAdd(&nfsu2_inflight, -leaked);
     HMODULE self = nullptr;
     GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
                        reinterpret_cast<LPCSTR>(&run_one), &self);

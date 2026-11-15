@@ -7,6 +7,7 @@
 #include <cstring>
 #include <vector>
 
+#include "diff.h"
 #include "rewrite.h"
 
 namespace game::testing {
@@ -36,9 +37,16 @@ struct TestHeap {
     }
     ~TestHeap() {
         if (game_var<void*>(kPoolTable + 7 * 4) == pool) slot7_set(nullptr);
+        delete undo;  // runs the undo (harmless: slot already cleared) and pops it
         game_fn<void(__thiscall*)(void*)>(0x0043F9A0)(pool);  // Destroy (frees OS blocks, deletes the CS)
     }
-    void install() { slot7_set(pool); }
+    // installing registers an undo (clear slot 7) so a crashing test can't leave a dead pool installed - a crash
+    // once did, and after the next reload nothing knew slot 7 was a test leftover
+    void install() {
+        slot7_set(pool);
+        if (!undo) undo = new game::ScopedUndo([] { if (g_slot7_ours) slot7_set(nullptr); });
+    }
+    game::ScopedUndo* undo = nullptr;
     void uninstall() { slot7_set(nullptr); }
     int32_t num_allocs() const { return *reinterpret_cast<const int32_t*>(pool + 0x1C); }
     int32_t used() const { return *reinterpret_cast<const int32_t*>(pool + 0x28); }

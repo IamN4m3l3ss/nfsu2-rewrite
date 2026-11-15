@@ -825,4 +825,12 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   `mov ax, word` path (52 call sites read it). `memory/poolstats.cpp` + bMemoryPool::VerifyPoolIntegrity (every
   failure is an int3 in the original too; only the healthy paths, the fill check and the "already flagged" exit
   are testable). 0 mismatches. 786 verified.
+- `bstring/bprintf.cpp` (5): EA's printf - _bOutput (3,198 bytes: the CRT-style state machine reading the game's
+  class/transition table, flags incl. '$' thousands grouping, %b %z (16.16) %v2/%v3 (bVectors), the ring-buffer
+  target), bVSPrintf (timed into 0x828518/0x82851C), bSPrintf (own varargs entry stub: passes a pointer to the
+  caller's arguments), _stuff_str, bIsValidPointer. The float path runs through small x87 primitives on 80-bit values
+  under the game's own control word (24-bit precision from a 53-bit double), so it rounds exactly like the original;
+  to be swapped for a soft-float at port time. Original bug found: %v3 with a long result overruns a ~48-byte
+  buffer in its own stack frame and crashes (tests keep vectors short; game formats are). 3x10,000 random formats
+  0 mismatches; live ~550 calls/s; HUD and pause menu normal. 791 verified.
 

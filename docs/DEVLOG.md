@@ -680,3 +680,21 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   good: the harness now gives back the in-flight count a crashed test leaked (else the next reload keeps the old
   DLL and the new one can't hook), and TestHeap::install registers an undo that clears pool slot 7.
 - Process change (user: speed up): bigger batches, one boot per batch, mutation checks only for new test kinds.
+
+## 2026-11-15 — nfsu2-gcpc menu engine imported (385 functions) + mod conflicts
+
+- Vendored nfsu2-gcpc's `port/game` (CC0) into `third_party/nfsu2-gcpc/`; it compiles with clang-cl as is. Their
+  referee built with our toolchain first gave 333k mismatches: their maths uses 80-bit long double (MinGW), which is
+  64-bit under the MSVC ABI. Fixed by building their code as its own library with `-mlong-double-80` + C++17
+  (MSVC's C++20 <cmath> instantiates std::lerp<long double> and breaks) and three marked patches (a `small` macro,
+  fabsl -> builtin, std::fabs/sqrt on long double -> builtins). Then: 1,672,945 checks, 0 mismatches (8 Wine shards
+  against a copy of the exe, our build).
+- `game/systems/frontend/gcpc_hooks.cpp` registers their verified frontend/camera entries at run time with runtime
+  thunks (call counter; ECX/EDX-preserving where their audit says callers need it). 421 hooked.
+- User: garbled menu text, 4:3 HUD. Cause: the user's mods (WidescreenFix, HD UI) patch code inside some of these
+  functions (5, found by a full-function byte compare) and inside functions they call - rewritten code calls its
+  own C++ versions directly and skips the mod patches. Full .text diff (memory vs exe, minus our hook jumps): 86
+  functions patched by mods/probe. Excluded every rewrite that is patched or reaches patched code via direct calls,
+  transitively: 36 excluded, 385 enabled. User: "All normal" (pause menu, email, HUD). Boot fine, heap clean.
+  Limitation: virtual calls aren't in that call graph - watch for reports.
+- User wants: rewrites stay byte-for-byte faithful; mod features later as a separate optional layer ("Mods" tab).

@@ -46,9 +46,15 @@ case "${1:-}" in
     on) "$PY" tools/probe/probe.py enable "$2" ;;
     off) "$PY" tools/probe/probe.py disable "$2" ;;
     all-on)
-        for f in $(awk -F, '$4=="verified"{print $2}' docs/symbols.csv); do
-            "$PY" tools/probe/probe.py enable "$f" >/dev/null 2>&1 || true
-        done
+        "$PY" - <<'PYEOF'
+import csv, sys
+sys.path.insert(0, "tools/probe")
+import probe_client as pc
+for r in csv.DictReader(open("docs/symbols.csv")):
+    if r["status"] == "verified":
+        try: pc.call("rewrite_enable", {"addr": r["addr"], "enabled": True}, timeout=20)
+        except Exception: pass
+PYEOF
         "$PY" tools/probe/probe.py rewrites | grep -c ' ON ' | xargs echo "rewrites on:" ;;
     all-off)
         for f in $("$PY" tools/probe/probe.py rewrites | awk '$3=="ON"{print $2}'); do

@@ -85,6 +85,19 @@ Cars: `CARS/<NAME>/GEOMETRY.BIN, TEXTURES.BIN, VINYLS.BIN`. The exe loads tracks
 **Scale (measured 15 Nov 2026):** 14,450 game functions in the exe (Ghidra 12.2, below `0x75BBFA` where the Winsock
 stubs and MSVC runtime start; GameCube build: 14,666). Use it to track coverage.
 
+**Mods vs rewrites (learned 15 Nov 2026):** the user's mods patch code inside ~80 functions (WidescreenFix, HD UI,
+Extra Options). A rewrite must never replace a function the mods patch, nor one that reaches patched code through
+its (transitive) calls - rewritten code calls our own versions directly and would skip the mod (garbled menu text,
+4:3 HUD). Before enabling a batch, diff the whole .text in memory against the exe on disk (excluding our own hook
+jumps) and exclude those. Our functions stay byte-for-byte faithful to the original; mod features come later as a
+separate optional layer on top (user wants a "Mods" tab in the panel), never inside rewritten functions.
+
+**nfsu2-gcpc code in the build:** `third_party/nfsu2-gcpc/` (CC0, 3 marked patches) is built as its own library
+(C++17, `-mlong-double-80`: their maths mirrors x87 extended precision; MSVC's C++20 <cmath> breaks with it) and
+registered at run time by `game/systems/frontend/gcpc_hooks.cpp` from their replacement table + an allowlist
+(their verified frontend/camera entries) minus the mod-conflict list. Their referee, built with our toolchain and
+run in 8 Wine shards against a copy of the exe: 1,672,945 checks, 0 mismatches.
+
 **RE kit (15 Nov 2026):** EA names + Ghidra decompilations of the GameCube and PC builds live outside the repo
 (`.env.local`: `KNOWLEDGE_DB`, `GC_DECOMP`, `PC_DECOMP`). `tools/re/kb.py ADDR [--pc] [--gc]` shows everything for an
 address. Names from knowledge.db are hints (auto matches can be stale/wrong); our diff test still decides. Never

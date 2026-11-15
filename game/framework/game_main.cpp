@@ -186,7 +186,10 @@ const char* diff(const char* name, uint32_t iterations, uint32_t seed) {
 }  // namespace
 }  // namespace game
 
+namespace game { void gcpc_register(); }  // game/systems/frontend/gcpc_hooks.cpp
+
 extern "C" __declspec(dllexport) const probe::GameApi* nfsu2_game_api() {
+    game::gcpc_register();  // nfsu2-gcpc's verified menu/camera rewrites (built at run time from their table)
     auto& r = game::registry();
     game::g_api = {probe::kGameApiVersion, __DATE__ " " __TIME__, static_cast<uint32_t>(r.size()), r.data(),
                    &game::diff_list, &game::diff, &nfsu2_inflight};

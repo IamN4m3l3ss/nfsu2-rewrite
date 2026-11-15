@@ -80,7 +80,8 @@ info and the log.
 
 - **[nfsu2-gcpc](https://github.com/octavioCuatrochio/nfsu2-gcpc)** (CC0) — its knowledge base matching the
   GameCube build's symbols to `SPEED2.EXE`, and its Ghidra tooling, give us EA's function names and readable
-  decompilations to work from, and some of our rewrites are adapted from its rewritten code (credited in each file).
+  decompilations to work from. Some of our rewrites are adapted from its code (credited in each file), and its
+  menu-engine/camera rewrites are included as-is in `third_party/nfsu2-gcpc/` (licence there).
   Every function only counts once our own diff test proves it identical in the game.
 - Libraries in `third_party/`: [MinHook](https://github.com/TsudaKageyu/minhook) (BSD-2-Clause),
   [nlohmann/json](https://github.com/nlohmann/json) (MIT), [Dear ImGui](https://github.com/ocornut/imgui) (MIT).

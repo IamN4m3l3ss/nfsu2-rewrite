@@ -1,0 +1,781 @@
+// Bridge: everything rewritten game code needs from parts of the game that are NOT rewritten yet.
+//
+// Rewritten code calls only these functions for such things, never addresses or platform APIs directly.
+// Implementations:
+//   host/win32-hook/bridge_win32.cpp  -> calls the original SPEED2.EXE functions (hooked build)
+//   tests/bridge_stub.cpp             -> simple stand-ins for native unit tests
+//   (later) the native port          -> rewritten implementations
+// When the code behind an entry gets rewritten, the entry is removed and callers use the rewrite directly.
+#pragma once
+#include <cstdarg>
+#include <cstdint>
+struct feDialogConfig;
+struct cFrontendDatabase;
+
+struct FEMultiPool;   // frontend/FEMultiPool.h
+struct FEMinList;     // frontend/FEMinList.h
+struct FEPackage;     // frontend/FEPackage.h
+struct cFEng;         // frontend/cFEng.h
+struct SlotPoolManager;   // bWare/bSlotPool.h
+struct SlotPool;
+struct FEPackageManager;   // frontend/FEPackageManager.h
+struct FEObject;
+struct LanguageStringRecord;
+
+struct bASinTableEntry;
+struct FESortGlobals;
+struct TrackInfo;
+struct QuickRaceSettings;
+struct FEngFont;
+struct FEngine;
+struct FERenderBucket;
+struct ePoly;
+struct cFEngRender;
+struct cFEngRenderContext;
+struct FERenderObject;
+struct bMatrix4;
+struct JollyRancherResponseData;   // camera/Camera.h
+struct FEngJoyMapEntry;
+struct bList;
+struct bNode;
+namespace bridge {
+
+// --- memory: buffers are shared with original game code, so they must come from the game's heap ---
+void *Alloc(uint32_t bytes);           // PC 0x575620 -> CRT operator new (NOT zeroed)
+void FreeArray(void *p);               // PC 0x575630 -> CRT operator delete[] (null is fine)
+
+// --- frontend text ---
+// Global character histogram used to unpack the game's compressed (packed) 8-bit strings into wide
+// strings. Null until language data is loaded.            PC: pWideCharHistogram @ 0x8383DC
+void *WideCharHistogram();
+// WideCharHistogram::UnpackString(dst, dstBytes, packed)  PC 0x50D3C0 (__thiscall, ret 0xC)
+void WideCharHistogram_UnpackString(void *histogram, uint16_t *dst, int dstBytes, const char *packed);
+// FEng global UseOldFEngDirtyFlag: when set, string changes always mark objects dirty.  PC @ 0x8384D4
+bool UseOldFEngDirtyFlag();
+
+// --- FEng objects not rewritten yet ---
+void *FEStringVTable();                                                // PC 0x78F53C (hooked: the game's vtable)
+// FEString::pLabelCallback (PC 0x838478): if set, calls its vtable[0](callback, string)
+void CallLabelCallback(void *feString);
+
+void *FEMinNodeVTable();                                               // PC 0x79A9E8
+void *FEFieldNodeVTable();                                             // PC 0x79B018
+void *FETypeNodeVTable();                                              // PC 0x79B90C
+void *FEMinListVTable();                                               // PC 0x79A9EC
+// delete an object through its own vtable: slot 0 = MSVC scalar deleting destructor, called with flag 1
+void VirtualScalarDelete(void *object);
+void VirtualScalarDtor(void *object, uint32_t flags);                 // vtable slot 0 with explicit flags
+
+void *FEObjectVTable();                                                // PC 0x79B8E0
+uint32_t NextFEObjectGUID();                                           // FEngine::SysGUID++ (PC 0x7F7CF8)
+::FEMultiPool *ObjDataPool();                                            // global FEMultiPool, PC 0x863770
+void *FESlotNodeVTable();                                              // PC 0x79B13C
+void *FESlotPoolVTable();                                              // PC 0x79B8DC
+// FEObject::pDestructorCallback (PC 0x838474): if set, calls its vtable[0](callback, object)
+void CallDestructorCallback(void *object);
+
+// object pools (FEPool.h): pool lists and block vtables
+::FEMinList *FEMessageResponsePool();                             // PC 0x8637A0
+::FEMinList *FEScriptPool();                                      // PC 0x839C30
+void *FEMessageResponseBlockVTable();                                  // PC 0x79BF50 (slot 0 = 53EB20)
+void *FEScriptBlockVTable();                                           // PC 0x79BF54 (slot 0 = 53EC20)
+void *FEScriptVTable();                                                // PC 0x79AD28 (slot 0 = 53EE30)
+void *FEKeyNodeVTable();                                               // PC 0x79AA34
+::FEMinList *FEKeyNodePool();                                          // PC 0x839BD0
+void *FEKeyNodeBlockVTable();                                          // PC 0x79B9EC (slot 0 = 531BC0)
+void *bWareMalloc(uint32_t size, const char *name, int32_t line, uint32_t flags);   // PC 0x440390 (__cdecl)
+::SlotPoolManager *TheSlotPoolManager();                                   // PC 0x828530 (game global)
+::SlotPool **BPNodeSlotPool();          // PC 0x8284F0 (game global)
+int32_t *BPListWantToClose();          // PC 0x8284F4 (game global)
+::FEngJoyMapEntry *FEngJoyMap();                 // PC 0x7F91C8 (21 entries)
+uint32_t *FEngJoyRegistered();                   // PC 0x8384B8
+void *FEngHandleJoyFunction();                   // handler passed to AddJoyHandlerToAllPorts (PC 0x50C630, rewritten)
+void AddJoyHandlerToAllPorts(uint32_t event, void *handler, void *user);   // PC 5794B0 (__cdecl)
+void RemoveJoyHandlerFromAllPorts(uint32_t event);                         // PC 57D590 (__cdecl)
+void InitDebugLanguageChange();                  // PC: AddJoyHandler 579410(0, 0x34, 0x527520, 0)
+void CloseDebugLanguageChange();                 // PC: RemoveJoyHandler 57C330(0, 0x34)
+int32_t IsLiveJoystickPluggedIn(int32_t port);   // PC 571A80 (__cdecl)
+void *RenderObjectDisconnectVTable();                                              // PC 0x79AB9C
+void bWareFree(void *p);
+int32_t FEngLoadCounter();                                                         // PC 0x8384D0 (game global)
+int32_t *FEngLoadCounterPtr();                                                     // same global (GC gInsideScreenConstructor)
+// FEPackageManager callees (game-side screens; PC __cdecl)
+// FEPackageReader chunk readers not rewritten yet (PC __thiscall on the reader, bool in AL)
+// FEGameInterface (engine +0x10C) vtable slot 0: package data by name; *freeBuffer -> caller frees *buffer
+const void *FEGameInterface_GetPackageData(void *gi, const char *name, void **buffer, uint8_t *freeBuffer);
+void FEGameInterface_LibraryLoaded(void *gi, ::FEPackage *pkg);   // vtable slot 3 (+0xC): library / package activated
+void FEGameInterface_ReleaseResources(void *gi, ::FEPackage *pkg, uint32_t count, void *resources);   // slot 2 (+0x8)
+bool FEGameInterface_PackageWillUnload(void *gi, ::FEPackage *pkg);   // slot 4 (+0x10): true -> delete it
+bool FEGameInterface_CanUnloadLibrary(void *gi, ::FEPackage *pkg);    // slot 5 (+0x14)
+uint32_t FEGameInterface_GetJoyPadBits(void *gi, uint32_t pad);   // +0x40 (one argument)
+void FEGameInterface_GetMouseInfo(void *gi, void *info);              // +0x44 (8 bytes: x, y, wheel, buttons)
+void FEGameInterface_BeginUpdate(void *gi);                           // +0x5C
+void FEGameInterface_EndUpdate(void *gi);                             // +0x60
+uint8_t FEGameInterface_GetContextTransform(void *gi, uint32_t context, float *matrix16);   // +0x2C (GC +0x64), bool in AL
+uint8_t FEGameInterface_IsPointInObject(void *gi, float x, float y, ::FEObject *obj);   // +0x48 (PC; GC +0x9C), bool in AL
+// game interface render slots (PC cFEng vtable 0x79BCD8)
+void FEGameInterface_BeginPackageRendering(void *gi, ::FEPackage *pkg, uint32_t flag);       // +0x20
+void FEGameInterface_EndPackageRendering(void *gi, ::FEPackage *pkg);                        // +0x24
+void FEGameInterface_GenerateRenderContext(void *gi, uint32_t context, ::FEObject *group);   // +0x28
+void FEGameInterface_RenderObjectList(void *gi, void *entries, uint32_t count);              // +0x30 ({obj, key} x count)
+// --- cFEngRender (engine side; see frontend/cFEngRender.h) ---
+::SlotPool **FERenderObjectPool();               // PC 0x83847C
+::SlotPool **FERenderEPolyPool();                // PC 0x838480
+::SlotPool **FERenderEPolyOverflowPool();        // PC 0x838484 (created on demand, deleted when empty)
+::FERenderBucket *FERenderBuckets();             // PC 0x8639A0 (256)
+void *eGetView(int32_t index);                   // PC 48B1E0: 0x832DE0 + 0x70 * index
+void eView_Render(void *view, ::ePoly *poly, void *texture, int32_t flag);   // PC 5C7EA0 (__thiscall, ret 0xC)
+const int32_t *FERenderStatsMode();              // PC *(0x8900D8): stats counted when it points at 4
+uint32_t *FERenderStats();                       // PC 0x837D20: objects, cached, cached+built, clipped
+void *cFEngRenderVTable();                       // PC 0x79BBA0
+int32_t CurrentLanguage();                       // PC 0x7F70D0 (GetCurrentLanguage inlined)
+int32_t MovieActive();                           // PC 0x8383AC
+const uint8_t *MoviePlayer();                    // PC *(0x8383A4): +0x0C byte = flip vertically
+void *MovieTexture();                            // PC 0x8385C0 (TextureInfo of the playing movie)
+// PC 51C110 (FEngFont::RenderString, __thiscall, ret 0x18)
+void FEngFont_RenderString(void *font, const int32_t *colour, const uint16_t *text, ::FEObject *obj, const ::bMatrix4 *m,
+                           ::FERenderObject *cached, void *renderInfo);
+// cFEng unit
+// FEngFont unit
+struct FEngFontList { ::FEngFont *mpHead, *mpTail; };
+FEngFontList *FontList();                        // PC 0x863768
+const uint32_t *FontAlias();                     // PC 0x7F9184: {hash, alias}
+const uint8_t *FontMetricsTable();               // PC 0x7F918C: 4 x {hash, baseline, leading scale}
+const char *LanguageSuffix(int32_t lang);         // PC table 0x7F7020 (11 x 16 {id, name, ...}); else "UNKNOWN" (0x79AA54)
+void *RealFont_Create(const void *data);         // PC 6F4690 (RealFontOld::Font::Create)
+void RealFont_Destroy(void *font);               // PC 6F46C0
+void *FixupTextureInfoNull(void *tex, uint32_t hash, uint32_t a, uint32_t b);   // PC 4902D0
+void *FEGameInterfaceVTable();                   // PC 0x79BCD8 (cFEng)
+void *FEObjectInitializerVTable();               // PC 0x79AAEC
+void *FEngMovieStarterVTable();                  // PC 0x79AB84
+void *FEngMovieStopperVTable();                  // PC 0x79AB94
+void *FEDirtyMakerVTable();                      // PC 0x79ABF0
+::SlotPool **LevelSorterSlotsPtr();              // PC 0x8384B0
+int32_t InsideScreenConstructor();               // PC 0x8384D0 gInsideScreenConstructor
+int32_t GameFlowState();                         // PC 0x8654A4 (6 = racing)
+float WorldTimeElapsed();                        // PC 0x865154
+float RealTimeElapsed();                         // PC 0x865198
+uint32_t *LastKnownJoystickTypes();              // PC 0x7F9414 (2 ports)
+uint8_t GetJoystickType(int32_t port);           // PC 571AC0 (byte table 0x864788)
+void *MemoryCardInstance();                      // PC 0x836498 MemoryCard::s_pThis
+void MemoryCard_Tick(void *card, int32_t ms);    // PC 4F4A20 (__thiscall)
+void MovieUpdate();                              // PC 5660F0
+void MovieStop();                                // PC 511BC0
+int32_t *SummonChyron();                         // PC 0x8384BC
+int32_t *StopChyron();                           // PC 0x8384C0
+void FakeCallFromSound();                        // PC 4ACA40
+void CurrentSongStopped(void *song);             // PC 4AC9B0
+int32_t GetMovieNameEnum(const char *name);      // PC 51C580
+void CalculateMovieFilename(char *out, int32_t size, const char *name);   // PC 51C740
+bool FILE_exists(const char *path);              // PC 6F909D
+void MovieStart(const char *path, bool loop, int32_t which);              // PC 566020
+int32_t *DiscErrorOccurred();                    // PC 0x864F2C g_discErrorOccured
+const char **FEngPleaseRenderSinglePackage();    // PC 0x8384B4
+const uint8_t *MouseGlobals();                   // PC 0x8763D4: +0 x, +4 y (int), +0x1C left-handed, +0x1D / +0x20 buttons
+void FEGameInterface_RenderObject(void *gi, ::FEObject *obj);                                // +0x34
+void cFEngRender_GenerateRenderContext(void *render, uint32_t context, ::FEObject *group);  // PC 51B7F0 (__thiscall, ret 8)
+void cFEngRender_AddToRenderList(void *render, ::FEObject *obj);                           // PC 51B850 (ret 4)
+void cFEngRender_PackageFinished(void *render, ::FEPackage *pkg);                          // PC 5371F0 (ret 4)
+void FEGameInterface_GetViewTransformation(void *gi, void *matrix);                          // +0x3C (FEMatrix4)
+::FESortGlobals *FEngSortGlobals();   // PC 0x838488
+uint32_t FEngHashStringUpper(const char *fmt);   // PC 50B9C0 (__cdecl, varargs): bVSPrintf into 0x100 bytes, then FEHashUpper
+// FEngFont (not rewritten): FindFont PC 51BD70 (__cdecl hash); members __thiscall, results in st0.
+void *FEngFindFont(uint32_t hash);
+long double FEngFont_GetTextWidth(void *font, const uint16_t *text, uint32_t flags);     // PC 50BEC0 (ret 8)
+long double FEngFont_GetTextHeight(void *font, const uint16_t *text, uint32_t arg);      // PC 50BF40 (ret 8)
+long double FEngFont_CalculateXOffset(void *font, uint32_t justify, float width);       // PC 50C020 (ret 8)
+long double FEngFont_CalculateYOffset(void *font, uint32_t justify, float height);      // PC 50C050 (ret 8)
+bool FEngGetLocalizedString(uint16_t *buffer, int32_t bytes, uint32_t labelHash);        // PC 512570 (__cdecl)
+void *FEWidgetVTable();                          // PC 0x790B98
+void *FEButtonWidgetVTable();                    // PC 0x79B2F8
+void *FELabelWidgetVTable();                     // PC 0x79B338
+void *FEStatWidgetVTable();                      // PC 0x79B378
+void *FEInputWidgetVTable();                     // PC 0x79B450
+void *FEDateWidgetVTable();                      // PC 0x79B490
+void *FESliderWidgetVTable();                    // PC 0x79B400
+void *FEToggleWidgetVTable();                    // PC 0x79B3B8
+void *MenuScreenVTable();                        // PC 0x79AC00
+int32_t ProfileState();                           // PC *(int*)0x8500D0 (>= 0xC: profile loaded)
+int32_t GameModeFlags();                          // PC *(int*)0x850078 (0x200 / 0x20 / 0x100: no EAM icons)
+const char *ProfileName(bool alternate);          // PC 0x850128 (alternate, mode 0x200) / 0x8500EC
+void SetShowEAMIcons(bool on);                    // PC byte 0x838528
+bool CallingScreenFrozen();                       // PC byte 0x838520
+char *CallingScreenPackageName();                 // PC char[] 0x8384E0 (gCallingScreenPackageName)
+void FEngPrintfString(const char *pkg, uint32_t objHash, const char *fmt, const char *s);   // PC 537B80 (varargs)
+void HelpBar_SyncByMask(uint32_t mask, const char *pkg);   // PC 54E6E0 __thiscall on *(0x8384D8) (PCHelpBarFNGObject)
+void *TuningSliderVTable();                      // PC 0x79B7B0
+void *ThreeStageSliderVTable();                  // PC 0x79AE54
+void *cSliderVTable();                           // PC 0x78F544
+const char *GameEmptyString();                   // PC 0x783FE5 ("")
+// cSlider virtuals (thiscall through the object's vtable): +0x0C Toggle(bool) 512240, +0x10 Highlight 526D90,
+// +0x14 UnHighlight 526F80, +0x18 Draw 4FF530.
+void cSlider_Toggle(void *slider, bool on);
+void cSlider_Highlight(void *slider);
+void cSlider_UnHighlight(void *slider);
+void cSlider_Draw(void *slider);
+void cSlider_DrawVertical(void *slider);     // vtable +0x1C
+void cSlider_DrawHorizontal(void *slider);   // vtable +0x20
+void FEPrintfStrings(FEObject *str, const char *fmt, const char *a, const char *b);   // PC 537BE0 (varargs)
+void FEPrintfDouble(FEObject *str, const char *fmt, double v);                         // PC 537BE0 (varargs)
+const LanguageStringRecord *LanguageStrings(uint32_t *count);   // PC count *(0x8383D0), table *(0x8383D8)
+const char *TuningMasterScreenName();                           // PC *(0x7FA214) (GC gTuningMasterScreenName)
+// PC car tuning object *(0x83A540) (GC: CarTuneManager / CustomPhysicsSpec calls). All __thiscall on it.
+int32_t TuningUnitType();                                       // *(*(0x83A540) + 4) (GC eUnitType, 1 = metric)
+bool Tuning_IsAvailable(int32_t type);                          // 59B080 (type)
+long double Tuning_GetMin(int32_t type);                        // 5B0BD0 (type, 0, 1)
+long double Tuning_GetMax(int32_t type);                        // 5B0C00 (type, 0, 1)
+long double Tuning_GetValue(int32_t type);                      // 5B3E40 (type, 0, 1)
+long double Tuning_GetUpper(int32_t type);                      // 5B2BD0 (type, 0, 1): ThreeStageSlider upper stage
+long double Tuning_GetLower(int32_t type);                      // 5B2BA0 (type, 0, 1): lower stage
+void Tuning_SetValue(float v, int32_t type);                    // 5B4670 (v, type, 0, 1)
+long double CarTuneManager_GetStep(int32_t type);               // 522560 (__thiscall on 0x839C40)
+bool cSlider_Update(void *slider, uint32_t msg);                // slider vtable +0x04
+void FEWidget_Draw(void *widget);                               // widget vtable +0x0C
+void FEWidget_Position(void *widget);                           // widget vtable +0x10
+void FEWidget_Show(void *widget);                               // widget vtable +0x14
+void FEWidget_Hide(void *widget);                               // widget vtable +0x18
+void FEWidget_Disable(void *widget);                            // widget vtable +0x20
+void FEWidget_Slot17(void *widget);                             // widget vtable +0x44 (slider widgets; GC vptr[0x12])
+void FEWidget_SetFocus(void *widget, const char *pkg);          // widget vtable +0x24
+void FEWidget_UnsetFocus(void *widget);                         // widget vtable +0x28
+void FEWidget_SetPosX(void *widget, float x);                   // widget vtable +0x30
+void FEWidget_SetPosY(void *widget, float y);                   // widget vtable +0x34
+void FEWidget_CheckMouse(void *widget, const char *pkg, float x, float y);   // widget vtable +0x08
+void MenuScreen_Setup(void *screen);                            // screen vtable +0x10 (UIWidgetMenu Setup)
+void FEDateWidget_SetDate(void *widget);                        // PC 538060 (__thiscall)
+void FEInputWidget_SetText(void *widget, const char *text);     // PC 4957D0 (__thiscall)
+void FEInputWidget_SetInputFocus(void *widget);                 // PC 51EB60 (__thiscall)
+// MenuScreen::FEngBeginTextInput PC 555F80 (__thiscall, 6 args)
+void MenuScreen_BeginTextInput(void *screen, uint32_t objHash, uint32_t maxLen, void *buffer, void *buffer2, uint32_t mode, uint32_t flags);
+char *EditedStringBuffer();                                     // PC 0x83A8B0 (FEngGetEditedString)
+int32_t RealTimer();                                            // PC *(int*)0x8651AC
+int32_t KeyboardCreationTimer();                                // PC *(int*)0x83A9C8 (KBCreationTimer)
+float KeyboardDelaySeconds();                                   // PC *(float*)0x7F942C (g_KBDelaySeconds, 0.75)
+// --- MenuScreen (PC): text input, alternating texts, EAM, online, help (addresses in bridge_win32.cpp)
+uint8_t *TextInputFlag();                       // PC byte 0x83A9C0 (FocusedTextbox active)
+uint32_t *TextInputHandle();                    // PC dword 0x83A9C4
+char *TextInputBuffer();                        // PC 0x83A7B0 (0x100 bytes; also the input manager `this`)
+void TextInput_Start(void *obj, uint32_t maxLen, char *buffer, uint32_t mode);   // PC 4FF3B0 __thiscall on 0x83A7B0
+void TextInput_Close(void *obj, uint32_t flag); // PC 540AB0 (__thiscall)
+void TextInput_Accept(void *obj);               // PC 54C8A0
+void TextInput_Cancel(void *obj);               // PC 54C7F0
+void TextInput_Notify(void *obj, uint32_t msg); // PC 540BF0
+void MenuScreen_NotificationMessage(void *screen, uint32_t msg, FEObject *obj, uint32_t arg, uint32_t pkg);   // vtable +0x08
+uint32_t MenuScreen_NotifySoundMessage(void *screen, uint32_t msg, FEObject *obj, uint32_t arg, uint32_t pkg, uint32_t event);   // +0x0C
+void FEPrintfString(FEObject *str, const char *fmt, const char *s);   // PC 537BE0 (varargs)
+const char *ProfileNameBuffer();                // PC 0x83A9E0
+int32_t PlayerCash();                           // PC *(int*)0x861E74
+int32_t Timer_CountDown(int32_t *timer, float elapsed);   // PC 577310 (__thiscall): nonzero while running
+uint8_t *EAMIconState();                        // PC byte 0x838524 (gEAMIconState)
+uint8_t *ResetMasksFlag();                      // PC byte 0x838521: BaseNotify zeroes the package masks
+bool ShowEAMIcons();                            // PC byte 0x838528
+void SetCallingScreenFrozen(bool on);           // PC byte 0x838520
+int32_t MessengerButtonTimer();                 // PC *(int*)0x8637C8
+bool OnlineBusy();                              // PC 5F00F0 (__thiscall on 0x89CF48)
+void Call4A0140(int32_t a);                     // PC 4A0140 (__cdecl)
+void FEngSwitchPackages(const char *a, const char *b, uint32_t c, uint32_t d);   // PC 555F10 (__cdecl)
+void FEngPushPackageOver(const char *a, const char *b, uint32_t c, uint32_t d);  // PC 555EB0 (__cdecl)
+void PlayUISound(int32_t id);                   // PC 458520 (__thiscall on *(0x82B884))
+void ShowHelpMessage(const char *pkg, const char *s, uint32_t hash);   // PC 558AC0 (__cdecl, DialogInterface)
+bool HelpBar_HandlesSelect();                   // PC 50CF10 (__thiscall on *(0x8384D8))
+void ShowOneButtonDialog(const char *pkg, const char *s, uint32_t a, int32_t b, int32_t c, const char *msg);   // PC 558540
+const char *LocalizedString(uint32_t hash);     // PC 4FFA80 (__cdecl)
+void *Online_Manager();                         // PC 58F6D0 (__cdecl)
+void *Online_GetEntry(void *mgr, int32_t i);    // PC 5847F0 (__thiscall)
+void *Online_Find(void *mgr, const char *name, uint32_t id);   // PC 5847A0 (__thiscall)
+const char *Online_DictGet(void *dict, const char *key);       // PC 7414A0 (__cdecl)
+void Online_CopyOrDefault(const char *src, char *dst, uint32_t size, const char *def);   // PC 742360 (__cdecl)
+void Online_Select(void *mgr, const char *name, uint32_t id);  // PC 58D150 (__thiscall, + 0)
+int32_t Online_Login(char *bufA, char *bufB, void *screen);    // PC 58F740(0)->58D6B0(bufA, bufB, 0x558F50, screen)
+uint32_t Online_558330(const char *pkg, const char *s, uint32_t hash, const char *name);   // PC 558330 (__cdecl)
+const char *OnlineUserName();                   // PC 0x836014
+char *OnlineField85009C();                      // PC 0x85009C (13 bytes)
+char *OnlineField8500A9();                      // PC 0x8500A9
+uint8_t *OnlineFlag85009B();                    // PC byte 0x85009B
+uint32_t *OnlineLoginHandle();                  // PC 0x83852C
+void *UIWidgetMenuVTable();                                     // PC 0x795CDC
+void FEPrintfInts3(FEObject *str, const char *fmt, int32_t a, int32_t b, int32_t c);   // PC 537BE0 (varargs)
+void FEPrintfInt(FEObject *str, const char *fmt, int32_t v);   // PC 537BE0 (__cdecl varargs): format into a string object
+uint32_t FEWidget_DetermineSoundTrigger(void *widget);             // widget vtable +0x3C
+void FEWidget_Act(void *widget, const char *pkg, uint32_t msg);   // widget vtable +0x04
+uint32_t FEWidget_DetermineSpecialSound(void *widget, uint32_t msg, uint32_t event);   // widget vtable +0x38
+void FEWidget_BlinkArrows(void *widget, uint32_t msg);             // toggle widget vtable +0x40
+// GC MakeFrontendSound (PC inlined): idx = (int8) table 0x837FE0[event * 0x1B + trigger]; != -1 -> PlayUISoundFX 458520
+void MakeFrontendSound(uint32_t event, uint32_t trigger);
+void PlayFrontendSound(uint32_t trigger);       // PC: idx = (int8) table 0x8380B8[trigger]; != -1 -> PlayUISoundFX 458520
+int32_t IsJoystickPluggedIn(int32_t port);              // PC 571A60 (__cdecl)
+const uint8_t *JoyPortConfig();                         // PC 0x7F9414: 4 bytes per port, 0xFF = unused
+uint32_t GetJoyEventTexture(const char *name, int32_t port);   // PC 572190 (__cdecl): icon texture hash
+void *GetTextureInfo(uint32_t hash, int32_t a, int32_t b);     // PC 4901D0 (__cdecl)
+bool TextInputFocused();   // PC globals 0x83A9C0 (byte, FocusedTextbox active) && 0x83A9C4 (dword) both nonzero
+void SetHoldDirtyFlags(uint32_t v);                                   // uHoldDirtyFlags, PC 0x7F7C8C
+// constructors of object types not rewritten yet (types 1, 4, 5, 6, 7, 9, 10, 11; PC 532640/5349C0/52B080/52B9E0/52B0B0/534B90/534DB0/52B480)
+::FEObject *FEObjectTypeConstruct(void *mem, uint32_t type);
+::FEObject *FEObject_VirtualClone(::FEObject *obj, bool reference);       // vtable slot 1
+::FEObject *FEGroup_CopyConstruct(void *mem, ::FEObject *src, bool a, bool b);   // PC 5548A0 (__thiscall, 0x6C bytes)
+void FEKeyInterpScript(void *script, uint8_t track, uint32_t time, void *obj);   // PC 541F60 (__cdecl; GC FEKeyInterp 4 args)
+// FEGameInterface vtable +0x4C (__thiscall): fill one code list box cell (virtual column, row)
+void FEGameInterface_FillCodeListBoxCell(void *gi, void *listBox, int32_t column, int32_t row);
+// FEGameInterface vtable +0x18 (__thiscall): message to the game (msg hash, object, arg, extra)
+void FEGameInterface_Message(void *gi, uint32_t msg, void *obj, uint32_t arg, uint32_t extra);
+void *FECodeListBoxVTable();                                       // PC 0x79B904 (slot 0 = 5352B0)
+void *FECodeListBoxDefaultCallback();                              // FECodeListBox::mpDefaultCallback (PC *0x7F7CC4)
+void *FEListBoxVTable();                                           // PC 0x79BAE4 (slot 0 = 541D90)
+void *FEPackageVTable();                                           // PC 0x79B8F8 (slot 0 = 534C50)
+void *FENodeVTable();                                              // PC 0x79AB0C
+void *FEPackageList74VTable();                                     // PC 0x79B878 (FEPackage +0x74 list)
+void *ResourceConnectorVTable();                                   // PC 0x79AB04 (game-side FEObjectCallback)
+// FEGameInterface vtable slot 1 (__thiscall): load the package's resources        (GC slot +0x14)
+bool FEGameInterface_LoadResources(void *gi, ::FEPackage *pkg, uint32_t count, void *resources);
+void *FEPackageDataVTable();                                       // PC 0x79B15C (slot 0 = 52CC20)
+void *ScreenFactory(uint32_t nameHash, ::FEPackage *pkg, int32_t arg);   // PC 0x50B790 (GC 8014A2CC)
+uint32_t FindScreenCreateData(uint32_t nameHash);                  // PC 0x50B840 (GC 8014A3A8)
+void HackClearCache(::FEPackage *pkg);                             // PC 0x50C550 (GC 8014DFBC)
+void FEngine_Update(void *engine, uint32_t a, uint32_t b);         // PC 0x558C00 (__thiscall, GC 80146028)
+bool IsCurrentlyHotChunking();                                     // PC 0x571090 (GC 80195514)
+::SlotPool *LevelSorterSlots();                                                    // PC *(0x8384B0) (game global)
+// MenuScreen::BaseNotify(msg, obj, arg, pkg): game-side screen notification            PC 0x55B5C0 (__thiscall)
+void MenuScreen_BaseNotify(void *screen, uint32_t msg, void *obj, uint32_t arg, ::FEPackage *pkg);
+void MenuScreen_BaseNotifySound(void *screen, uint32_t msg, void *obj, uint32_t arg, ::FEPackage *pkg);   // PC 51DCD0 (ret 0x10)
+void *FEPackageManagerVTable();                                    // PC 0x79B910 (slot 0 = 52CC70)
+void *bMalloc(uint32_t size, uint32_t flags);                                      // PC 0x440820 (__cdecl; GC bMalloc(int,int))
+void LZDecompress(const uint8_t *src, uint8_t *dst);                               // PC 0x574670 (__cdecl)
+::FEPackageManager *TheFEPackageManager();                                         // PC 0x8637B0 (game global)                                                       // PC 0x440540 (__cdecl)
+uint16_t BaselineFovNoise();           // PC 0x7EC1F0 aBaselineFovNoise (game global)
+// Camera (camera/Camera.cpp) game globals and engine matrix helpers not rewritten yet
+int32_t CameraStopUpdating();          // PC 0x828640 Camera::StopUpdating (game global)
+int32_t DisableCommunication();        // PC 0x865094 (game global)
+int32_t SeeulatorToolActive();         // PC 0x883DE0 (game global)
+uint32_t RealTimeFrames();             // PC 0x7FB708 (game global)
+const ::JollyRancherResponseData *JollyRancherResponse();   // PC 0x82A480 Camera::JollyRancherResponse (.bss)
+void eRotateX(::bMatrix4 *out, const ::bMatrix4 *in, uint16_t angle);   // PC 5BACF0 (__cdecl; D3DX multiply)
+void eRotateY(::bMatrix4 *out, const ::bMatrix4 *in, uint16_t angle);   // PC 5BADA0 (__cdecl; D3DX multiply)
+uint32_t *BRandomSeed();              // PC 0x7EA624 (game global)
+const uint8_t *BFastATanTable();      // PC 0x7EACB0 (game data, 257 bytes)
+const uint16_t *BFixATanTable1();     // PC 0x7EB1C0 (game data, 129 entries: atan(i / 32))
+const uint16_t *BFixATanTable2();     // PC 0x7EB2C8 (game data, 129 entries: atan(i / 4))
+const ::bASinTableEntry *BASinTable();                            // PC 0x7EA628 (game data)
+// FEPackage callees not rewritten yet (PC __thiscall)
+// FEngine package loading (not rewritten; __thiscall)
+void FEngine_UnloadPackage(void *engine, FEPackage *pkg);                                    // 5362E0 (GC 80145A94)
+FEPackage *FEngine_PushPackage(void *engine, const char *name, uint8_t priority, uint32_t mask);   // 555860 (GC 80145CF8)
+cFEng *cFEngInstance();                                 // cFEng::pInstance (PC 0x8384C4)
+void *FEPackageCommandVTable();                                                   // PC 0x79AB64
+void *FEMessageNodeVTable();                                                      // PC 0x79AB60
+// game UI handler virtual calls (__thiscall), slot given as a byte offset
+void FEUIData_Call4(void *ui, uint32_t slotOffset, uint32_t a, const void *b, uint32_t c, const void *d);
+void FEUIData_Call5(void *ui, uint32_t slotOffset, uint32_t a, const void *b, const void *c, const void *d, uint32_t e);
+void FEUIData_OnQueueMessage(void *ui, uint32_t msg, void *obj, void *pkg, void *target, uint32_t arg);   // vtable +0x54
+void FEngine_SendMessageToGame(void *engine, uint32_t msg, void *obj, void *pkg);   // engine+0x10C vtable slot 6 (msg, obj, 0, pkg)
+bool FEObjectCallback_Call(void *callback, void *obj);                               // vtable slot 1, __thiscall
+void FEListBox_Update(void *listBox, float delta);                                                        // 517230
+void FECodeListBox_Update(void *listBox, float delta);                                                    // 504DC0
+uint32_t HoldDirtyFlags();                                             // uHoldDirtyFlags, PC 0x7F7C8C
+void *FERefListVTable();                                               // PC 0x79AA30
+void *FEMessageResponseVTable();                                       // PC 0x79AA38
+
+// ---- TuningSlidersMenu (game state) ----
+void *TuningSlidersMenuVTable();                 // PC 0x79D360
+void HelpBar_SetFlag6C(uint8_t v);               // PC byte *(0x8384D8) + 0x6C (set before 542990 by help-bar screens)
+void HelpBar_542990(bool on);                    // PC 542990 (__thiscall on *(0x8384D8), ret 4; walks the bar's buttons)
+int32_t TuningCategory();                        // PC *(int*)0x83A648: 0 suspension, 1 drivetrain, 2 aero, 3 wheels/brakes
+int32_t FEngAllPortsFlag();                      // PC *(int*)0x83A644: nonzero -> control mask 0xFF, else the active port's
+int32_t FEngActivePort();                        // PC *(int*)0x83A7A0 (FEngMapPortToControlMask argument)
+bool TuningAcceptBlocked();                      // PC byte 0x83A7A4: set -> TuningSlidersMenu ignores accept
+bool SpeedUnitsMetric();                         // PC byte 0x83AA1A == 1 (drivetrain speed labels 60-step, else 35)
+const char *TuningSlidersScreenName();           // PC *(const char**)0x7FA220 "UI_PerformanceTuning_Sliders.fng"
+int32_t *ScreenLastButtonSlot(uint32_t nameHash);   // PC FindScreenCreateData 50B840 -> &record->+0x10 (null if none)
+void FEngPrintfInt(const char *pkg, uint32_t objHash, const char *fmt, int32_t v);   // PC 537B80 (__cdecl varargs)
+void TuneManager_ResetToDefault(int32_t type);   // PC 50F9B0 (__thiscall on 0x839C40, ret 4)
+void TuneManager_RebuildTheRideInfo();           // PC 50FDA0 (__thiscall on 0x839C40)
+void TuneManager_RebuildPlayersRideInfo();       // PC 50FDD0 (__thiscall on 0x839C40)
+void BuildPlayerCarPhysicsInfo();                // PC Car::BuildCarPhysicsInfo 5F6C20(true) on Player::pPlayersByNumber[*(0x83A64C)] (0x8900AC) +4
+void RaceCoordinator_RequestUnPause(int32_t v);  // PC 5F4240 (__thiscall on *(0x8900D8), ret 4)
+void DialogInterface_ShowOk(const char *pkg, const char *fmt, uint32_t textHash);   // PC 558430 (__cdecl varargs)
+// ---- frontend frame entry points ----
+bool DrawFEng();                                 // PC *(int*)0x7F91C4 (GC DrawFEng)
+void DrawFEGraphs();                             // PC 510090: *(0x838564) ? its vtable +0xC : nothing (GC DrawFEGraphs)
+bool MouseCursorEnabled();                       // PC byte 0x7FA29C (1 at start)
+void DrawMouseCursor(int32_t x, int32_t y);      // PC 50B460 (__cdecl, PC only)
+// ---- UIWheelOptionsMenu ----
+void *UIWheelOptionsMenuVTable();                // PC 0x795E4C
+void *WCOWheelRangeVTable();                     // PC 0x791E40
+void *WCOStrengthOfForceVTable();                // PC 0x791E90
+void *WCOOverallForceStrengthVTable();           // PC 0x791EE0
+int32_t PlayerToEditForOptions();                // PC *(int*)0x836364 (GC GetPlayerToEditForOptions)
+uint8_t *PlayerControllerOptions(int32_t player);   // PC 0x83AA64 + player * 0x28
+float FEWidget_GetValue(void *widget);           // slider widget vtable +0x48 (x87 result, rounded to float)
+// ---- ChooseBrandsScreen / customization ----
+void *BrandScrollerThingVTable();                // PC 0x79B6A0
+void *ChooseBrandsScreenVTable();                // PC 0x79CACC
+void FEPrintfFormat(FEObject *str, const char *fmt);   // PC 537BE0 with no arguments (the text is the format)
+const char *BrandDisplayName(uint32_t brand);    // PC 4FFF00 (__cdecl)
+const char *BrandStringFromHash(uint32_t brand); // PC 4FFF40 GetBrandStringFromHash (__cdecl)
+uint32_t FEngHashStringArg(const char *fmt, const char *s);   // PC 50B990 FEngHashString (__cdecl varargs)
+uint32_t *ChosenBrands();                        // PC 0x8389B4 (one per package part)
+bool BrowsingIndividualParts();                  // PC byte 0x83855D (GC ChoosePerformancePackages::bBrowsingIndividualParts)
+const uint8_t *SelectedPerfPackage();            // PC *(0x839BB4)
+const uint8_t *SelectedPerfPart();               // PC *(0x839BB0)
+void CCM_BuyPerfPackage(const uint8_t *p);       // PC 54FE50 (__thiscall on gCarCustomizeManager 0x838980, ret 4)
+void CCM_InstallPerfPackage(const uint8_t *p);   // PC 521340 (p, null ride info; ret 8)
+void CCM_BuyPerfPart(const uint8_t *p);          // PC 521B00 (ret 4)
+void CCM_InstallPerfPart(const uint8_t *p);      // PC 5213D0 (p, null; ret 8)
+void CustomizationScreenManager_ChangeToNextScreen();   // PC 54F980 Instance() -> 55BD60
+// ---- option widgets ----
+uint8_t *AudioSettings();                        // PC 0x83AA28 (GC 0x803BC274)
+void EAXSound_UpdateAudioSettings();             // PC 469050(&0x83AA28) (__thiscall on *(0x82B884), ret 4)
+uint8_t *GameByte(uint32_t pcAddress);           // a PC global byte by address (option flags; tests remap)
+void *JumpCamObject();                           // PC *(0x8650B8)
+void JumpCam_Set(int32_t value);                 // PC 578EF0(3, 0, value, 1) (__thiscall on *(0x8650B8))
+int32_t FtoL(float v);                           // PC _ftol 75BED4 (truncation)
+bool AutoSaveSecondStateAllowed();               // PC 502FE0 (__thiscall on 0x83A9E0)
+void ApplyDetailLevel();                         // PC 5BE9F0 (__cdecl, no args)
+void DialogInterface_ShowTwoButtons(const char *pkg, const char *dlg, uint32_t a, uint32_t b, uint32_t c, uint32_t d,
+                                    uint32_t e, uint32_t f, uint32_t g);   // PC 558790 (__cdecl)
+const char *TrailerNameSSX();                    // PC 0x7944C0 "SSX" (the game's own string, stored as a pointer)
+void SetTrailerName(const char *name);           // PC *(const char**)0x7F4480
+// ---- UIOptionsScreen ----
+void *UIOptionsScreenVTable();                   // PC 0x795E28
+void *GameVTable(uint32_t pcAddress);            // a game vtable by address (option widget classes)
+int32_t OptionsPage();                           // PC *(int*)0x83AA04
+void FEngPrintfByName(const char *pkg, const char *obj, const char *fmt);   // PC 542600 (__cdecl varargs)
+bool ForceFeedbackAvailable();                   // PC 5B8240 (__cdecl, AL)
+bool WheelPluggedIn(int32_t player);             // PC 5C1000(*(0x83A9D8 + player * 4)) (__cdecl, AL)
+void FEWidget_Enable(void *widget);              // widget vtable +0x1C
+void ResetVideoDefaults();                       // PC 5CEC90 (__cdecl)
+void ApplyVideoSettings();                       // PC 5BEEA0 (__cdecl)
+int32_t RaceCoordinatorPausePlayer();             // PC *(*(0x8900D8) + 0x20) (no null check)
+int32_t PlayerId(int32_t number);                // PC Player::pPlayersByNumber[n] (0x8900AC) ->+8, null -> -1
+void JumpCamObject_Call578EF0(int32_t a, int32_t b, int32_t c, int32_t d);   // PC *(0x8650B8)->578EF0(a, b, c, d), no null check
+void Player_ChangeCamera(int32_t number, int32_t dir);   // PC Player::pPlayersByNumber[n] (0x8900AC) 5F2FA0(dir) (__thiscall)
+// ---- Icon scrollers (IconOption / IconPanel / IconScroller / IconScrollerMenu) ----
+void *ThumbnailNodeVTable();                     // PC 0x79AFDC (IconOption base, set by ~IconOption)
+void *IconOptionVTable();                        // PC 0x79B4D8 (React pure)
+void *CPPaintOptionVTable();                     // PC 0x79B604
+void *IconPanelVTable();                         // PC 0x795CBC
+void *IconScrollerVTable();                      // PC 0x79C0F4
+void *IconScrollerMenuVTable();                  // PC 0x7974D4
+void *ThumbnailScrollerVTable();                 // PC 0x79B948 (ThumbnailScroller scalar dtor only)
+void IconOption_React(void *opt, const char *pkg, uint32_t msg, void *obj, uint32_t a3, uint32_t a4);   // slot 1 (ret 0x14)
+void *IconPanel_AddOption(void *panel, void *opt);   // slot 2 (+0x08): the option's image or null
+void IconPanel_Update(void *panel);                   // slot 1 (+0x04)
+void IconPanel_Act(void *panel, uint32_t msg, void *obj, uint32_t a3, uint32_t a4);   // slot 3 (+0x0C)
+bool IconPanel_SetSelectionOption(void *panel, void *opt);   // slot 5 (+0x14)
+bool IconPanel_HandleMouse(void *panel);              // slot 6 (+0x18, PC only)
+void IconScrollerMenu_RefreshHeader(void *menu);      // slot 4 (+0x10)
+void SplineSeek(void *cubic, float dt, float a, float b);   // PC 574E30 (__cdecl, cPoint::SplineSeek on a tCubic1D)
+void SetIconScrollTime(int32_t t);                    // PC *(int*)0x8641A0 = RealTimer when an icon scroller moves
+// ---- UIOptionsMain / UIPauseOptionsMain ----
+void *UIOptionsMainVTable();                     // PC 0x797794
+void *UIPauseOptionsMainVTable();                // PC 0x797CCC
+void IconScrollerMenu_AddOption(void *menu, void *opt);        // menu slot 6 (+0x18)
+void IconScroller_SetInitialPos(void *scroller, int32_t index); // scroller slot 8 (+0x20)
+void SetOptionsPage(int32_t page);                // PC *(int*)0x83AA04 = page
+void SetPlayerToEditForOptions(int32_t player);  // PC 49C5F0: *(int*)0x836364 = player
+bool OptionsDB_IsDirty();                        // PC 52A4C0 (__thiscall on 0x83A9D0, AL)
+void OptionsDB_DeallocBackup();                  // PC 5032C0 (__thiscall on 0x83A9D0)
+const char *OptionsReturnScreen();               // PC *(const char **)0x83635C: package to go back to
+void EnterMemcard(const char *pkg, const char *to, uint32_t op, uint32_t a, uint32_t b, uint32_t c, uint32_t d);   // PC 4A3100 (__cdecl)
+// ---- PauseMenu ----
+void *PauseMenuVTable();                         // PC 0x797CB0
+int32_t RaceType();                              // PC *(int*)0x89E7B0 (0 = free roam, 7 = ?), GC DAT_803ce800-ish
+bool RaceCoordinatorAltQuitText();               // PC *(int*)RC == 6 && *(int*)(RC + 0x24) == 4 (RC = *0x8900D8)
+void RaceCoordinator_PostMessage(int32_t msg, int32_t arg);   // PC 5F41E0 (__thiscall on *(0x8900D8))
+bool ReplayAvailable();                          // PC byte *(0x8650B8)+0x50EC && int +0xB8 > 0 && *(int*)0x88F1A8 == 0
+void SetReplayReturnScreen(const char *pkg);     // PC *(const char **)0x8363E4 = pkg
+void PlayerCareerState_513B30();                 // PC 513B30 (__thiscall on 0x85AD40) before returning to the crib / map
+void PlayerCareerState_NotifyExitToMainMenu();   // PC 5139C0 (__thiscall on 0x85AD40)
+void FEngSetFirstFrontendScreen(const char *pkg);   // PC 50C8D0 (__cdecl)
+const char *FirstScreenAfterQuitRace();          // PC 502FF0(0) (__thiscall on 0x83A9D0)
+bool OnlineSessionActive();
+bool PlayerExists(int32_t number);               // PC Player::pPlayersByNumber[n] (0x8900AC) != null
+uint32_t PlayerField50(int32_t number);          // PC Player::pPlayersByNumber[n] +0x50 (non-null player)                      // PC 5F0120 (__thiscall on 0x89CF48, AL)
+// ---- UIMain (main menu) ----
+void *UIMainVTable();                            // PC 0x797510
+void SetGameModeFlags(int32_t f);                // PC *(int*)0x850078 = f
+void **PendingOnlineScreen();                    // PC 0x836370: object built by 4EFFD0 (deleted by UIMain's ctor)
+void CreateOnlineLoginScreen(const char *pkg);   // PC 4EFFD0 (__cdecl): new 0x154 (ctor 4E3960) -> *0x836370
+void GarageShowPlayerCar();                      // PC UIMain ctor 4DF1B5..4DF28A: RideInfo (current ride or the
+                                                 //   "DDAY_PLAYER_CAR" preset) -> 0x8371B0 -> garage screen (stack 0x8FC)
+void QuickRaceSettings_SetNumPlayers(int32_t n); // PC 502930 (__thiscall on 0x83AAB4)
+void QuickRace_Begin(const char *pkg);           // PC MMQuickRace React 4FC050 body after the mode write (4EF1B0, IsBackdoor)
+const char *CareerReturnScreen();                // PC *(const char **)0x7F42C0
+void SetOptionsReturnScreen(const char *pkg);    // PC *(const char **)0x83635C = pkg
+void OptionsDB_AllocBackup();                    // PC 52A460(0) (__thiscall on 0x83A9D0)
+void SetMenuJoyPort(int32_t port);               // PC *(int*)0x83A9D8 = port
+// ---- UIQRModeSelect ----
+void *UIQRModeSelectVTable();                    // PC 0x797734
+int32_t *GameInt(uint32_t pcAddress);            // a PC global int by address (tests remap)
+uint8_t *QR_CurrentTrackSettings();              // PC 502910 (__thiscall on 0x83AAB4) GetCurrentTrackSettings
+void QR_SetNumOpponents(int32_t n);              // PC 502960 (__thiscall on 0x83AAB4)
+void QR_5028D0();                                // PC 5028D0 (__thiscall on 0x83AAB4) (PC LAN mode icon)
+void QRManager_ChangeToNextScreen();             // PC 4B29A0 (__thiscall on *0x836340)
+void QRManager_RestorePreviousStable();          // PC 4B2A00 (__thiscall on *0x836340)
+// ---- UIStartCareer ----
+void *UIStartCareerVTable();                     // PC 0x79752C
+void StartCareerHelper(int32_t arg);             // PC 495A30 (__cdecl)
+int32_t CareerSlot();                            // PC *(int*)0x836538 (StartCareerHelper argument after a load)
+void FEngPrintfString(const char *pkg, uint32_t objHash, const char *fmt);   // PC 537B80 (__cdecl varargs, no args)
+// ---- UIProfileManager / UIDeleteProfile ----
+void *UIProfileManagerVTable();                  // PC 0x797D14
+void *UIDeleteProfileVTable();                   // PC 0x797D30
+const char *ProfileDBName();                     // PC 502FD0 (__thiscall on 0x83A9E0) returns `this`: the name text
+uint8_t *MenuMusicObject();                      // PC *(uint8_t **)0x836498 (+0x0B byte, +0x5C stream)
+void MenuMusic_Command(int32_t cmd);             // PC InitCommand 6FBFCC (__thiscall on obj+0x5C)(cmd, 0x100)
+void GarageShowSelectedCar();                    // PC 4D98AF..4D9959: car record (GetCarRecordByHandle(*0x83AAB8) slot 3)
+                                                 //   -> RideInfo -> 0x8371B0 -> garage SetRideInfo(.., 1)
+// ---- uiCareerCrib ----
+void *CareerCribVTable();                        // PC 0x797548
+void GarageShowCurrentRide();                    // PC crib ctor 4DF3EA..4DF49D (BuildCurrentRideForPlayer always)
+void Garage_ChangePlatform(int32_t a, int32_t b);   // PC FEngFindScreen("GarageMain.fng")->ChangePlatform 4A7180(a, b) (no null check)
+bool PlatformFileLoaded(const char *path);       // PC 577EB0 (__cdecl) != 0
+void FESpeech_HandleEvent(int32_t e);            // PC HandleFESpeechEvent 5243D0 (__thiscall on 0x8635BC)
+void StartCareerFreeRoam();                      // PC 5404A0 (__cdecl)
+void Crib_ChangeParts(const char *pkg);          // PC 552CC0(1, pkg, 0, *0x863480) (__cdecl)
+void Crib_StartTuning();                         // PC 5309E0(0, *0x863480, 0) (__cdecl)
+int32_t CareerStage();                           // PC *(int*)0x862838 (> 1: world map icon)
+// ---- UIPauseOptions ----
+void *UIPauseOptionsVTable();                    // PC 0x796504
+bool IsCareerFreeRoam();                         // PC 500B60 (__thiscall on 0x85AD40, AL) PlayerCareerState
+int32_t QuickRaceNumPlayers();                   // PC 5026F0 (__thiscall on 0x83AAB4) QuickRaceSettings::GetNumPlayers
+bool IsDragRace();                               // PC byte 0x89E7D8 != 0 || int 0x890108 != 0 (GC DAT_803fca80 || g_tweakIsDragRace)
+bool IsInPerformanceTuning();                    // PC byte 0x89E7E6
+// ---- UIQRTrackSelect / TrackMapScroller ----
+void **TrackMapScrollerInstance();               // PC 0x836344 (the screen's embedded TrackMapScroller)
+::TrackInfo *TrackInfo_GetNth(int32_t i);        // PC 5D3E80 (__cdecl); count *(int*)0x883DA4
+void bList_Sort(void *list, int32_t (*cmp)(void *, void *));   // PC 43E650 (__thiscall, ret 4) bList::Sort
+bool UnlockSystem_IsTrackUnlocked(int32_t filter, int32_t track, int32_t a, int32_t b);   // PC 5156F0 (__cdecl, AL)
+uint32_t FEngHashStringInt(const char *fmt, int32_t v);   // PC 50B990 FEngHashString (__cdecl varargs)
+// PC 57CF70 (__cdecl) LoadResourceFile(name, type, flags, callback(param), param, 0, 0) -> ResourceFile*
+void *LoadResourceFile(const char *name, int32_t type, int32_t flags, void (*cb)(void *), void *param, int32_t a, int32_t b);
+void UnloadResourceFile(void *rf);               // PC 580E90 (__cdecl)
+void ServiceResourceLoading();                   // PC 57EF60 (__cdecl)
+uint32_t CalcTrackNameHash(int32_t track, int32_t dir);   // PC 516280 (__cdecl)
+int32_t HighScores_FindBestDriftScore(int32_t track, int32_t dir);   // PC 502C50 (__thiscall on 0x844ADC, ret 8)
+int32_t HighScores_FindBestLapTime(int32_t track, int32_t dir);      // PC 502AA0 (__thiscall on 0x844ADC, ret 8)
+void Timer_PrintToString(const int32_t *timer, char *buf, int32_t fmt);   // PC 577240 (__thiscall, ret 8)
+void GetLocalizedStringBuf(char *buf, int32_t len, uint32_t hash);   // PC 4FFA50 (__cdecl): missing -> 0xC01A6F63, bStrNCpy
+void FEngPrintfFloatString(const char *pkg, uint32_t objHash, const char *fmt, double v, const char *s);   // PC 537B80
+// ---- QuickRaceSettings / UIQRModeOptions (online helpers: network code, stubbed natively) ----
+::QuickRaceSettings *QuickRaceSettingsInstance();   // PC 0x83AAB4
+// FEPlayerCarDB::GetStockCarByCarType (inlined in PC 515800): player p's car DB (PC 0x83AD90 + p * 0xAB4C; count
+// +0x540, 0x1C-byte records, type = virtual slot 1) -> the first record of `type`'s id (+8), 0 if none.
+uint32_t StockCarIdByType(int32_t player, uint32_t type);
+uint32_t DefaultPlayerCarType(int32_t player);   // DefaultPlayer1CarType / 2: PC 0x7FAA48 / 0x7FAA4C
+const ::TrackInfo *TrackInfo_GetTrackInfo(uint32_t track);   // PC 5D3E40 (__cdecl)
+void FEngSendMessageToPackage(uint32_t msg, const char *pkg);   // PC 55DDA0 (__cdecl)
+void FEPrintfIntString(FEObject *str, const char *fmt, int32_t v, const char *s);   // PC 537BE0
+void QRModeOptions_BoilerPlateOnline(void *screen);              // PC 4B41C0 (__thiscall) network
+void QRModeOptions_HandlePasswordEntryRestrictions(void *screen);   // PC 4982C0 (__thiscall) network
+void QRModeOptions_OnlineAccept(void *screen);                   // PC 498440 (__thiscall) network
+void QRModeOptions_Online4A0140(const char *pkg);                // PC 4A0140 (__cdecl) network
+void QRModeOptions_Online4E2DC0(void *screen);                   // PC 4E2DC0 (__thiscall) network
+void QRModeOptions_Online495220(const char *text);               // PC 495220 (__thiscall on 0x850080, ret 4) network
+uint16_t OnlineNumLaps_MinLaps(void *widget);                    // PC 498400 (__thiscall) network
+void *DialogShowOk(const char *pkg, const char *dialog, uint32_t hash);   // PC DialogInterface::ShowOk 558430 (varargs)
+void *DialogShowOk(const char *pkg, const char *dialog, uint32_t hash, int32_t a, int32_t b);
+// DialogInterface support (DialogInterface.cpp)
+// UserProfile support
+uint8_t *PlayerCareer_SaveToBuffer(uint8_t *buf, int32_t size);         // PC 514530 (__thiscall on 0x85AD40)
+const uint8_t *PlayerCareer_LoadFromBuffer(const uint8_t *buf, int32_t size);   // PC 529230 (on 0x85AD40)
+void PlayerCareer_Default(bool all);                                    // PC 532830 (on 0x85AD40, ret 4)
+uint8_t *OnlineSettings_Save(uint8_t *p);       // PC 515BF0 (__thiscall on 0x850080) then 5B9420(result) (network)
+void OnlineSettings_Load(const uint8_t *p);     // PC 515C90 (on 0x850080) then 5B9570(result) (network)
+int32_t EAXSound_SetAudioModeFromMemoryCard(int32_t mode);   // PC 4792B0 (on *(0x82B884))
+void EAXSound_UpdateVolumes(void *audioSettings);            // PC 469050 (on *(0x82B884))
+void Sound_5BE690();                                         // PC 5BE690 (__cdecl, no args)
+// PC (inlined in 5344D0): GetJoystickType 571AC0(port), DetermineAvailableJoystickConfigurations 571FD0(list, 9,
+// type), SetJoystickUserConfiguration 571FB0(port, list[*(0x83AA6C + port * 0x28)]).
+void ApplyJoystickConfig(int32_t port);
+// cFrontendDatabase support
+const char *OnlineLobbyScreenName();             // PC 0x78F320 (network screen)
+void PlayerCareer_NotifyRestartCurrentRace();    // PC 5287A0(0x85BA64, 0) then *(*(0x85EF48) + 0x14) = 2
+void PlayerCareer_NotifyBeginNewRace();          // PC 533310 (__thiscall on 0x85AD40)
+// EventInProgressState::IsThereANextRace (inlined in 503080): cur = *(0x85EF48); cur && cur + 0xD24 (non-null) <
+// 0x85BAB8 + *(0x85EF4C) * 0xD24.
+bool EventInProgress_IsThereANextRace();
+int32_t OnlineSettingsSaveSize();                // PC 5B9680 (returns 0x43E)
+// cFinishedRaceStats support
+uint8_t *FinishedRaceStatsGlobal();              // PC 0x85036C (FEDatabase +0x1599C entries, 0x224 each)
+int32_t RaceNumRacers(void *race);               // Race +0x24
+void *RaceRacer(void *race, int32_t i);          // Race +0xBD0 + i * 4 (RacingCar)
+void *CurrentRace();                             // pCurrentRace, PC *(0x890118)
+void FinishedRaceStatsEntry_Construct(uint8_t *entry, void *car, bool b);   // PC 515DB0 (__thiscall, ret 8)
+int32_t RaceParameters_GetDriverNumber(int32_t player);   // PC 5ED980 (__thiscall on 0x89E7A0, ret 4)
+void PlayerCareer_NotifyCurrentRaceFinished(void *race);  // PC 54CA60 (__thiscall on 0x85AD40, ret 4)
+uint32_t CarRecord_GetType(const void *car);                      // car record vtable slot 1 (car type)
+void CarConfig_Init(uint8_t *rec, uint32_t handle, const uint8_t *stock);   // PC 516B90 (__thiscall, ret 8)
+const uint32_t *OnlineCareerCarEntry(int32_t i);   // PC 0x8641A8 + i * 0xC
+void CarRecord_BuildRide(void *car, int32_t player, void *ride, int32_t tuning);   // vtable slot 3 (ret 0xC)
+uint8_t *CareerCarData_Save(uint8_t *data, uint8_t *p, int32_t *remaining);       // PC 503F00 (__thiscall, ret 8)
+const uint8_t *CareerCarData_Load(uint8_t *data, const uint8_t *p, uint32_t *slot); // PC 504040 (__thiscall, ret 8)
+enum class CarRecordKind { Stock, Tuned, Career, Online, Sponsor };
+// Game record ctors (PC: stock 503A00, tuned 516B30, career / online 525CF0, sponsor 5118E0; __thiscall).
+void CarRecord_Construct(CarRecordKind kind, uint8_t *rec);
+bool UnlockSystem_IsCarUnlocked(int32_t arg, uint32_t handle, bool player2);   // PC 534180 (__cdecl, AL)
+const void *ProfileCarDB(int32_t player);        // PC 0x83AD90 + player * 0xAB4C (FEDatabase profiles' car DBs)
+// CarViewer support (GarageMainScreen is the game's)
+void *TopOrFullScreenRide();                     // PC 0x8371B0
+void *BottomScreenRide();                        // PC 0x836750
+void GarageMain_StopLookingAtParts(void *screen, bool flag);                   // PC 4C1FA0 (__thiscall, ret 4)
+void GarageMain_SetLookatPart(void *screen, void *part, int32_t a, bool flag, bool b);   // PC 4C1D40 (ret 0x10)
+void GarageMain_SetCameraParams(void *screen, const float cam[10]);            // PC 4A5B70 (__thiscall, 10 floats)
+void GarageMain_SetRideInfo(void *screen, void *ride, int32_t reason);          // PC 4D8C70 (ret 8)
+void GarageMain_ChangePlatform(void *screen, int32_t a, int32_t b);             // PC 4A7180 (ret 8)
+void RideInfo_Assign(void *dst, const void *src);                              // PC 413440 (__thiscall)
+uint32_t ShaperLightsValue(uint32_t hash);                                     // PC 48A2D0 (__cdecl)
+// UIQRCarSelect support
+::cFrontendDatabase *FrontendDatabase();         // FEDatabase, PC 0x83A9D0
+void *SelectableCar_GetRide(void *car);          // PC 511E00 (__thiscall): RideInfo
+long double RideRating(void *ride, int32_t kind);   // RidePhysicsInfo (ride +0x10) accel 5B53A0 / top 5B6A20 / handling 5B5490
+void QRCarSelect_BuildCarList(void *screen, uint32_t filter);   // PC 4E22E0 (__thiscall, ret 4)
+void QRCarSelect_RefreshHeader(void *screen);                    // PC 4B2310 (__thiscall)
+bool CarTypeCheck840(int32_t v);                 // PC 5022C0 (__cdecl, AL) on car type +0x840
+bool CarTypeInfo_610180(const uint8_t *ct);      // PC 610180 (__thiscall on the car type, AL)
+void *SelectableCar_New(const uint8_t *ct, uint32_t c, uint32_t handle, int32_t player, int32_t flag);   // new 0x930 + ctor 511DB0
+void QRCarSelect_SortCars(void *list);           // PC bList::Sort 43E650 with comparator 40CB20 (always 1)
+uint32_t GetCarTypeLogoHash(int32_t type, bool primary);   // PC 511E60 (__cdecl): manufacturer / secondary logo texture
+// network (not ported): online slot info 497F20 (__thiscall, ret 4), confirm online 497FC0 / unranked 498040 / LAN 498000
+void QRCarSelect_SetOnlineSlotInfo(void *screen, void *carRecord);
+void QRCarSelect_ConfirmOnline(void *screen);
+void QRCarSelect_ConfirmOnlineUnranked(void *screen);
+void QRCarSelect_ConfirmLAN(void *screen);
+// network: UIQRCarSelect dtor 4E2131..4E2225 (online / LAN): the kept car's ride into the top garage view + audio
+void QRCarSelect_OnlineExitRide(uint32_t handle);
+void GarageMain_SetCarType(void *screen, int32_t type);   // PC 4A5EE0 (__thiscall, ret 4)
+// PC 4E2804..4E28DC: stack RideInfo (40C910), Init(type, 1, 0, 0) 610270, SetCompositeNameHash(1) 61C280, random
+// parts 637190 + paint 6371E0, fn(ride), dtor (4022C0 on ride +0x384).
+void WithRandomRide(int32_t type, void (*fn)(void *ride));
+void RaceStarter_StartRace();                              // PC 53FC20 (__cdecl)
+// QRTrackSelectScreenManager node functions: idx 0..5 = mode select next / prev, mode options next / prev, track
+// select next / prev (PC 4B2A80, 498290, 498220, 4B2AF0, 498240, 4982B0: __thiscall on the manager)
+void *QRManager_CalcFn(int32_t idx);
+const char *QRManager_CallCalc(void *fn, void *manager);
+int32_t bRandomInt(int32_t range);                         // PC 43C1C0 (__cdecl)
+int32_t GetRandomGetAwayTrack(int32_t r);                  // PC 4FEF50 (__cdecl)
+// PostRaceResultsScreen support
+const char **PostRaceManager_CurrentScreen();    // cPostRaceScreenManager (PC *0x8363DC) +0x1C
+void PostRaceManager_ChangeToNextScreen();       // PC 4BFF80 (__thiscall on *0x8363DC)
+::bNode *bList_GetNode(::bList *list, int32_t i);   // PC 43BE60 (__thiscall, ret 4): past the end -> the head
+::bList *DriftScoreList();                       // DriftManager::ScoreList (PC 0x864630)
+int32_t CurrentRaceDriverCount();                // PC *(*0x890118 + 0x24)
+const uint8_t *RacerInfo(int32_t index);         // PC 5F0E30 (__thiscall on *0x890080, ret 4): +0xC car type, +0x14 car, +0x18 player
+const char *DriverName(void *player);            // PC 5F41B0 (__thiscall on the player; online: the online name)
+const char *OnlinePlayerName(int32_t index);     // network: PC 5F0220(0x89CF48, index) + 0x12
+void Timer_PrintToString(int32_t ticks, char *buf, int32_t mode);   // PC 577240 (__thiscall on the ticks, ret 8)
+void FEngPrintfDouble(const char *pkg, uint32_t objHash, const char *fmt, double v);   // PC 537B80
+void PostRace_ManageOnlineUpdates(void *screen); // network: PC 4E97E0 (__thiscall)
+bool Online_5FE500();                            // network: PC 5FE500 (__thiscall on 0x89CF48, AL)
+void Online_601D00();                            // network: PC 601D00 (__thiscall on 0x89CF48)
+void Online_609750();                            // network: PC 609750 (__thiscall on 0x89CF48)
+void Profile_5100B0();                           // PC 5100B0 (__cdecl): 0x83A611 reset / copy from *0x83A540 + 0x14
+float FrameSeconds();                            // PC *(float*)0x865154 (frame time)
+// cPostRaceScreenManager support
+bool Career_5287A0(bool a);                      // PC 5287A0 (__thiscall on 0x85BA64, ret 4, AL): reward available
+bool Career_500DB0();                            // PC 500DB0 (__thiscall on 0x85BA64): +2 && !+3
+bool Career_500DD0();                            // PC 500DD0 (__thiscall on 0x85BA64): byte +4
+bool CareerStage_500610(int32_t stage);          // PC 500610 (__thiscall on 0x862018 + stage * 0x104, AL)
+float CareerStage_5005E0(int32_t stage);         // PC 5005E0 (__thiscall on 0x861F14 + stage * 0x104 = previous stage; ST0)
+int32_t CareerStage_500670(int32_t stage, float v);   // PC 500670 (__thiscall on 0x862018 + stage * 0x104, ret 4)
+void Call526830(int32_t a);                      // PC 526830 (__cdecl): next split-screen race setup
+bool Online_5FE4C0();                            // network: PC 5FE4C0 (__thiscall on 0x89CF48, AL)
+void PostRaceMessageCenter_Destruct(void *p);    // network: PC 4E9180 (__thiscall on cPostRaceScreenManager +4)
+// PostRaceStatsScreen support
+void FEPrintfInts2(FEObject *str, const char *fmt, int32_t a, int32_t b);                  // PC 537BE0
+void FEPrintfDoubleString(FEObject *str, const char *fmt, double v, const char *s);        // PC 537BE0
+void FEngPrintfIntStrings(const char *pkg, uint32_t objHash, const char *fmt, int32_t v, const char *a, const char *b);   // PC 537B80
+const char *CarTypeDisplayName(int32_t type);   // PC 5120B0 (__cdecl): the car type's full name
+// cPostRaceTournamentResults support (network parts: game calls in the hooked build, no-ops natively)
+void TournResults_OnlineRegister(void *screen, bool on);   // 58F740(0)->582910(on ? 4C0430 : 0, on ? screen : 0)
+void TournResults_OnlineHelperInit(void *helper, void *screen);   // 4CFD80(helper = screen +0x70, screen, 1)
+void TournResults_OnlineTeardown(void *screen);  // dtor 4EA385..4EA402: online state 3, callback off, dialogs +0x54/+0x58
+void TournResults_OnlineLeave(void *screen);     // 0x2C0E485A: online state 3 (58FD50(0)), dialogs +0x54/+0x58
+void TournResults_OnlineTick(void *screen);      // tick with +0x64: 4A3DA0(manager +4), dialogs (+0x54 if > 0, +0x58)
+void TournResults_OnlineMessages(void *screen, uint32_t msg, void *obj, uint32_t arg, uint32_t pkg);   // 4F44F2..4F45FC
+void Call5B7C40();                               // PC 5B7C40 (__cdecl)
+void PostRaceMessageCenter_4A3DA0();             // network: PC 4A3DA0 (__thiscall on cPostRaceScreenManager +4)
+void PostRaceMessageCenter_Update(void *center, int32_t v);   // PC 4E9210 (__thiscall on cPostRaceScreenManager +4, ret 4)
+int32_t OnlineRacerCount();                      // network: PC 5F01E0 (__thiscall on 0x89CF48)
+int32_t CareerRacerDriver(int32_t i);            // PC 500D90(0x85BA64, i) record +4 (driver number)
+int32_t Career_GetPointsThisRace(int32_t i);     // PC 513E70 (__thiscall on 0x85BA64, ret 4)
+int32_t Career_GetPointsTotal(int32_t i);        // PC 513EB0 (__thiscall on 0x85BA64, ret 4)
+float Career_GetSponsorPointsEarned();          // PC 5330D0 (__thiscall on 0x85BA64; ST0)
+int32_t Career_GetLastPurse();                   // PC 532E50 (__thiscall on 0x85AD40)
+void HelpBar_Off();                              // PC 54E6B0 (__thiscall on *0x8384D8): flag 0, 542990(0), hide 0x2BAC0CEE
+void FEngStopInteraction(const char *pkg);       // PC 558F00 (__cdecl)
+uint32_t BeginCarCustomize(int32_t kind, const char *pkg, int32_t player, uint32_t handle);   // PC 552CC0 (__cdecl)
+uint32_t BeginCarCustomizeOnline(int32_t kind, const char *pkg, int32_t player, void *rec);   // PC 552E30 (__cdecl, network)
+const char *SponsorName(int32_t i);              // PC *(0x7F7C6C + i * 4) (8 names)
+void CareerCarData_Clear(uint8_t *data);         // PC 503E70 (__thiscall on career record +0x434)
+const uint8_t *CarTypeInfo(int32_t i);           // PC *(0x8A1CCC) + i * 0x890 (null table -> null)
+void *EAXSoundInstance();                        // g_pEAXSound, PC *(0x82B884)
+int32_t EAXSound_GetDefaultPlatformAudioMode();  // PC 40CB20 (__thiscall on it; returns 1)
+void EAXSound_InitEATRAX();                      // PC 479220 (__thiscall on *(0x82B884), even when null)
+const char *EATraxPlayIn(int32_t i);             // PC *(0x7ECD8C + i * 0x10): "FE" / "IG" / "AL" / ...
+::feDialogConfig *SecretDialogInfo();            // PC 0x838640 (0x338)
+int32_t bVSPrintf(char *buf, const char *fmt, va_list va);   // PC 43FBC0 (__cdecl; bWare formatter, no length)
+const char *FEngGetTopPackage(const uint32_t *skipHashes, int32_t count);   // PC 50CE30 (__cdecl)
+void FEngSetCreateCallback(const char *pkg, void *callback);   // PC 50B8E0 (__cdecl)
+void *DialogCreaterCallback();                   // PC 5542A0 (DialogCreater, game code)
+void DialogDismiss(void *dialog);                                // PC DialogInterface::DismissDialog 540A60 (__cdecl)
+// ---- PostRaceMenu ----
+bool CareerState_5287A0();                       // PC 5287A0 (__thiscall on 0x85BA64, arg 0, AL): result accepted for autosave
+bool CareerState_513FA0();                       // PC 513FA0 (__thiscall on 0x85BA64, AL): a next event exists
+void PlayerCareerState_54CAE0();                 // PC 54CAE0 (__thiscall on 0x85AD40) -> 541580(this + 0xD24)
+bool FrontendDatabase_503080();                  // PC 503080 (__thiscall on 0x83A9D0, AL): free roam needs a confirm
+void EAXSound_481210(int32_t v);                 // PC 481210 (__thiscall on *(0x82B884), ret 4)
+bool PostRaceReplayAvailable();                  // PC byte *(0x8650B8)+0x50EC && int +0xBC > 0
+void PlayerCareerState_NotifyEnterCribFromPostRace();   // PC 54CA40 (__thiscall on 0x85AD40)
+void PlayerCareerState_513950();                 // PC 513950 (__thiscall on 0x85AD40) before free roam
+bool PlayerCareerState_NotifyEnterFreeRoamFromPostRace(char *movie);   // PC 54C9D0 (__thiscall on 0x85AD40, AL)
+void LaunchPostRaceMovie(const char *pkg, const char *movie);   // PC InGamePlayMovie 53D7A0 (__cdecl)
+void PlayerCareerState_MarkCurrentEventComplete();   // PC 54CA30 (__thiscall on 0x85AD40)
+// PC PostRaceMenu 0x911AB364: m = *0x8363DC (cPostRaceScreenManager); 4A45E0(m) ? 4EA240(m) : -; ChangeToPrevScreen 4C0020
+void PostRaceManager_Back();
+// ---- CarTunePauseScreen (CarTuneManager 0x839C40 not rewritten) ----
+const char *GameStringPointer(uint32_t addr);    // a game `const char *` global (e.g. 0x7FA218 tuning setting package)
+void **GamePtrSlot(uint32_t addr);              // a game pointer global (tests: pointer-sized slots)
+const char **GameStringSlot(uint32_t addr);      // a game `const char *` global to write (0x83A650, 0x8384C8)
+int32_t RaceCoordinatorState();                  // PC *(int*)*(0x8900D8)
+void RaceCoordinator_RequestPause(int32_t player);   // PC 5F4230 (__thiscall on *(0x8900D8), ret 4)
+int32_t TuningPlayerId();                        // PC Player::pPlayersByNumber[*0x83A64C] (0x8900AC) +0x08
+bool Player_IsHudKPH(int32_t index);             // PC 5EA8B0 (__thiscall on pPlayersByNumber[index], AL)
+void SetCarTuningSpec();                         // PC 50FE20 (__cdecl)
+void cFEng_RegisterJoy();                        // PC 52CDD0 (__thiscall on *(0x8384C4))
+uint8_t *CarTuneStoredSpecs();                   // PC *(uint8_t **)0x83A540
+bool CarTuneManagerActive();                     // PC *(int*)0x839C40 && *(int*)0x83A540
+bool CarTune_59AE90(int32_t category);           // PC 59AE90 (__thiscall on stored + 0x14, arg 0x83A544 + cat * 0x29, AL)
+void CarTune_RestoreCustomTunings(int32_t category);   // PC 50FC60 (__thiscall on 0x839C40, ret 4)
+void CarTune_50FAE0(int32_t category);           // PC 50FAE0 (__thiscall on 0x839C40, ret 4)
+void CarTune_50FC20(int32_t category);           // PC 50FC20 (__thiscall on 0x839C40, ret 4)
+bool CarTune_50FD10();                           // PC 50FD10 (__thiscall on 0x839C40, AL)
+void CarTune_50FDF0();                           // PC 50FDF0 (__thiscall on 0x839C40)
+void CarTune_50F7E0(int32_t v);                  // PC 50F7E0 (__thiscall on 0x839C40, ret 4)
+void CarTune_5B7ED0(int32_t v);                  // PC 5B7ED0 (__cdecl)
+void PresetCarSlot_DefaultCustomTuningSpecs(int32_t v);   // PC 59AFE0 (__thiscall on 0x83A611, ret 4)
+void CarTune_CopyStoredSpecs();                  // PC 53C901..: 0x83A611 <- *(0x83A540) + 0x14 (0x29 bytes) when set
+void Race_SimulateRaceFinish();                  // PC 608CA0 (__thiscall on *(0x890118))
+// ---- UIMagazineSelect / MagazineViewer ----
+char *GameChars(uint32_t addr);                  // a game char array by address (0x837CA0 return package, 0x83A9E0 profile name, 0x837B80)
+uint8_t *ShowcaseRecords();                      // PC *(uint8_t **)0x83840C (0x40-byte records, count *0x838408)
+uint8_t *UnlockEntries();                        // PC 0x862840 (8-byte unlock entries, count *0x86283C)
+void MagazineTextureHandler_Reset();             // PC 488AE0 (__thiscall on 0x832DAC)
+void MagazineTextureHandler_Unload(uint32_t flags);   // PC 488AA0 (__thiscall on 0x832DAC, ret 4)
+// ---- magazine batch 2 (streaming / screen shot / memory card internals, bridged) ----
+bool IsResourceLoadingComplete();                // PC 571060 (__cdecl)
+bool eIsStreamingTexturePackLoaded(const char *name);   // PC 4901B0
+void eLoadStreamingTexturePack(const char *name);       // PC 4944D0 (name, 0, 0, 0)
+void eWaitForStreamingTexturePackLoading(const char *name);   // PC 490170
+void eUnloadStreamingTexturePack(const char *name);     // PC 494550 (name, 0, 0)
+void eLoadStreamingTexture(uint32_t hash, void (*cb)(void *), void *param, int32_t flag);   // PC 494D30
+void eUnloadStreamingTexture(uint32_t hash);            // PC 490130
+void *TrackStreamer_AllocateUserMemory(int32_t a, const char *name, int32_t b);   // PC 5E8670 (__thiscall on 0x88EB00)
+void TrackStreamer_FreeUserMemory(void *mem);           // PC 5D6130 (__thiscall on 0x88EB00)
+const char *HelpBarPackageName();                // PC *(*(0x8384D8) + 4)
+void ScreenShot_488B10();                        // PC 488B10 (__thiscall on 0x832DAC)
+const uint8_t *ScreenShot_Get(uint32_t slot);    // PC 4889D0 (__thiscall on 0x832DAC, ret 4): +0x24 texture hash
+bool ScreenShot_Allocate(int32_t w, int32_t h, uint32_t slot, const char *hashName);   // PC 4889F0 (ret 0x10)
+uint32_t ScreenShot_Buffer();                    // PC *(0x832DB4)
+uint32_t ScreenShot_5BA030(uint32_t slot);       // PC 5BA030 (__thiscall on 0x832DAC, ret 4)
+void Memcard_4A95B0(int32_t op, const char *name, uint32_t buffer, uint32_t slot);   // PC 4A95B0 (__cdecl)
+}  // namespace bridge

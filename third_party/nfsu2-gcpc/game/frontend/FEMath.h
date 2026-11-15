@@ -1,0 +1,56 @@
+// Small FEng value types used by key tracks. Original: zFe2.cpp (GC: mostly inlined).
+#pragma once
+#include <cstdint>
+
+struct FEVector2 {
+    float x, y;
+};
+
+struct FEVector3 {
+    float x, y, z;
+};
+
+struct FEQuaternion {
+    float x, y, z, w;
+};
+
+struct FEColor {                     // 4 signed channels (track values, not packed)
+    int32_t c[4];
+};
+
+// PC 4FE6B0 (__thiscall a, out, b; GC: inlined in SetupMoveToTracks). Hamilton product a*b, evaluated in the
+// original's order.
+FEQuaternion FEQuatMultiply(const FEQuaternion &a, const FEQuaternion &b);
+// PC 504500 / 5045A0 (two identical copies, eps 1e-6 at 0x7992EC / 0x7992F0; GC: Close() x3): every component
+// of a within eps of b. NaN -> false.
+bool FEVector3Close(const FEVector3 &a, const FEVector3 &b);
+// PC 504640: every channel within +-1 (channels tested 2, 1, 0, 3; 32-bit wraparound like the original).
+bool FEColorClose(const FEColor &a, const FEColor &b);
+// Key lerps used by FEInterpLinear (GC FELerp*, PC __cdecl): out = lerp(a, b, t) + base, in the original's x87
+// evaluation order. Integer/color: truncate(diff * t + 0.5) like MSVC _ftol, then + base + a (32-bit wrap).
+void FELerpInteger(int32_t a, int32_t b, float t, const int32_t *base, int32_t *out);                  // PC 5050D0
+void FELerpVector2(const FEVector2 *a, const FEVector2 *b, float t, const FEVector2 *base, FEVector2 *out);   // PC 505110
+void FELerpVector3(const FEVector3 *a, const FEVector3 *b, float t, const FEVector3 *base, FEVector3 *out);   // PC 505150
+void FELerpColor(const FEColor *a, const FEColor *b, float t, const FEColor *base, FEColor *out);       // PC 5051A0
+// Quaternion helpers (PC __cdecl, struct return through the first argument; each component rounded to float).
+void FEQuatScale(FEQuaternion *out, const FEQuaternion *q, float s);                   // PC 4FE770
+void FEQuatAdd(FEQuaternion *out, const FEQuaternion *a, const FEQuaternion *b);       // PC 4FE7D0
+void FEQuatSub(FEQuaternion *out, const FEQuaternion *a, const FEQuaternion *b);       // PC 4FE830
+void FEQuatNormalize(FEQuaternion *q);                                                 // PC 511C80: tiny 1/len -> identity
+// GC FELerpQuaternion 80140A8C / PC 519B00: slerp (bWare table trig) or, when nearly parallel (|cos| >= 0.999),
+// normalized lerp; result * base. As in the original, the near-parallel branch uses b un-negated.
+void FELerpQuaternion(const FEQuaternion *a, const FEQuaternion *b, float t, const FEQuaternion *base, FEQuaternion *out);
+// MSVC __ftol2 (PC 75BED4): truncate toward zero through a 64-bit integer, low 32 bits.
+int32_t FEFtol(long double x);
+// PC 505580 / GC FEColor::operator-: per-channel subtraction (32-bit wraparound).
+FEColor FEColorSub(const FEColor &a, const FEColor &b);
+// PC 5054D0 (__thiscall on the colour; GC FEColor::operator unsigned long): channels clamped to 0..255, packed
+// c[3] << 24 | c[2] << 16 | c[1] << 8 | c[0] (alpha, red, green, blue).
+uint32_t FEColorPack(const FEColor &c);
+// GC FEColor::FEColor(unsigned long) 801424D4 / PC 5054A0 (__thiscall, ret 4): no clamping, c[0] = low byte (blue).
+void FEColorUnpack(FEColor *c, uint32_t argb);
+// GC FEColor::operator= 801425AC / PC 505560 (__thiscall, ret 4, returns this): channels copied 3, 2, 1, 0.
+FEColor *FEColorAssign(FEColor *c, const FEColor &src);
+// GC FEColor::operator+= 801425D4 (PC: inlined into FEObject::SetTrackValue / FEKeyTrack::SetBaseValueAt):
+// per-channel 32-bit wraparound add.
+void FEColorAddTo(FEColor *c, const FEColor &d);

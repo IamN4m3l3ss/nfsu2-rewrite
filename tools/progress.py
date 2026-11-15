@@ -46,7 +46,7 @@ SYSTEMS = [
     ("Audio", ["audio"], "engine sounds, music, effects", 1808, "zEAXSound"),
     ("Rendering", ["render"], "last: the future port boundary (size: rough estimate)", 305, "zPlatform (GameCube)"),
 ]
-FOLDER_LABEL = {"bstring": "Strings", "bmath": "Maths", "memory": "Memory", "bware": "Lists & pools",
+FOLDER_LABEL = {"bstring": "Strings", "bmath": "Maths", "memory": "Memory", "bware": "Lists & pools", "frontend": "Menu engine (FEng)", "camera": "Camera",
                 "bchunk": "Chunks", "resource": "Resource files", "file": "File layer"}
 
 STATUS_ORDER = {"verified": 0, "rewritten": 1, "named": 2, "unknown": 3}
@@ -79,6 +79,12 @@ def ea_named():
             if addr < GAME_END and not re.match(r"^(thunk_)?FUN_[0-9a-f]+$", name):
                 out.add(addr)
     return out
+
+
+def gcpc_folder(row):
+    """nfsu2-gcpc rewrites registered at run time (frontend/gcpc_hooks.cpp): system from the 'gcpc:<folder>' note."""
+    n = row.get("notes") or ""
+    return n[5:n.index(";")] if n.startswith("gcpc:") and ";" in n else None
 
 
 def load_symbols():
@@ -222,12 +228,12 @@ def main():
 
     per_folder = {}
     for r in verified:
-        per_folder.setdefault(folders.get(int(r["addr"], 16), "misc"), []).append(r)
+        per_folder.setdefault(folders.get(int(r["addr"], 16)) or gcpc_folder(r) or "misc", []).append(r)
     counts = {f: len(v) for f, v in per_folder.items()}
     per_system = []
     for sname, flds, note, total, _src in SYSTEMS:
         per_system.append((sname, sum(counts.get(f, 0) for f in flds), note, flds, total))
-    unassigned = [r["name"] for r in verified if folders.get(int(r["addr"], 16)) is None]
+    unassigned = [r["name"] for r in verified if folders.get(int(r["addr"], 16)) is None and not gcpc_folder(r)]
     if unassigned:
         print("warning: verified but no rewrite registration found:", ", ".join(unassigned))
 

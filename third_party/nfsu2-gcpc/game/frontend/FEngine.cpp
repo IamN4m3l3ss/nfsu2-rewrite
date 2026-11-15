@@ -1,0 +1,936 @@
+#include "FEScript.h"
+#include "FENode.h"
+#include "FEPackageReader.h"
+#include "FEngine.h"
+#include "FECodeListBox.h"
+#include "FEListBox.h"
+#include "FEButtonMap.h"
+#include "cFEng.h"
+#include "FEHash.h"
+#include <cstring>
+#include "bridge/Bridge.h"
+#include "FEPackage.h"
+#include "FEMessageResponse.h"
+#include "FEObject.h"
+
+void FEngine::QueueMessage(uint32_t msg, FEObject *obj, FEPackage *pkg, FEObject *target, uint32_t arg)
+{
+    auto *n = static_cast<FEMessageNode *>(bridge::Alloc(sizeof(FEMessageNode)));
+    if (n) {
+        n->node.next = n->node.prev = reinterpret_cast<FEMinNode *>(FEMINNODE_UNLINKED);
+        n->node.vtable = bridge::FEMessageNodeVTable();
+    }
+    n->mpPackage = pkg;
+    n->mu32MsgId = msg;
+    n->mpObject = obj;
+    n->mpTarget = target;
+    n->mu32Arg = arg;
+    if (mbForwardQueuedMessages) bridge::FEUIData_OnQueueMessage(mpUIData, msg, obj, pkg, target, arg);
+    mMessages.AddTail(&n->node);
+}
+
+namespace {
+// Inlined FEPackageCommand constructor + field setup (PC: every QueuePackage* starts like this). Like the original,
+// allocation failure crashes (writes through null).
+FEPackageCommand *NewPackageCommand(uint32_t type, uint32_t mask, FEPackage *pkg)
+{
+    auto *c = static_cast<FEPackageCommand *>(bridge::Alloc(sizeof(FEPackageCommand)));
+    if (c) {
+        c->node.node.next = c->node.node.prev = reinterpret_cast<FEMinNode *>(FEMINNODE_UNLINKED);
+        c->node.mpcName = nullptr;
+        c->node.mu32NameHash = 0;
+        c->node.node.vtable = bridge::FEPackageCommandVTable();
+    }
+    c->mpPackage = pkg;
+    c->mu32Mask = mask;
+    c->mu32Type = type;
+    return c;
+}
+FEPackage *NextPackage(const FEPackage *p) { return reinterpret_cast<FEPackage *>(reinterpret_cast<const FEMinNode *>(p)->next); }
+}
+
+// GC null-checks pkg before clearing its masks; PC reads pkg->mu32ControlMask first, so pkg must be valid.
+void FEngine::QueuePackageSwitch(const char *name, FEPackage *pkg)
+{
+    FEPackageCommand *c = NewPackageCommand(3, pkg->mu32ControlMask, pkg);
+    c->node.SetName(name);
+    mPackageCommands.AddTail(&c->node.node);
+    pkg->SetControlMask(0);
+}
+
+void FEngine::QueuePackagePush(const char *name, FEPackage *pkg, uint32_t mask)
+{
+    FEPackageCommand *c = NewPackageCommand(2, mask, pkg);
+    c->node.SetName(name);
+    mPackageCommands.AddTail(&c->node.node);
+    if (pkg) pkg->SetControlMask(pkg->mu32ControlMask & ~mask);
+}
+
+void FEngine::QueuePackagePushForModal(const char *name, FEPackage *pkg, uint32_t mask)
+{
+    FEPackageCommand *c = NewPackageCommand(0x12, mask, pkg);
+    c->node.SetName(name);
+    mPackageCommands.AddTail(&c->node.node);
+    for (FEPackage *p = mpPackages; p; p = NextPackage(p)) p->SetControlMaskOnly(p->mu32ControlMask & ~mask);
+}
+
+void FEngine::QueuePackagePop(FEPackage *pkg)
+{
+    FEPackageCommand *c = NewPackageCommand(1, pkg->mu32ControlMask, pkg);
+    mPackageCommands.AddTail(&c->node.node);
+    for (FEPackage *p = mpPackages; p; p = NextPackage(p)) p->RestoreControlMask();
+    pkg->SetControlMask(0);
+}
+
+bool FEngine::PackagePopQueuedPushPackage(const char *name)
+{
+    if (!name) return false;
+    const uint32_t hash = FEHashUpper(name);
+    for (FEMinNode *n = mPackageCommands.tail; n; n = n->prev) {
+        auto *c = reinterpret_cast<FEPackageCommand *>(n);
+        if ((c->mu32Type & 2) && c->node.mu32NameHash == hash) {
+            mPackageCommands.RemNode(n);
+            for (FEPackage *p = mpPackages; p; p = NextPackage(p)) {
+                p->RestoreControlMask();
+                p->RestoreControlMaskUsedByInput();
+            }
+            return true;
+        }
+        if (n == mPackageCommands.head) break;
+    }
+    return false;
+}
+
+// Command type bits: 1 pop the command's package (unload; its parent gets the command mask back), 2 push the named
+// package (if it is in cFEng's level sorting list) at priority+1, 0x10 (modal) limit every other package's input
+// mask, 4 / 8 hand the masked controls back to the parent / to the first child. A switch (3) pops then pushes,
+// and the new package takes over the old one's parent and children.
+// PC differences from GC: the parent of a popped package must still be active (else it is dropped, with a debug
+// print); the "replaced" package/parent of a switch persist across loop iterations (GC: reset per command).
+void FEngine::ProcessPackageCommands()
+{
+    FEPackage *replaced = nullptr;       // PC [esp+0x1C]: package popped by the last switch
+    FEPackage *replacedParent = nullptr; // PC [esp+0x18]: its parent
+    while (FEMinNode *head = mPackageCommands.RemHead()) {
+        auto *c = reinterpret_cast<FEPackageCommand *>(head);
+        int32_t priority = c->mpPackage ? c->mpPackage->mi32Priority : -1;
+        if ((c->mu32Type & 1) && priority >= 0) {
+            FEPackage *pkg = c->mpPackage;
+            if (FEPackage *parent = pkg->mpParent) {
+                bool active = false;
+                for (FEPackage *p = mpPackages; p; p = NextPackage(p))
+                    if (p == parent) { active = true; break; }
+                if (!active) pkg->mpParent = nullptr;   // "FEPC_Pop : Parent of package being popped ... invalid"
+            }
+            if (!(c->mu32Type & 2)) {
+                FEPackage *grand = pkg->mpParent;
+                for (FEPackage *p = mpPackages; p; p = NextPackage(p))
+                    if (p->mpParent == pkg) p->mpParent = grand;
+            } else {
+                replaced = pkg;
+                replacedParent = pkg->mpParent;
+            }
+            if (FEPackage *parent = c->mpPackage->mpParent) parent->SetControlMask(parent->mu32ControlMask | c->mu32Mask);
+            if (!(c->mu32Type & 2))
+                for (FEPackage *p = mpPackages; p; p = NextPackage(p)) p->RestoreControlMaskUsedByInput();
+            bridge::FEngine_UnloadPackage(this, c->mpPackage);
+            --priority;
+        }
+        if ((c->mu32Type & 2) && bridge::cFEngInstance()->FindInLevelSortingList(c->node.mpcName)) {
+            FEPackage *np = bridge::FEngine_PushPackage(this, c->node.mpcName, static_cast<uint8_t>(priority + 1), c->mu32Mask);
+            if (np) {
+                if (!(c->mu32Type & 1) && priority >= 0) {
+                    np->mpParent = c->mpPackage;
+                    c->mpPackage->SetControlMaskOnly(c->mpPackage->mu32ControlMask & ~c->mu32Mask);
+                } else if (c->mu32Type & 1) {
+                    np->mpParent = replacedParent;
+                    for (FEPackage *p = mpPackages; p; p = NextPackage(p))
+                        if (p->mpParent == replaced) p->mpParent = np;
+                }
+            }
+            if (c->mu32Type & 0x10)
+                for (FEPackage *p = mpPackages; p; p = NextPackage(p))
+                    if (p != np) p->SetControlMaskUsedByInputOnly(p->mu32ControlMask & ~c->mu32Mask);
+        }
+        // hand the masked controls from the command's package to `to` (and tell `to`)
+        auto giveBack = [&](FEPackage *to) {
+            FEPackage *pkg = c->mpPackage;
+            const uint32_t m = pkg->mu32ControlMask & c->mu32Mask;
+            pkg->SetControlMask(pkg->mu32ControlMask & ~m);
+            to->SetControlMask(to->mu32ControlMask | m);
+            QueueMessage(0x334C5493u, nullptr, to, reinterpret_cast<FEObject *>(uintptr_t(0xFFFFFFFCu)), c->mu32Mask);
+        };
+        if (c->mu32Type & 4)
+            if (FEPackage *parent = c->mpPackage->mpParent) giveBack(parent);
+        if (c->mu32Type & 8)
+            for (FEPackage *p = mpPackages; p; p = NextPackage(p))
+                if (p->mpParent == c->mpPackage) { giveBack(p); break; }
+        bridge::VirtualScalarDelete(c);
+    }
+}
+
+void FEngine::QueuePackageUserTransfer(FEPackage *pkg, bool flag, uint32_t mask)
+{
+    FEPackageCommand *c = NewPackageCommand(flag ? 8 : 4, pkg->mu32ControlMask & mask, pkg);
+    mPackageCommands.AddTail(&c->node.node);
+}
+
+bool FEngine::RecordPackageMarker(const char *name)
+{
+    if (mu32NumPackageMarkers == 16) return false;
+    std::strcpy(macPackageMarkers[mu32NumPackageMarkers++], name);
+    return true;
+}
+
+void FEngine::ClearPackageMarkers()
+{
+    for (auto &m : macPackageMarkers) m[0] = 0;
+    mu32NumPackageMarkers = 0;
+}
+
+void FEngine::RecordLastPackageButton(uint32_t pkgHash, uint32_t guid)
+{
+    for (auto &b : mLastButtons)
+        if (b.mu32PackageHash == pkgHash) b.mu32PackageHash = 0;
+    mLastButtons[mi32LastButtonIndex] = {pkgHash, guid};
+    mi32LastButtonIndex = (mi32LastButtonIndex + 1) % 32;   // signed modulo like the original
+}
+
+uint32_t FEngine::RecallLastPackageButton(uint32_t pkgHash) const
+{
+    for (const auto &b : mLastButtons)
+        if (b.mu32PackageHash == pkgHash) return b.mu32ButtonGUID;
+    return 0;
+}
+
+// GC 801484AC: the package's own response to the message, if any.
+void FEngine::ProcessGlobalMessage(FEPackage *pkg, uint32_t msg, uint32_t arg)
+{
+    if (FEMessageResponse *r = pkg->FindResponse(msg)) ProcessResponses(r, nullptr, pkg, arg);
+}
+
+// PC 541FC0. Targets: an object -> ProcessObjectMessage; 0 -> every package (global response + listed objects);
+// -4 -> the sender package only (if active); -2 -> every package's global response; -3 -> the sender package's
+// global response; -1 / -5 -> game callbacks (UI vtable +0x18 / +0x1C); -6 -> engine flag 1.
+void FEngine::ProcessMessageQueue()
+{
+    while (FEMinNode *head = mMessages.RemHead()) {
+        auto *n = reinterpret_cast<FEMessageNode *>(head);
+        const uint32_t msg = n->mu32MsgId;
+        if (mbForwardQueuedMessages)
+            bridge::FEUIData_Call5(mpUIData, 0x58, msg, n->mpTarget, n->mpObject, n->mpPackage, n->mu32Arg);
+        const uint32_t target = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(n->mpTarget));
+        auto deliver = [&](FEPackage *p) {
+            ProcessGlobalMessage(p, msg, n->mu32Arg);
+            if (FEMessageTargets *t = p->GetMessageTargets(msg))
+                for (uint32_t i = 0; i < t->mu32Count; ++i)
+                    ProcessObjectMessage(t->mpObjects[i], p, msg, n->mu32Arg);
+        };
+        switch (target) {
+        case 0:
+            for (FEPackage *p = mpPackages; p; p = NextPackage(p)) deliver(p);
+            break;
+        case 0xFFFFFFFCu:
+            for (FEPackage *p = mpPackages; p; p = NextPackage(p))
+                if (p == n->mpPackage) { deliver(p); break; }
+            break;
+        case 0xFFFFFFFAu:
+            if (msg == 0x59BED120u) mbFlag01 = 1;
+            else if (msg == 0x5D4CE32Du) mbFlag01 = 0;
+            break;
+        case 0xFFFFFFFBu:
+            bridge::FEUIData_Call4(mpUIData, 0x1C, msg, n->mpObject, n->mu32Arg, n->mpPackage);
+            break;
+        case 0xFFFFFFFFu:
+            bridge::FEUIData_Call4(mpUIData, 0x18, msg, n->mpObject, n->mu32Arg, n->mpPackage);
+            break;
+        case 0xFFFFFFFEu:
+            for (FEPackage *p = mpPackages; p; p = NextPackage(p)) ProcessGlobalMessage(p, msg, n->mu32Arg);
+            break;
+        case 0xFFFFFFFDu:
+            ProcessGlobalMessage(n->mpPackage, msg, n->mu32Arg);   // no null check, like the original
+            break;
+        default:
+            ProcessObjectMessage(n->mpTarget, n->mpPackage, msg, n->mu32Arg);
+            break;
+        }
+        bridge::VirtualScalarDelete(n);
+    }
+}
+
+namespace {
+// Scroll messages (up/down/left/right as sent by the pad code) -> selection delta.
+bool ScrollDelta(uint32_t msg, int32_t &dx, int32_t &dy)
+{
+    switch (msg) {
+    case 0xE10814A6u: dx = 0; dy = 1; return true;
+    case 0x030471ACu: dx = 1; dy = 0; return true;
+    case 0xE10C4AF9u: dx = -1; dy = 0; return true;
+    case 0xFB814F13u: dx = 0; dy = -1; return true;
+    default: return false;
+    }
+}
+}  // namespace
+
+bool FEngine::ProcessListBoxResponses(FEObject *listBox, FEPackage *, uint32_t msg)
+{
+    int32_t dx, dy;
+    if (!ScrollDelta(msg, dx, dy)) return false;
+    reinterpret_cast<FEListBox *>(listBox)->ScrollSelection(dx, dy);
+    return true;
+}
+
+bool FEngine::ProcessCodeListBoxResponses(FEObject *listBox, FEPackage *, uint32_t msg)
+{
+    int32_t dx, dy;
+    if (!ScrollDelta(msg, dx, dy)) return false;
+    reinterpret_cast<FECodeListBox *>(listBox)->ScrollSelection(dx, dy);
+    return true;
+}
+
+void FEngine::ProcessObjectMessage(FEObject *obj, FEPackage *pkg, uint32_t msg, uint32_t arg)
+{
+    if (obj->mu32Type == 4 && ProcessListBoxResponses(obj, pkg, msg)) return;
+    if (obj->mu32Type == 6 && ProcessCodeListBoxResponses(obj, pkg, msg)) return;
+    if (FEMessageResponse *r = obj->FindResponse(msg)) ProcessResponses(r, obj, pkg, arg);
+}
+
+// PC 52C7C0. Response = {type, param, extra}. Opcodes:
+//   0 run script `param` on obj (time 0)       1 queue message param to target `extra` (GUID, or -4/-1 as is)
+//   2/3 queue message param to the game (-1) / special (-5)
+//   0x100 make GUID `param` the current button (0: none, no notification; missing GUID: ignored)
+//   0x101 engine flag 1 = (param == 1)          0x102 / 0x103 record / recall the package's last button
+//   0x105..0x108 package user transfer           0x200 switch / 0x201 push (control mask) / 0x202 push per arg bit
+//   0x203 pop / 0x204 push (mask 0)               0x2C0..0x2C2 package marker record / recall / clear
+//   0x300 / 0x301 if the current script id is not / is `param`: continue, else jump to the matching branch;
+//   0x500 (else) jumps to the end. The response count is read once (like the original).
+void FEngine::ProcessResponses(FEMessageResponse *resp, FEObject *obj, FEPackage *pkg, uint32_t arg)
+{
+    const uint32_t count = resp->mu32Count;
+    auto special = [](uint32_t v) { return reinterpret_cast<FEObject *>(static_cast<uintptr_t>(v)); };
+    for (uint32_t i = 0; i < count; ++i) {
+        const FEResponse &r = resp->mpResponses[i];
+        const uint32_t param = static_cast<uint32_t>(r.mParam);
+        switch (r.mu32Type) {
+        case 0:
+            if (obj)
+                if (FEScript *s = obj->FindScript(param)) { obj->SetCurrentScript(s); s->mi32Time = 0; }
+            break;
+        case 1: {
+            FEObject *target = special(r.mu32Extra);
+            if (r.mu32Extra != 0xFFFFFFFCu && r.mu32Extra != 0xFFFFFFFFu) target = pkg->FindObjectByGUID(r.mu32Extra);
+            QueueMessage(param, obj, pkg, target, arg);
+            break;
+        }
+        case 2: QueueMessage(param, obj, pkg, special(0xFFFFFFFFu), arg); break;
+        case 3: QueueMessage(param, obj, pkg, special(0xFFFFFFFBu), arg); break;
+        case 0x100: {
+            FEObject *b = param ? pkg->FindObjectByGUID(param) : nullptr;
+            if (b || !param) pkg->SetCurrentButton(this, b, b != nullptr);
+            break;
+        }
+        case 0x101: mbFlag01 = param == 1; break;
+        case 0x102:
+            RecordLastPackageButton(pkg->mu32NameHash, pkg->mpCurrentButton ? pkg->mpCurrentButton->mu32GUID : 0);
+            break;
+        case 0x103: {
+            FEObject *b = nullptr;
+            if (uint32_t guid = RecallLastPackageButton(pkg->mu32NameHash)) b = pkg->FindObjectByGUID(guid);
+            if (!b && param) b = pkg->FindObjectByGUID(param);
+            if (b || !param) pkg->SetCurrentButton(this, b, b != nullptr);
+            break;
+        }
+        case 0x105: QueuePackageUserTransfer(pkg, true, arg); break;
+        case 0x106: QueuePackageUserTransfer(pkg, true, 0xFF); break;
+        case 0x107: QueuePackageUserTransfer(pkg, false, arg); break;
+        case 0x108: QueuePackageUserTransfer(pkg, false, 0xFF); break;
+        case 0x200: QueuePackageSwitch(reinterpret_cast<const char *>(r.mParam), pkg); break;
+        case 0x201: QueuePackagePush(reinterpret_cast<const char *>(r.mParam), pkg, pkg->mu32ControlMask); break;
+        case 0x202:
+            for (uint32_t bit = 0; bit < 8; ++bit)
+                if (arg & (1u << bit)) QueuePackagePush(reinterpret_cast<const char *>(r.mParam), pkg, 1u << bit);
+            break;
+        case 0x203: QueuePackagePop(pkg); break;
+        case 0x204: QueuePackagePush(reinterpret_cast<const char *>(r.mParam), pkg, 0); break;
+        case 0x2C0: RecordPackageMarker(pkg->mpcName); break;
+        case 0x2C1:                                       // RecallPackageMarker (inlined): pop the last name
+            if (const char *m = RecallPackageMarker()) QueuePackageSwitch(m, pkg);
+            break;
+        case 0x2C2: ClearPackageMarkers(); break;
+        case 0x300:
+            if (obj->mpCurrentScript->mu32Id != param) i = resp->FindConditionBranchTarget(i);
+            break;
+        case 0x301:
+            if (obj->mpCurrentScript->mu32Id == param) i = resp->FindConditionBranchTarget(i);
+            break;
+        case 0x500: i = resp->FindConditionBranchTarget(i); break;
+        default: break;
+        }
+    }
+}
+
+namespace {
+// unlink without a membership check (PC: inlined FEMinList::RemNode), then delete through the vtable
+void UnlinkAndDelete(FEMinList &l, FEMinNode *n)
+{
+    l.RemNode(n);
+    bridge::VirtualScalarDelete(n);
+}
+
+// PC callback 0x79AAEC (slot 1 517EE0): back to script 0x1744B3 at time 0, all track flags dirty.
+void ResetToInitialScript(FEObject *o)
+{
+    FEScript *s = o->FindScript(0x1744B3);
+    o->SetCurrentScript(s);
+    s->mi32Time = 0;   // PC: no null check
+    o->mu32Flags |= 0x3C00000;
+}
+template <typename F> void ForEachObject(FEMinNode *head, F f)
+{
+    for (FEMinNode *n = head; n; n = n->next) {
+        auto *o = reinterpret_cast<FEObject *>(n);
+        f(o);
+        if (o->mu32Type == 5) ForEachObject(reinterpret_cast<FEGroup *>(o)->mChildren.head, f);
+    }
+}
+
+bool IsSpecialTarget(const FEObject *t)
+{
+    const auto v = static_cast<int32_t>(reinterpret_cast<intptr_t>(t));
+    return v == 0 || (v >= -6 && v <= -1);
+}
+}  // namespace
+
+void FEngine::AddPackageByPriority(FEPackage *pkg)
+{
+    FEMinList &l = ActiveList();
+    auto *after = reinterpret_cast<FEPackage *>(l.tail);
+    while (after && after->mi32Priority > pkg->mi32Priority) after = reinterpret_cast<FEPackage *>(after->node.prev);
+    l.AddNode(after ? &after->node : nullptr, &pkg->node);
+}
+
+void FEngine::AddToIdleList(FEPackage *pkg) { mIdlePackages.AddTail(&pkg->node); }
+
+const char *FEngine::RecallPackageMarker()
+{
+    if (!mu32NumPackageMarkers) return nullptr;
+    --mu32NumPackageMarkers;
+    return macPackageMarkers[mu32NumPackageMarkers];
+}
+
+void FEngine::SetExecution(bool on)
+{
+    _unknown000 = on;
+    for (FEPackage *p = mpPackages; p; p = reinterpret_cast<FEPackage *>(p->node.next)) p->mbFastInterp = _unknown000;
+}
+
+bool FEngine::ForAllObjects(FEObjectCallback *cb)
+{
+    for (FEPackage *p = mpPackages; p; p = reinterpret_cast<FEPackage *>(p->node.next))
+        if (!p->ForAllObjects(cb)) return false;
+    return true;
+}
+
+void FEngine::SetInitialState()
+{
+    struct { void *vtable; } init = {bridge::FEObjectInitializerVTable()};
+    ForAllObjects(reinterpret_cast<FEObjectCallback *>(&init));
+    for (uint32_t i = 0; i < mu32NumJoyPads; i = static_cast<uint8_t>(i + 1)) mpJoyPads[i].Reset();   // byte counter
+    if (mbMouseEnabled) {   // PC clears +0x00..+0x1D (not the 2 padding bytes)
+        mMouse.mi32X = mMouse.mi32Y = mMouse.mi32Wheel = 0;
+        mMouse.mu16Previous = mMouse.mu16Current = 0;
+        mMouse.mHoldTime[0] = mMouse.mHoldTime[1] = mMouse.mHoldTime[2] = 0;
+        mMouse._unknown1C = 0;
+        mMouse.mbMoved = 0;
+    }
+}
+
+FEPackage *FEngine::FindIdlePackage(const char *name) { return reinterpret_cast<FEPackage *>(FEListFindNode(name, mIdlePackages)); }
+
+void FEngine::SendMessageToGame(uint32_t msg, FEObject *obj, FEPackage *pkg) { bridge::FEngine_SendMessageToGame(this, msg, obj, pkg); }
+
+void FEngine::RemoveFromLibraryList(FEPackage *pkg) { mLibraries.RemNode(&pkg->node); }
+
+FEPackage *FEngine::PushPackage(const char *name, uint8_t priority, uint32_t mask)
+{
+    FEPackage *pkg = FindIdlePackage(name);
+    if (!pkg) {   // try the base name (after the last '/' or '\\'; signed char length like the original)
+        int8_t i = static_cast<int8_t>(std::strlen(name));
+        const char *p = name + i - 1;
+        for (;;) {   // PC 5558B0..5558D7 (may read the byte before the string, like the original)
+            if (*p == '/' || *p == '\\') {
+                if (i != 0) ++p;
+                break;
+            }
+            if (i <= 0) {
+                ++p;
+                break;
+            }
+            --p;
+            --i;
+        }
+        pkg = FindIdlePackage(p);
+    }
+    if (pkg) {
+        pkg->_unknown15[0] = 1;   // +0x15
+        ForEachObject(pkg->mObjects.head, ResetToInitialScript);
+        mIdlePackages.RemNode(&pkg->node);
+    } else {
+        void *buffer;
+        uint8_t freeBuffer;
+        const void *data = bridge::FEGameInterface_GetPackageData(mpUIData, name, &buffer, &freeBuffer);
+        if (!data) return nullptr;
+        pkg = FEngine_LoadPackage(this, data, 0);
+        if (freeBuffer) bridge::FreeArray(buffer);
+        if (!pkg) return nullptr;
+    }
+    pkg->SetControlMask(mask);
+    pkg->mi32Priority = priority;
+    pkg->mbFastInterp = _unknown000;
+    if (mpUIData) bridge::FEGameInterface_LibraryLoaded(mpUIData, pkg);   // interface +0xC: package activated
+    AddPackageByPriority(pkg);
+    return pkg;
+}
+
+bool FEngine::UnloadPackage(FEPackage *pkg)
+{
+    FEMinList &active = ActiveList();
+    FEMinNode *n = active.head;
+    while (n && n != &pkg->node) n = n->next;
+    if (!n) return false;
+    const bool remove = mpUIData ? bridge::FEGameInterface_PackageWillUnload(mpUIData, pkg) : true;
+    active.RemNode(&pkg->node);
+    for (FEMinNode *c = mPackageCommands.head, *next; c; c = next) {
+        next = c->next;
+        if (reinterpret_cast<FEPackageCommand *>(c)->mpPackage == pkg) UnlinkAndDelete(mPackageCommands, c);
+    }
+    for (FEMinNode *m = mMessages.head, *next; m; m = next) {
+        next = m->next;
+        auto *msg = reinterpret_cast<FEMessageNode *>(m);
+        bool drop = msg->mpPackage == pkg;   // "Removing message from package" (debug print stub)
+        if (!drop && !IsSpecialTarget(msg->mpTarget)) drop = pkg->FindObjectByGUID(msg->mpTarget->mu32GUID) != nullptr;
+        if (drop) UnlinkAndDelete(mMessages, m);
+    }
+    if (pkg->_unknown15[0]) {   // +0x15: keep it loaded
+        AddToIdleList(pkg);
+        return true;
+    }
+    for (FEMinNode *r = pkg->mList74.head; r; r = r->next) {
+        FEPackage *lib = FEngine_FindLibraryPackage(this, reinterpret_cast<FENode *>(r)->mu32NameHash);
+        if (!lib) continue;
+        if (lib->mi32Priority - 1 > 0) lib->mi32Priority -= 1;   // library reference count
+        else UnloadLibraryPackage(lib);
+    }
+    pkg->Shutdown(mpUIData);
+    if (remove) bridge::VirtualScalarDelete(pkg);
+    return true;
+}
+
+void FEngine::UnloadLibraryPackage(FEPackage *pkg)
+{
+    if (!bridge::FEGameInterface_CanUnloadLibrary(mpUIData, pkg)) return;   // PC: no null check here
+    RemoveFromLibraryList(pkg);
+    const bool remove = mpUIData ? bridge::FEGameInterface_PackageWillUnload(mpUIData, pkg) : true;
+    pkg->Shutdown(mpUIData);
+    if (remove && pkg) bridge::VirtualScalarDelete(pkg);
+}
+
+void FEJoyPad::Update(uint32_t bits, uint32_t delta)
+{
+    mu32Previous = mu32Current;
+    mu32Current = bits;
+    for (int i = 0; i < 32; ++i) {
+        const uint32_t b = 1u << i;
+        if (!(mu32Current & b)) continue;
+        if (mu32Previous & b) mHoldTime[i] += delta;
+        else mHoldTime[i] = 0;
+    }
+}
+
+void FEMouse::Update(const Info &info, uint32_t delta)
+{
+    mbMoved = info.x != mi32X || info.y != mi32Y;
+    mi32X = info.x;
+    mi32Y = info.y;
+    mi32Wheel = info.wheel;
+    mu16Previous = mu16Current;
+    mu16Current = info.buttons;
+    for (int i = 0; i < 3; ++i) {
+        const uint32_t b = 1u << i;
+        if (!(mu16Current & b)) continue;
+        if (mu16Previous & b) mHoldTime[i] += delta;
+        else mHoldTime[i] = 0;
+    }
+}
+
+void FEngine::Update(uint32_t delta, uint32_t wholeStep)
+{
+    if (mbForwardQueuedMessages) bridge::FEGameInterface_BeginUpdate(mpUIData);   // +0x5251: interface +0x5C
+    auto updateObjects = [&](uint32_t step) {
+        for (auto *pkg = reinterpret_cast<FEPackage *>(ActiveList().head), *next = pkg; pkg; pkg = next) {
+            next = reinterpret_cast<FEPackage *>(pkg->node.next);
+            pkg->mpEngine = this;
+            pkg->mi32ScriptDelta = static_cast<int32_t>(step);
+            for (FEMinNode *o = pkg->mObjects.head; o; o = o->next) pkg->UpdateObject(reinterpret_cast<FEObject *>(o), static_cast<int32_t>(step));
+        }
+    };
+    if (_unknown000) {
+        if (mbFlag01) {
+            mu32ButtonsToRelease = 0;
+            if (mbMouseEnabled) {
+                FEMouse::Info info;
+                bridge::FEGameInterface_GetMouseInfo(mpUIData, &info);
+                mMouse.Update(info, delta);
+            }
+            for (uint8_t i = 0; i < mu32NumJoyPads; ++i)
+                mpJoyPads[i].Update(bridge::FEGameInterface_GetJoyPadBits(mpUIData, i), delta);
+            for (auto *pkg = reinterpret_cast<FEPackage *>(ActiveList().head); pkg; pkg = reinterpret_cast<FEPackage *>(pkg->node.next)) {
+                ProcessPadsForPackage(pkg);
+                if (mbMouseEnabled) ProcessMouseForPackage(pkg);
+            }
+            for (int k = 0; k < 19; ++k) {
+                if (mu32ButtonsToRelease & (1u << k))
+                    for (uint8_t p = 0; p < mu32NumJoyPads; ++p) {
+                        uint32_t &h = mpJoyPads[p].mHoldTime[k];
+                        h = h > mReleaseTime[k] ? h - mReleaseTime[k] : 0;
+                    }
+                mReleaseTime[k] = 0;
+            }
+            _unknown02C = _unknown030;
+        }
+        if (_unknown000) {
+            uint32_t remaining = delta;
+            do {
+                const uint32_t step = (wholeStep == 0 && static_cast<int32_t>(remaining) > 20) ? 20 : remaining;
+                bridge::SetHoldDirtyFlags(_unknown5250 ? 0u : 0xFFFFFFFFu);
+                updateObjects(step);
+                ProcessMessageQueue();
+                ProcessPackageCommands();
+                if (mMessages.head) ProcessMessageQueue();
+                remaining -= step;
+                _unknown5250 = 0;
+            } while (remaining != 0);
+        } else {
+            updateObjects(delta);
+        }
+    } else {
+        updateObjects(delta);
+    }
+    if (mbForwardQueuedMessages) bridge::FEGameInterface_EndUpdate(mpUIData);   // interface +0x60
+}
+
+const uint32_t kFEPadPressedHash[19] = {0, 0, 0, 0, 0x406415E3, 0x911AB364, 0xB5AF2461, 0x5073EF13, 0xD9FEEC59, 0xC519BFBF,
+    0xC519BFC0, 0xC519BFC1, 0xC519BFC2, 0xC519BFC3, 0xC519BFC4, 0xC519BFC5, 0xC519BFC6, 0xC519BFC7, 0xC519BFC8};
+const uint32_t kFEPadHeldHash[2] = {0x447315AF, 0x20AD4EB5};
+const uint32_t kFEPadReleasedHash[19] = {0, 0, 0, 0, 0xC12E9E27, 0xC2F8FCC8, 0xEBFCDA65, 0x091DCD57, 0x7A39195D, 0xD4671F83,
+    0xD871B0A4, 0xDC7C41C5, 0xE086D2E6, 0xE4916407, 0xE89BF528, 0xECA68649, 0xF0B1176A, 0xF4BBA88B, 0xF8C639AC};
+
+FEObject *FEngine::FindObject(uint32_t nameHash, const char *package)
+{
+    if (package) {
+        auto *pkg = reinterpret_cast<FEPackage *>(FEListFindNode(package, reinterpret_cast<FENode *>(ActiveList().head)));
+        return pkg ? pkg->FindObjectByHash(nameHash) : nullptr;
+    }
+    for (auto *pkg = reinterpret_cast<FEPackage *>(ActiveList().head); pkg; pkg = reinterpret_cast<FEPackage *>(pkg->node.next))
+        if (FEObject *o = pkg->FindObjectByHash(nameHash)) return o;
+    return nullptr;
+}
+
+bool FEngine::IsInputMessage(uint32_t msg)
+{
+    if (!msg) return false;
+    for (uint32_t h : kFEPadPressedHash) if (msg == h) return true;
+    for (uint32_t h : kFEPadHeldHash) if (msg == h) return true;
+    for (uint32_t h : kFEPadReleasedHash) if (msg == h) return true;
+    return msg == 0x0C407210u || msg == 0x936A6A7Fu;
+}
+
+uint32_t FEJoyPad::HeldFor(uint32_t mask) const
+{
+    uint32_t r = 0xFFFFFFFFu;
+    for (int i = 0; i < 32; ++i)
+        if ((mask & (1u << i)) && mHoldTime[i] <= r) r = mHoldTime[i];
+    return r;
+}
+
+namespace {
+// direction table (PC 0x7F7CFC): buttons a [and b], direction index into kDirHash (PC 0x7F7C90)
+struct DirEntry { uint8_t a, b; uint16_t dir; };
+const DirEntry kDirs[8] = {{0, 2, 7}, {0, 3, 1}, {1, 2, 5}, {1, 3, 3}, {0, 0xFF, 0}, {2, 0xFF, 6}, {1, 0xFF, 4}, {3, 0xFF, 2}};
+const uint32_t kDirHash[8] = {0x72619778, 0x6FD81B16, 0xB5971BF1, 0xAB1A49C9, 0x911C0A4B, 0x79891376, 0x9120409E, 0x6FFB6F23};
+}  // namespace
+
+void FEngine::ProcessPadsForPackage(FEPackage *pkg)
+{
+    if (!pkg->mu32InputControlMask) return;
+    bool any = false;
+    for (uint8_t p = 0; p < mu32NumJoyPads; ++p)
+        if (pkg->mu32InputControlMask & (1u << p)) any |= (mpJoyPads[p].mu32Current | mpJoyPads[p].mu32Previous) != 0;
+    if (!any) return;
+    uint32_t held[19] = {};
+    uint8_t pressedPads[19] = {}, releasedPads[19] = {}, heldPads[19] = {};
+    // queue msg for an object that answers it (to the object, then to -5), else for the package (-3 and -5)
+    auto send = [&](uint32_t msg, FEObject *btn, uint32_t pads) {
+        if (btn && btn->FindResponse(msg)) {
+            QueueMessage(msg, nullptr, pkg, btn, pads);
+            QueueMessage(msg, btn, pkg, reinterpret_cast<FEObject *>(intptr_t{-5}), pads);
+        } else if (pkg->FindResponse(msg)) {
+            QueueMessage(msg, nullptr, pkg, reinterpret_cast<FEObject *>(intptr_t{-3}), pads);
+            QueueMessage(msg, nullptr, pkg, reinterpret_cast<FEObject *>(intptr_t{-5}), pads);
+        }
+    };
+    auto scan = [&](uint32_t k, uint32_t bit, uint32_t &pressed, uint32_t *released, uint32_t &heldBits) {
+        const uint32_t mask = pkg->mu32InputControlMask;
+        for (uint8_t p = 0; p < mu32NumJoyPads; ++p) {
+            if (!(mask & (1u << p))) continue;
+            const FEJoyPad &pad = mpJoyPads[p];
+            const uint8_t pb = static_cast<uint8_t>(1u << p);
+            if (pad.WasPressed(bit)) { pressed |= bit; pressedPads[k] |= pb; }
+            if (released && pad.WasReleased(bit)) { *released |= bit; releasedPads[k] |= pb; }
+            if (pad.WasHeld(bit)) {
+                heldBits |= bit;
+                const uint32_t h = pad.HeldFor(bit);
+                held[k] = held[k] > h ? held[k] : pad.HeldFor(bit);
+                heldPads[k] |= pb;
+            }
+        }
+    };
+    // phase 1: buttons 4..18
+    for (uint32_t k = 4; k < 19 && mbFlag01; ++k) {
+        const uint32_t bit = 1u << k;
+        uint32_t pressed = 0, released = 0, heldBits = 0;
+        scan(k, bit, pressed, &released, heldBits);
+        if (k == 4 && pkg->_unknown15[2]) {   // +0x17: pad bit 6 counts as button 4
+            const uint32_t mask = pkg->mu32InputControlMask;
+            for (uint8_t p = 0; p < mu32NumJoyPads; ++p) {
+                if (!(mask & (1u << p))) continue;
+                const FEJoyPad &pad = mpJoyPads[p];
+                const uint8_t pb = static_cast<uint8_t>(1u << p);
+                if (pad.WasPressed(0x40)) { pressed |= bit; pressedPads[4] |= pb; }
+                if (pad.WasReleased(0x40)) { released |= bit; releasedPads[4] |= pb; }
+                if (pad.WasHeld(0x40)) {
+                    heldBits |= bit;
+                    const uint32_t h = pad.HeldFor(0x40);
+                    held[4] = held[4] > h ? held[4] : pad.HeldFor(0x40);
+                    heldPads[4] |= pb;
+                }
+            }
+        }
+        if (!(pressed | released | heldBits)) continue;
+        FEObject *btn = pkg->mbFlagsAC[2] ? pkg->mpCurrentButton : nullptr;   // +0xAE
+        if (k == 4) {
+            if (pressed & 0x10) {
+                mPressedButton[4] = btn;
+                if (btn && btn->FindResponse(0x0C407210u)) {
+                    QueueMessage(0x0C407210u, nullptr, pkg, pkg->mpCurrentButton, pressedPads[4]);
+                    QueueMessage(0x0C407210u, pkg->mpCurrentButton, pkg, reinterpret_cast<FEObject *>(intptr_t{-5}), pressedPads[4]);
+                } else if (pkg->FindResponse(0x406415E3u)) {
+                    QueueMessage(0x406415E3u, nullptr, pkg, reinterpret_cast<FEObject *>(intptr_t{-3}), pressedPads[4]);
+                    QueueMessage(0x406415E3u, nullptr, pkg, reinterpret_cast<FEObject *>(intptr_t{-5}), pressedPads[4]);
+                }
+            }
+        } else {
+            if ((k == 7 || k == 8) && (heldBits & bit)) send(kFEPadHeldHash[k - 7], btn, pressedPads[k]);   // sic: pressed pads
+            if (pressed & bit) {
+                mPressedButton[k] = btn;
+                send(kFEPadPressedHash[k], btn, pressedPads[k]);
+            }
+        }
+        if (released & bit) {
+            uint32_t msg = kFEPadReleasedHash[k];
+            const uint32_t pads = releasedPads[k];
+            if (mPressedButton[k] == btn && btn) {
+                mPressedButton[k] = nullptr;
+                if (k == 4) msg = 0x936A6A7Fu;
+                if (btn->FindResponse(msg)) {
+                    QueueMessage(msg, nullptr, pkg, btn, pads);
+                    QueueMessage(msg, btn, pkg, reinterpret_cast<FEObject *>(intptr_t{-5}), pads);
+                }
+            }
+            if (pkg->FindResponse(msg)) {   // the package hears releases too
+                QueueMessage(msg, nullptr, pkg, reinterpret_cast<FEObject *>(intptr_t{-3}), pads);
+                QueueMessage(msg, nullptr, pkg, reinterpret_cast<FEObject *>(intptr_t{-5}), pads);
+            }
+        }
+        if (mMessages.count) ProcessMessageQueue();
+    }
+    // phase 2: directions 0..3 (pressed and held only)
+    uint32_t pressedDirs = 0;
+    for (uint32_t k = 0; k < 4 && mbFlag01; ++k) {
+        uint32_t heldBits = 0;
+        scan(k, 1u << k, pressedDirs, nullptr, heldBits);
+    }
+    // phase 3: direction messages with repeat, button navigation
+    for (uint32_t e = 0; e < 8 && mbFlag01; ++e) {
+        const DirEntry &d = kDirs[e];
+        FEObject *cur = pkg->mpCurrentButton;
+        uint32_t hold, wasPressed, pads;
+        if (d.b != 0xFF) {
+            hold = held[d.a] < held[d.b] ? held[d.a] : held[d.b];
+            wasPressed = (pressedDirs >> d.a) & (pressedDirs >> d.b);
+            pads = (pressedPads[d.b] & pressedPads[d.a]) | (heldPads[d.b] & heldPads[d.a]);
+        } else {
+            hold = held[d.a];
+            wasPressed = pressedDirs >> d.a;
+            pads = pressedPads[d.a] | heldPads[d.a];
+        }
+        wasPressed &= 1;
+        const uint32_t bit = 1u << e;
+        const uint32_t threshold = (_unknown02C & bit) ? 120u : 320u;
+        bool fire;
+        if (hold >= threshold) {
+            if (hold) _unknown030 |= bit;
+            fire = true;
+        } else if (wasPressed) {
+            fire = hold == 0;
+        } else {
+            if (hold == 0) _unknown030 &= ~bit;
+            fire = false;
+        }
+        if (!fire) {
+            if (mMessages.count) ProcessMessageQueue();
+            continue;
+        }
+        mReleaseTime[d.a] = threshold;
+        if (d.b != 0xFF) mReleaseTime[d.b] = threshold;
+        held[d.a] = 0;
+        mu32ButtonsToRelease |= 1u << d.a;
+        if (d.b != 0xFF) {
+            held[d.b] = 0;
+            mu32ButtonsToRelease |= 1u << d.b;
+        }
+        const uint32_t msg = kDirHash[d.dir];
+        if (!cur) {
+            if (pkg->FindResponse(msg)) {
+                QueueMessage(msg, nullptr, pkg, reinterpret_cast<FEObject *>(intptr_t{-3}), pads);
+                QueueMessage(msg, nullptr, pkg, reinterpret_cast<FEObject *>(intptr_t{-5}), pads);
+            }
+            return;
+        }
+        FEObject *next = nullptr;
+        FEMessageResponse *r = cur->FindResponse(msg);
+        if (r) {
+            QueueMessage(msg, nullptr, pkg, cur, pads);
+            if (!(cur->mu32Flags & 0x80000)) {
+                uint32_t i = 0;
+                while (i < r->mu32Count && r->mpResponses[i].mu32Type != 0x104) ++i;
+                if (i >= r->mu32Count)   // no explicit "move to" response: navigate
+                    next = reinterpret_cast<const FEButtonMap *>(&pkg->mppButtons)->GetButtonFrom(cur, d.dir, mpUIData, mu32ButtonMapArg);
+            }
+        } else {
+            if (!(cur->mu32Flags & 0x80000))
+                next = reinterpret_cast<const FEButtonMap *>(&pkg->mppButtons)->GetButtonFrom(cur, d.dir, mpUIData, mu32ButtonMapArg);
+            QueueMessage(msg, nullptr, pkg, reinterpret_cast<FEObject *>(intptr_t{-3}), pads);
+        }
+        QueueMessage(msg, cur, pkg, reinterpret_cast<FEObject *>(intptr_t{-5}), pads);
+        if (!next) return;
+        for (uint32_t k = 4; k < 19; ++k) {   // the selection moves: pending presses are released on the old button
+            if (!mPressedButton[k]) continue;
+            mPressedButton[k] = nullptr;
+            const uint32_t m2 = k == 4 ? 0x936A6A7Fu : kFEPadReleasedHash[k];
+            if (cur->FindResponse(m2)) {
+                QueueMessage(m2, nullptr, pkg, cur, releasedPads[k]);
+                QueueMessage(m2, cur, pkg, reinterpret_cast<FEObject *>(intptr_t{-5}), releasedPads[k]);
+            }
+        }
+        if (pkg->mpCurrentButton) {
+            QueueMessage(0x55D1E635u, nullptr, pkg, pkg->mpCurrentButton, 0);
+            QueueMessage(0x55D1E635u, pkg->mpCurrentButton, pkg, reinterpret_cast<FEObject *>(intptr_t{-5}), 0);
+        }
+        QueueMessage(0xABC08912u, nullptr, pkg, next, 0);
+        QueueMessage(0xABC08912u, next, pkg, reinterpret_cast<FEObject *>(intptr_t{-5}), 0);
+        pkg->mpCurrentButton = next;
+        return;
+    }
+}
+
+void FEngine::ProcessMouseForPackage(FEPackage *pkg)
+{
+    if (!(pkg->mu32InputControlMask & 1) || !mbFlag01) return;
+    const float x = static_cast<float>(mMouse.mi32X), y = static_cast<float>(mMouse.mi32Y);
+    FEObject *const m3 = reinterpret_cast<FEObject *>(intptr_t{-3}), *const m5 = reinterpret_cast<FEObject *>(intptr_t{-5});
+    for (uint32_t i = 0; i < 2 && mbFlag01; ++i) {
+        const uint16_t bit = static_cast<uint16_t>(1u << i);
+        const bool now = (mMouse.mu16Current & bit) == bit, before = (mMouse.mu16Previous & bit) == bit;
+        // (both down: the original calls FEMouse::HeldFor 50B150 and drops the result)
+        FEObject *btn = pkg->mpCurrentButton;
+        if (now && !before) {
+            if (i == 0) {
+                mPressedButton[4] = btn;
+                if (btn && btn->FindResponse(0x0C407210u) && bridge::FEGameInterface_IsPointInObject(mpUIData, x, y, btn) == 1) {
+                    QueueMessage(0x0C407210u, nullptr, pkg, pkg->mpCurrentButton, 1);
+                    QueueMessage(0x0C407210u, pkg->mpCurrentButton, pkg, m5, 1);
+                } else if (pkg->FindResponse(0x406415E3u) && pkg->mbFlagsAC[0]) {   // PC-only package gate +0xAC
+                    QueueMessage(0x406415E3u, nullptr, pkg, m3, 1);
+                    QueueMessage(0x406415E3u, nullptr, pkg, m5, 1);
+                }
+            } else {
+                if (btn && btn->FindResponse(0x14DD0705u) && bridge::FEGameInterface_IsPointInObject(mpUIData, x, y, btn) == 1) {
+                    QueueMessage(0x14DD0705u, nullptr, pkg, btn, 1);
+                    QueueMessage(0x14DD0705u, btn, pkg, m5, 1);
+                } else if (pkg->FindResponse(0x14DD0705u) && pkg->mbFlagsAC[1]) {   // PC-only package gate +0xAD
+                    QueueMessage(0x14DD0705u, nullptr, pkg, m3, 1);
+                    QueueMessage(0x14DD0705u, nullptr, pkg, m5, 1);
+                }
+            }
+        }
+        if (!now && before && i == 0) {
+            if (mPressedButton[4] == btn && btn) {
+                mPressedButton[4] = nullptr;
+                if (btn->FindResponse(0x936A6A7Fu)) {
+                    QueueMessage(0x936A6A7Fu, nullptr, pkg, btn, 1);
+                    QueueMessage(0x936A6A7Fu, btn, pkg, m5, 1);
+                }
+            }
+            if (pkg->FindResponse(0x936A6A7Fu)) {
+                QueueMessage(0x936A6A7Fu, nullptr, pkg, m3, 1);
+                QueueMessage(0x936A6A7Fu, nullptr, pkg, m5, 1);
+            }
+        }
+        if (mMessages.count) ProcessMessageQueue();
+    }
+    // hover selection: after a move, the first selectable button under the pointer becomes current
+    if (!mMouse.mbMoved) return;
+    if (!pkg->mbFlagsAC[3] && bridge::TextInputFocused()) return;   // PC only
+    FEObject *cur = pkg->mpCurrentButton;
+    if (!cur || bridge::FEGameInterface_IsPointInObject(mpUIData, x, y, cur) == 1) return;
+    FEObject *next = nullptr;
+    for (uint32_t n = pkg->mu32NumButtons, i = 0; i < n; ++i) {
+        FEObject *o = pkg->mppButtons[i];
+        if (o->mu32Flags & 0x4000000) continue;
+        if (bridge::FEGameInterface_IsPointInObject(mpUIData, x, y, o)) { next = o; break; }
+    }
+    if (!next) return;
+    for (uint32_t k = 4; k < 19; ++k) {   // pending presses are released on the old button
+        if (!mPressedButton[k]) continue;
+        mPressedButton[k] = nullptr;
+        const uint32_t msg = k == 4 ? 0x936A6A7Fu : kFEPadReleasedHash[k];
+        if (cur->FindResponse(msg)) {
+            QueueMessage(msg, nullptr, pkg, cur, 1);
+            QueueMessage(msg, cur, pkg, m5, 1);
+        }
+    }
+    if (pkg->mpCurrentButton) {
+        QueueMessage(0x55D1E635u, nullptr, pkg, pkg->mpCurrentButton, 0);
+        QueueMessage(0x55D1E635u, pkg->mpCurrentButton, pkg, m5, 0);
+    }
+    QueueMessage(0xABC08912u, nullptr, pkg, next, 0);
+    QueueMessage(0xABC08912u, next, pkg, m5, 0);
+    pkg->mpCurrentButton = next;
+}
+
+void FEJoyPad::DecrementHold(uint32_t mask, uint32_t amount)
+{
+    for (int i = 0; i < 32; ++i)
+        if (mask & (1u << i)) mHoldTime[i] = amount < mHoldTime[i] ? mHoldTime[i] - amount : 0;
+}
+
+uint32_t FEMouse::HeldFor(uint16_t mask) const
+{
+    // raw words from +0x10 like the original (indices 3..15 lie in the owning FEngine)
+    const uint32_t *w = reinterpret_cast<const uint32_t *>(reinterpret_cast<const uint8_t *>(this) + 0x10);
+    uint32_t best = 0xFFFFFFFFu;
+    for (int i = 0; i < 16; ++i)
+        if ((mask >> i & 1) && w[i] <= best) best = w[i];
+    return best;
+}

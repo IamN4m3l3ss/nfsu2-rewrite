@@ -70,6 +70,17 @@ NFSU2_X87_BIN(sub, fsubp)  // a - b
 NFSU2_X87_BIN(mul, fmulp)
 NFSU2_X87_BIN(div, fdivp)  // a / b
 #undef NFSU2_X87_BIN
+inline X sqrt(const X& a) {  // fsqrt
+    X r;
+    const uint8_t* pa = a.b;
+    __asm {
+        mov eax, pa
+        fld tbyte ptr [eax]
+        fsqrt
+        fstp tbyte ptr [r]
+    }
+    return r;
+}
 inline int32_t ftol(const X& a) {  // _ftol2: truncate toward zero, low 32 bits
     int64_t r;
     const uint8_t* pa = a.b;

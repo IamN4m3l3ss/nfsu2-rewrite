@@ -40,6 +40,29 @@ Because the core and the rewrite reload themselves, you can keep driving while t
 4. **Switch it on** — in the running game. If anything feels off, it can be switched back instantly.
 5. **Count it** — marked *verified* in `docs/symbols.csv`; the tracker updates from that.
 
+### Who does what
+
+- **You** decide what to work on and do the quick checks only a person can (does the car still handle right, does
+  the screen look right).
+- **Claude Code** plans and drives the work. It writes the hard functions itself (maths, physics, anything with
+  tricky floating point), builds the tools, checks the results, switches rewrites on and commits.
+- **The local model** (Qwen 3.6 35B through Ollama on your RX 9070 XT) does the bulk drafting of small, simple
+  functions, so Claude's usage limits go further. It runs unattended:
+
+  ```
+  .venv/bin/python tools/re/llm/llm_batch.py work/llm_core_list.txt --max 30
+  ```
+
+  For each function the script shows the model the machine code and two worked examples
+  (`tools/re/llm/example*.cpp`). The model writes the C++ rewrite plus its diff test, the script compiles it,
+  reloads it into the running game and runs the test. Compile errors or mismatches go back to the model, up to
+  3 tries. Only drafts whose test passes are kept (`game/systems/<system>/llm/`); nothing is switched on
+  automatically. Claude reviews the passed ones, switches them on and records them. Progress: `work/llm/log.txt`,
+  results `work/llm/passed.txt`. The diff test is the referee, so a wrong draft can't slip through, it just fails.
+  The Ollama server must be running (`OLLAMA_MODELS=/mnt/m2drive/ollama/models ollama serve`).
+- **Menu rewrites from nfsu2-gcpc** get proven by scripted menu walks instead (`tools/game/fe_boot_ab.py`): the
+  game boots twice with the original code and once with the rewrites, and every menu object must match.
+
 ## Everyday commands
 
 Everything goes through one script in the project folder (`./nfsu2` alone lists them all):

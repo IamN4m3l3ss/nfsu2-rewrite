@@ -3,7 +3,7 @@
 Rebuilding **Need for Speed: Underground 2** (PC, 2004, NA v1.2) as our own C++ code, one function at a time,
 while the original game keeps running.
 
-![progress](docs/progress.svg?v=865-2026-11-15)
+![progress](docs/progress.svg?v=879-2026-11-16)
 
 **→ Full lists of what's done and what isn't: [PROGRESS.md](PROGRESS.md)**
 

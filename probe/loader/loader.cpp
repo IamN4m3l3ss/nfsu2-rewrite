@@ -302,7 +302,46 @@ HRESULT STDMETHODCALLTYPE hk_Present(IDirect3DDevice9* dev, const RECT* src, con
     return o_Present(dev, src, dst, wnd, dirty);
 }
 
+// ---------------------------------------------------------------- mod: borderless window at the desktop size
+// (NFSU2_BORDERLESS=1; an optional layer, never part of a rewrite). The game picks its size from a 6-entry table
+// (GetRacingResolution 0x5BF610, stdcall(int* w, int* h), index 0x870D1C: 640x480 .. 1600x1200); here it gets the
+// monitor's size, the device is created windowed and the window becomes a WS_POPUP covering the monitor, so
+// alt-tab is an ordinary window switch. 3D aspect and the 4:3 UI layout are separate stages.
+bool g_borderless = false;
+int g_desk_w = 0, g_desk_h = 0;
+using GetRes_t = void(__stdcall*)(int*, int*);
+GetRes_t o_GetRacingResolution = nullptr;
+void __stdcall hk_GetRacingResolution(int* w, int* h) {
+    *w = g_desk_w;
+    *h = g_desk_h;
+}
+void borderless_params(D3DPRESENT_PARAMETERS* pp) {
+    if (!g_borderless || !pp) return;
+    pp->Windowed = TRUE;
+    pp->FullScreen_RefreshRateInHz = 0;
+    pp->BackBufferWidth = static_cast<UINT>(g_desk_w);
+    pp->BackBufferHeight = static_cast<UINT>(g_desk_h);
+}
+void borderless_window(HWND wnd) {
+    if (!g_borderless || !wnd) return;
+    SetWindowLongA(wnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
+    SetWindowLongA(wnd, GWL_EXSTYLE, 0);
+    SetWindowPos(wnd, HWND_TOP, 0, 0, g_desk_w, g_desk_h, SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+}
+void borderless_init() {
+    const char* e = std::getenv("NFSU2_BORDERLESS");
+    g_borderless = e && *e == '1';
+    if (!g_borderless) return;
+    g_desk_w = GetSystemMetrics(SM_CXSCREEN);
+    g_desk_h = GetSystemMetrics(SM_CYSCREEN);
+    MH_STATUS s = MH_CreateHook(reinterpret_cast<void*>(0x005BF610), reinterpret_cast<void*>(&hk_GetRacingResolution),
+                                reinterpret_cast<void**>(&o_GetRacingResolution));
+    if (s == MH_OK) s = MH_EnableHook(reinterpret_cast<void*>(0x005BF610));
+    logf("borderless: %dx%d, resolution hook %s", g_desk_w, g_desk_h, MH_StatusToString(s));
+}
+
 HRESULT STDMETHODCALLTYPE hk_Reset(IDirect3DDevice9* dev, D3DPRESENT_PARAMETERS* pp) {
+    borderless_params(pp);
     probe::ResetHook h = g_reset_hook.load();
     if (h) h(0);  // core releases its D3D objects (overlay) before the reset
     HRESULT hr = o_Reset(dev, pp);
@@ -313,7 +352,9 @@ HRESULT STDMETHODCALLTYPE hk_Reset(IDirect3DDevice9* dev, D3DPRESENT_PARAMETERS*
 
 HRESULT STDMETHODCALLTYPE hk_CreateDevice(IDirect3D9* d3d, UINT adapter, D3DDEVTYPE type, HWND focus, DWORD flags,
                                           D3DPRESENT_PARAMETERS* pp, IDirect3DDevice9** out) {
+    borderless_params(pp);
     HRESULT hr = o_CreateDevice(d3d, adapter, type, focus, flags, pp, out);
+    if (SUCCEEDED(hr)) borderless_window((pp && pp->hDeviceWindow) ? pp->hDeviceWindow : focus);
     logf("CreateDevice hr=%08lx focus=%p %ux%u fmt=%d windowed=%d msaa=%d swap=%d interval=%x", hr, focus,
          pp ? pp->BackBufferWidth : 0, pp ? pp->BackBufferHeight : 0, pp ? pp->BackBufferFormat : 0,
          pp ? pp->Windowed : -1, pp ? pp->MultiSampleType : -1, pp ? pp->SwapEffect : -1,
@@ -426,6 +467,7 @@ void init(HMODULE self) {
                               reinterpret_cast<void**>(&o_WndProc));
         if (s == MH_OK) s = MH_EnableHook(MH_ALL_HOOKS);
         logf("loader hooks (Direct3DCreate9, WndProc keep_active=%d): %s", g_keep_active.load(), MH_StatusToString(s));
+        borderless_init();
     } else {
         logf("ERROR: unsupported SPEED2.EXE build: no hooks; the core still loads for read-only diagnostics");
     }

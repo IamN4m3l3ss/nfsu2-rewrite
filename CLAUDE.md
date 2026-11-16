@@ -52,13 +52,17 @@ Our replacement code must match MSVC's ABI exactly where it touches game objects
 **Graphics/input/audio:** Direct3D 9 (`Direct3DCreate9` is the only D3D import; the rest goes through vtables),
 D3DX9 statically linked into the exe, DirectInput 8, DirectSound.
 
-**The user's game folder** (project copy: `/mnt/m2drive/Games/Need for Speed - Underground 2`) is a repack with an
-ASI loader (`dinput8.dll`, Ultimate ASI Loader), DXVK 3.1 (`d3d9.dll`) and `scripts/`: `NFSU2ExtraOptions.asi`,
-`NFSU2HDContentSupport.asi`, `NFSUnderground2.WidescreenFix.asi`. **These are required (user decision, 13 Nov 2026)**:
-WidescreenFix's `NoOpticalDriveFix` bypasses "please insert disc 2", and the data has an HD UI that needs
-HDContentSupport (without it, menu text is garbled). Always run with the full `scripts/` set plus our probe.
-They patch game code, so when mapping a function, check whether one of them hooks it (compare bytes against the exe
-on disk). `tools/game/run_game.sh` runs from a symlink copy in `work/profile/`, so the user's folder is never written to.
+**The user's game folder** (`/mnt/m2drive/Games/Need for Speed - Underground 2`) is a CLEAN install since 16 Nov 2026
+(user decision; replaces the 13 Nov "mods required" setup): only the ASI loader (`dinput8.dll`, Ultimate ASI Loader)
+and our probe; same SPEED2.EXE hash. No WidescreenFix/HDContentSupport/ExtraOptions, no game-folder DXVK. DXVK 3.1.1
+lives in our Wine prefix instead (`syswow64/d3d9.dll`; Wine's own kept as `d3d9.dll.wine-builtin`).
+"Please insert Disc 2" (0x5C0D30) is skipped without patching: the game accepts an empty file named `foobar` in its
+working directory, which `run_game.sh` creates in `work/profile/`. Saves made with the mods are rejected by the clean
+game (empty load list; Enter there crashes the original - Esc goes to the main menu): a fresh career is needed.
+Things the mods used to do come back as our probe's own optional layer (never inside rewrites): borderless window at
+the desktop size (`NFSU2_BORDERLESS=1`, default in run_game.sh, `--fullscreen` off; loader hooks GetRacingResolution
+0x5BF610 + CreateDevice/Reset windowed + WS_POPUP), then 3D aspect, 4:3 UI layout, intro skip. Reference for which code
+to touch: ThirteenAG's FusionFix sources (read only, write our own). `tools/re/modcheck.py` still works if mods return.
 
 **Floating point (measured 14 Nov 2026):** on the game thread the x87 control word is `0x007F` — 24-bit (single)
 precision, round to nearest, exceptions masked (D3D9 default); MXCSR `0x1FA0`. So x87 `+ - * / fsqrt` round like

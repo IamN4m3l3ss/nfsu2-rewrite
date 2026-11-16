@@ -9,9 +9,9 @@
 # --freeroam then drives the menus into Explore Mode with injected keys (tools/game/boot_freeroam.py, needs a save).
 #
 # The game runs from work/profile: a symlink copy of GAME_DIR, so the user's folder is never written to.
-# Every ASI in GAME_DIR/scripts/ is linked in: the user's mod set is REQUIRED to run the game properly
-# (WidescreenFix = no-disc fix, HDContentSupport = HD UI textures in the data). Our probe, when built,
-# is copied next to them.
+# GAME_DIR is a clean install (16 Nov 2026): only the ASI loader (dinput8.dll) plus our probe, no mods. Any ASI the user
+# puts in GAME_DIR/scripts/ is still linked in. "Please insert Disc 2" (0x5C0D30) is satisfied without patching: the
+# game skips the prompt when a file named "foobar" exists in its working directory, so the profile gets an empty one.
 #
 # Exit codes: 0 ok, 2 bad args/config, 3 exe hash mismatch, 4 game did not start, 5 probe/frames not ready,
 #             6 game survived --kill, 7 --freeroam failed. A game that is already running is killed first.
@@ -50,6 +50,7 @@ while [[ $# -gt 0 ]]; do
     --no-probe) wait_probe=0; shift ;;
     --freeroam) freeroam=1; shift ;;
     --no-traffic) export NFSU2_NO_TRAFFIC=1; shift ;;
+    --fullscreen) export NFSU2_BORDERLESS=0; shift ;;
     --timeout) probe_timeout="$2"; shift 2 ;;
     --kill)
       kill_game || { echo "game still running after kill" >&2; exit 6; }
@@ -74,8 +75,11 @@ build_profile() {
     ln -s "$entry" "$PROFILE_DIR/$name"
   done
   for entry in "$GAME_DIR"/scripts/*; do
+    [[ -e "$entry" ]] || continue  # empty scripts/ (clean install)
     ln -s "$entry" "$PROFILE_DIR/scripts/$(basename "$entry")"
   done
+  # disc-2 check fallback (see header): an empty "foobar" next to the exe
+  [[ -e "$PROFILE_DIR/foobar" ]] || : > "$PROFILE_DIR/foobar"
   if [[ -f "$ROOT/out/nfsu2_probe.asi" ]]; then
     cp -f "$ROOT/out/nfsu2_probe.asi" "$PROFILE_DIR/scripts/"
   fi
@@ -91,6 +95,8 @@ log="$LOG_DIR/game_$(date +%Y%m%d_%H%M%S).log"
 ln -sfn "$log" "$LOG_DIR/game_latest.log"
 
 export WINEDLLOVERRIDES="dinput8=n,b;d3d9=n,b"
+# borderless window at the desktop size (our probe's optional mod layer); --fullscreen turns it off
+export NFSU2_BORDERLESS="${NFSU2_BORDERLESS:-1}"
 # The loader (scripts/nfsu2_probe.asi) loads the core straight from the build output and reloads it whenever
 # out/nfsu2_core.dll changes: rebuild while the game runs.
 if [[ -f "$ROOT/out/nfsu2_core.dll" ]]; then

@@ -834,3 +834,23 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   buffer in its own stack frame and crashes (tests keep vectors short; game formats are). 3x10,000 random formats
   0 mismatches; live ~550 calls/s; HUD and pause menu normal. 791 verified.
 
+## 2026-11-15/16 — Bigger batches: zMisc, physics, generated accessors (+374)
+
+**Changed**
+- `misc/misc1.cpp` (21) + `misc/misc2.cpp` (8): easter eggs, joystick lookups, pause state, cubic curves, timer
+  rounding, splines, replay data movers / event lists, bit writer, running average, null file driver.
+- `physics/trivial1.cpp` (45) + `trivial2.cpp` (14): rigid/collision body accessors, state copies, collision
+  enable/query, idling, drive wheels, yaw, velocity, impulse energy, engine derivative. Table-driven tests on random
+  object graphs (pointers compared as (block, offset)).
+- `game/framework/x87.h`: shared x87 primitives (fld/fild/add/sub/mul/div/fsqrt/ftol/fcom on 80-bit values) for
+  the cases plain float can't match: fild of ints above 2^24, products past float range, denormal inputs, a callee's
+  unrounded st0 (found by the tests: random-bit floats hit them).
+- `tools/re/gen_accessors.py` + `game/framework/accessors.h`: every function in the exe whose whole body is one exact
+  accessor pattern (field / global getter, constant, movsx/movzx getter, setter) -> generated rewrite + generic test.
+  293 generated (mod check: none touch patched code), 287 hooked (6 are too short for a hook jump with no padding
+  after them; skipped). `tools/re/promote.py`: enable + record a hand-written file's rewrites.
+
+**Verified**
+- Every batch: 10,000+ random cases per test, 0 mismatches, plus a _BROKEN self-check caught. Accessors: 7 x 10,000.
+- 1,166 verified, 1,165 on; driving (170 km/h) and the HUD normal with everything on.
+

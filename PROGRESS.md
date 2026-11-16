@@ -29,17 +29,177 @@ Size of each system = functions in EA's matching source files of the GameCube bu
 
 | System | Verified | Size | Done | Status |
 |---|---:|---:|---:|---|
-| **Core utilities** — Strings 22, Maths 50, Memory 16, Lists & pools 49 | 137 | 216 (zBWare) | 63% | 🟡 in progress |
-| **Files & data loading** — File layer 41, Resource files 12, Chunks 7, misc 317 | 377 | 629 (filesys, syncfile, FSasync, zMisc) | 60% | 🟡 in progress |
-| **Frontend / menus** — Menu engine (FEng) 585 | 585 | 3,826 (zFe, zFe2) | 15% | 🟡 in progress |
-| **Camera** — Camera 8 | 8 | 322 (zCamera) | 2% | 🟡 in progress |
-| **Car physics & handling** — physics 59 | 59 | 738 (zPhysics) | 8% | 🟡 in progress |
-| **World streaming** — loading Bayview around the player | 0 | 1,494 (zWorld, zWorld2, zTrack) | 0% | ⬜ not started |
-| **AI racers & traffic** — opponents, traffic cars | 0 | 1,190 (zAI) | 0% | ⬜ not started |
-| **Audio** — engine sounds, music, effects | 0 | 1,808 (zEAXSound) | 0% | ⬜ not started |
+| **Core utilities** — Strings 22, Maths 50, Memory 16, Lists & pools 50 | 138 | 216 (zBWare) | 64% | 🟡 in progress |
+| **Files & data loading** — File layer 41, Resource files 12, Chunks 7, misc 135 | 195 | 629 (filesys, syncfile, FSasync, zMisc) | 31% | 🟡 in progress |
+| **Frontend / menus** — Menu engine (FEng) 603 | 603 | 3,826 (zFe, zFe2) | 16% | 🟡 in progress |
+| **Camera** — Camera 13 | 13 | 322 (zCamera) | 4% | 🟡 in progress |
+| **Car physics & handling** — physics 61 | 61 | 738 (zPhysics) | 8% | 🟡 in progress |
+| **World streaming** — world 6 | 6 | 1,494 (zWorld, zWorld2, zTrack) | 0% | 🟡 in progress |
+| **AI racers & traffic** — ai 39 | 39 | 1,190 (zAI) | 3% | 🟡 in progress |
+| **Audio** — audio 111 | 111 | 1,808 (zEAXSound) | 6% | 🟡 in progress |
 | **Rendering** — last: the future port boundary (size: rough estimate) | 0 | 305 (zPlatform (GameCube)) | 0% | ⬜ not started |
 
 ## Done (verified)
+
+### ai — 39
+
+| Address | Function | Signature |
+|---|---|---|
+| `0x00405BA0` | **DriftDriver__GetDesiredSpeed** | `ACC_FLD: fld dword ptr [ecx + 0x22c] ; ret` |
+| `0x00405BB0` | **DriftDriver__GetDesiredTimeToSpeed** | `ACC_FLDG: fld dword ptr [0x7844c0] ; ret` |
+| `0x00408380` | **RaceCarController__GetNumberOfRoutesToUs** | `ACC_GETG: mov eax, dword ptr [0x88d218] ; ret` |
+| `0x00408C70` | **TrafficController__GetLookaheadTime** | `ACC_FLDG: fld dword ptr [0x783b80] ; ret` |
+| `0x00408DD0` | **TrafficController__GetMinLifetimeForGetU** | `ACC_FLDG: fld dword ptr [0x783628] ; ret` |
+| `0x0040A240` | **RealController__GetLookaheadTime** | `ACC_FLDG: fld dword ptr [0x783c38] ; ret` |
+| `0x0040BDE0` | **StreamingTrafficCarManager__GetDummyRide** | `ACC_LEA: lea eax, [ecx + 0x10] ; ret` |
+| `0x0040CA90` | **AIGoalWinDragRace__GetName** | `ACC_CONST: mov eax, 0x784820 ; ret` |
+| `0x0040CAD0` | **AIGoalSteerPlayerInDragRace__GetName** | `ACC_CONST: mov eax, 0x784880 ; ret` |
+| `0x0040CB10` | **AIGoalBeTrafficCar__GetName** | `ACC_CONST: mov eax, 0x7848f0 ; ret` |
+| `0x0040CB50` | **AIGoalBeCrossTrafficCar__GetName** | `ACC_CONST: mov eax, 0x784950 ; ret` |
+| `0x0040CB60` | **AIGoalBeCrossTrafficCar__GetSpeedLimit** | `ACC_FLDG: fld dword ptr [0x7845a4] ; ret 4` |
+| `0x0040DAB0` | **AIGoalRollingStart__GetSpeedLimit** | `ACC_FLD: fld dword ptr [ecx + 0x18] ; ret 4` |
+| `0x0040DDD0` | **AIGoalRollingRoadblock__GetSpeedLimit** | `ACC_FLDG: fld dword ptr [0x7847c8] ; ret 4` |
+| `0x0040FFF0` | **PsychoDriver__GetDesiredSpeed** | `ACC_FLD: fld dword ptr [ecx + 0x230] ; ret` |
+| `0x00410000` | **PsychoDriver__GetDesiredTimeToSpeed** | `ACC_FLD: fld dword ptr [ecx + 0x234] ; ret` |
+| `0x00410420` | **RealDriver__SetJoystickPort** | `ACC_SET32: mov eax, dword ptr [esp + 4] ; mov dword ptr [ecx + 0x2ac], eax ; ret 4` |
+| `0x00410460` | **RealDriver__GetPort** | `ACC_GET32: mov eax, dword ptr [ecx + 0x2ac] ; ret` |
+| `0x00418560` | **RealController__GetFuturePoints** | `ACC_LEA: lea eax, [ecx + 0x68] ; ret` |
+| `0x0041BE90` | **AICarController__GetFuturePoints** | `ACC_GET32: mov eax, dword ptr [ecx + 0x6e8] ; ret` |
+| `0x0041E780` | **TrafficController__GetSkillLevel** | `ACC_SX8: movsx eax, byte ptr [ecx + 0x799] ; ret` |
+| `0x004235D0` | **AIActionJustDrive__GetName** | `ACC_CONST: mov eax, 0x7856a8 ; ret` |
+| `0x004236D0` | **AIActionPass__GetName** | `ACC_CONST: mov eax, 0x7856fc ; ret` |
+| `0x00423960` | **AIActionBlock__GetName** | `ACC_CONST: mov eax, 0x78574c ; ret` |
+| `0x00423C20` | **AIActionPullOver__GetName** | `ACC_CONST: mov eax, 0x785778 ; ret` |
+| `0x00423CB0` | **AIActionGetUnstuck__GetName** | `ACC_CONST: mov eax, 0x7857a8 ; ret` |
+| `0x00423D70` | **AIActionIJustGotHit__GetName** | `ACC_CONST: mov eax, 0x7857d8 ; ret` |
+| `0x00424200` | **AIActionAccidentRecovery__GetName** | `ACC_CONST: mov eax, 0x78580c ; ret` |
+| `0x004242C0` | **AIActionDriveTrafficLane__GetName** | `ACC_CONST: mov eax, 0x785844 ; ret` |
+| `0x004244B0` | **AIActionAvoidAvoidable__GetName** | `ACC_CONST: mov eax, 0x78587c ; ret` |
+| `0x00424600` | **AIActionIJustGotHitDragRace__GetName** | `ACC_CONST: mov eax, 0x7858b0 ; ret` |
+| `0x004249B0` | **AIActionHitWallDragRace__GetName** | `ACC_CONST: mov eax, 0x7858f8 ; ret` |
+| `0x00424B30` | **AIActionStopDriving__GetName** | `ACC_CONST: mov eax, 0x785940 ; ret` |
+| `0x00424C00` | **AIActionAvoidAvoidableAsTraffic__GetName** | `ACC_CONST: mov eax, 0x785974 ; ret` |
+| `0x00425140` | **AIActionObeyTrafficIntersections__GetNam** | `ACC_CONST: mov eax, 0x7859b4 ; ret` |
+| `0x004255C0` | **AIActionPickRouteToAvoidAnimation__GetNa** | `ACC_CONST: mov eax, 0x7859f8 ; ret` |
+| `0x00425620` | **AIActionDriveAtOffset__GetName** | `ACC_CONST: mov eax, 0x785a3c ; ret` |
+| `0x00425670` | **AIActionRollingRoadblock__GetName** | `ACC_CONST: mov eax, 0x785a70 ; ret` |
+| `0x00425850` | **AIActionRollingStart__GetName** | `ACC_CONST: mov eax, 0x784b48 ; ret` |
+
+### audio — 111
+
+| Address | Function | Signature |
+|---|---|---|
+| `0x00458E60` | **EAXAITunerCar__GetStateName** | `ACC_GETG: mov eax, dword ptr [0x7ecb3c] ; ret` |
+| `0x00458FE0` | **EAXTunerCar__GetStateInfo** | `ACC_CONST: mov eax, 0x7ecb68 ; ret` |
+| `0x00458FF0` | **EAXTunerCar__GetStateName** | `ACC_GETG: mov eax, dword ptr [0x7ecb6c] ; ret` |
+| `0x00459390` | **EAXCar__GetStateInfo** | `ACC_CONST: mov eax, 0x7ecb28 ; ret` |
+| `0x004593A0` | **EAXCar__GetStateName** | `ACC_GETG: mov eax, dword ptr [0x7ecb2c] ; ret` |
+| `0x0045BAA0` | **SndBase__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed138 ; ret` |
+| `0x0045BAB0` | **SndBase__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed13c] ; ret` |
+| `0x0045BAE0` | **SFXCTL_Skid__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed244 ; ret` |
+| `0x0045BAF0` | **SFXCTL_Skid__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed248] ; ret` |
+| `0x0045C050` | **SFXCTL_3DRightWheelPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed27c ; ret` |
+| `0x0045C060` | **SFXCTL_3DRightWheelPos__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed280] ; ret` |
+| `0x0045C070` | **SFXCTL_3DLeftWheelPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed28c ; ret` |
+| `0x0045C080` | **SFXCTL_3DLeftWheelPos__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed290] ; ret` |
+| `0x0045C0C0` | **SFXCTL_Shifting__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed2a8] ; ret` |
+| `0x0045C480` | **SFXCTL_AIShifting__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed2b8] ; ret` |
+| `0x0045C4B0` | **SFXCTL_Engine__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed2c4 ; ret` |
+| `0x0045C4C0` | **SFXCTL_Engine__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed2c8] ; ret` |
+| `0x0045C530` | **SFXCTL_Engine__GetEngRPM** | `ACC_FLD: fld dword ptr [ecx + 0x128] ; ret` |
+| `0x0045C540` | **SFXCTL_Engine__GetEngTorque** | `ACC_FLD: fld dword ptr [ecx + 0x130] ; ret` |
+| `0x0045CE00` | **SFXCTL_HybridMotor__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed2e4 ; ret` |
+| `0x0045CE10` | **SFXCTL_HybridMotor__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed2e8] ; ret` |
+| `0x0045D1F0` | **SFXCTL_Physics__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed2f4 ; ret` |
+| `0x0045D200` | **SFXCTL_Physics__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed2f8] ; ret` |
+| `0x0045D3D0` | **SFXCTL_AIPhysics__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed304 ; ret` |
+| `0x0045D3E0` | **SFXCTL_AIPhysics__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed308] ; ret` |
+| `0x0045DC40` | **SFXCTL_3DTunnelPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed324 ; ret` |
+| `0x0045DCE0` | **SFXCTL_3DColPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed348 ; ret` |
+| `0x0045DCF0` | **SFXCTL_3DColPos__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed34c] ; ret` |
+| `0x0045DD00` | **SFXCTL_3DScrapePos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed358 ; ret` |
+| `0x0045DD10` | **SFXCTL_3DScrapePos__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed35c] ; ret` |
+| `0x0045DD20` | **SFXCTL_3DCarPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed368 ; ret` |
+| `0x0045DD30` | **SFXCTL_3DCarPos__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed36c] ; ret` |
+| `0x0045DD40` | **SFXCTL_3DObjPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed26c ; ret` |
+| `0x0045DD50` | **SFXCTL_3DObjPos__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed270] ; ret` |
+| `0x0045E1D0` | **SFXCTL_3DObjPos__AssignPositionVector** | `ACC_SET32: mov eax, dword ptr [esp + 4] ; mov dword ptr [ecx + 0x70], eax ; ret 4` |
+| `0x0045E1E0` | **SFXCTL_3DObjPos__AssignDirectionVector** | `ACC_SET32: mov eax, dword ptr [esp + 4] ; mov dword ptr [ecx + 0x74], eax ; ret 4` |
+| `0x0045E410` | **SFX_Common__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed380 ; ret` |
+| `0x0045E420` | **SFX_Common__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed384] ; ret` |
+| `0x0045E630` | **CARSFX_Shift__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed394 ; ret` |
+| `0x0045E640` | **CARSFX_Shift__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed398] ; ret` |
+| `0x0045EAC0` | **CARSFX_Turbo__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed3a8 ; ret` |
+| `0x0045EAD0` | **CARSFX_Turbo__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed3ac] ; ret` |
+| `0x0045F1C0` | **CARSFX_Nitrous__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed3b8 ; ret` |
+| `0x0045F1D0` | **CARSFX_Nitrous__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed3bc] ; ret` |
+| `0x0045F690` | **CARSFX_SparkChatter__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed3c8 ; ret` |
+| `0x0045F6A0` | **CARSFX_SparkChatter__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed3cc] ; ret` |
+| `0x0045FA20` | **CARSFX_RoadNoise__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed3dc ; ret` |
+| `0x0045FA30` | **CARSFX_RoadNoise__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed3e0] ; ret` |
+| `0x0045FCF0` | **SFXCTL_3DLeftWindPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed3f0 ; ret` |
+| `0x0045FD50` | **SFXCTL_3DRightWindPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed400 ; ret` |
+| `0x0045FDB0` | **CARSFX_WindNoise__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed410 ; ret` |
+| `0x0045FDC0` | **CARSFX_WindNoise__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed414] ; ret` |
+| `0x00460660` | **CARSFX_WindWeather__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed420 ; ret` |
+| `0x00460670` | **CARSFX_WindWeather__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed424] ; ret` |
+| `0x004607F0` | **CARSFX_Skids__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed430 ; ret` |
+| `0x00460800` | **CARSFX_Skids__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed434] ; ret` |
+| `0x00461040` | **CARSFX_AIEngine__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed444 ; ret` |
+| `0x00461050` | **CARSFX_AIEngine__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed448] ; ret` |
+| `0x00461470` | **CARSFX_PlayerEngine__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed454 ; ret` |
+| `0x00461480` | **CARSFX_PlayerEngine__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed458] ; ret` |
+| `0x00461590` | **CARSFX_Hydraulics__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed464 ; ret` |
+| `0x004615A0` | **CARSFX_Hydraulics__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed468] ; ret` |
+| `0x00461730` | **CARSFX_Rain__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed474 ; ret` |
+| `0x00461740` | **CARSFX_Rain__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed478] ; ret` |
+| `0x004619E0` | **CARSFX_DriveBy__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed488] ; ret` |
+| `0x00461A60` | **SFXCTL_3DWooshPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed494 ; ret` |
+| `0x00461AC0` | **SFXObj_Collision__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed4a4 ; ret` |
+| `0x00461AD0` | **SFXObj_Collision__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed4a8] ; ret` |
+| `0x00461E80` | **SFXObj_Woosh__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed4b8] ; ret` |
+| `0x00461F90` | **SFXObj_Music__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed4c8] ; ret` |
+| `0x00461FB0` | **SFXObj_Ambience__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed4d8] ; ret` |
+| `0x00461FD0` | **SFXObj_Speech__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed4e8] ; ret` |
+| `0x00461FF0` | **SFXObj_Movies__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed4f8] ; ret` |
+| `0x00462000` | **SFXObj_NISStream__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed504 ; ret` |
+| `0x00462010` | **SFXObj_NISStream__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed508] ; ret` |
+| `0x00462040` | **SFXObj_FEHUD__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed518] ; ret` |
+| `0x00462050` | **CARSFX_TrafficEngine__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed524 ; ret` |
+| `0x00462060` | **CARSFX_TrafficEngine__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed528] ; ret` |
+| `0x00462440` | **SFXCTL_3DTrafficPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed534 ; ret` |
+| `0x00462450` | **SFXCTL_3DTrafficPos__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed538] ; ret` |
+| `0x00462460` | **CARSFX_TrafficHorn__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed544 ; ret` |
+| `0x00462470` | **CARSFX_TrafficHorn__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed548] ; ret` |
+| `0x00462630` | **CARSFX_TrafficWoosh__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed554 ; ret` |
+| `0x00462640` | **CARSFX_TrafficWoosh__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed558] ; ret` |
+| `0x004626F0` | **CARSFX_BottomOut__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed56c] ; ret` |
+| `0x00462760` | **CARSFX_TrafficBottomOut__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed57c] ; ret` |
+| `0x00462790` | **SFXObj_Plane__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed588 ; ret` |
+| `0x004627A0` | **SFXObj_Plane__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed58c] ; ret` |
+| `0x004627B0` | **SFXCTL_3DEnviroObjPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed598 ; ret` |
+| `0x00462FA0` | **SFXObj_Train__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed5a8 ; ret` |
+| `0x00462FB0` | **SFXObj_Train__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed5ac] ; ret` |
+| `0x00462FC0` | **SFXCTL_3DTrainObjPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed5b8 ; ret` |
+| `0x00463270` | **SFXObj_Reverb__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed5c8 ; ret` |
+| `0x00463280` | **SFXObj_Reverb__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed5cc] ; ret` |
+| `0x004634E0` | **CARSFX_Stereo__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed63c ; ret` |
+| `0x004634F0` | **CARSFX_Stereo__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed640] ; ret` |
+| `0x00463770` | **CARSFX_TrafficStereo__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed650] ; ret` |
+| `0x004637A0` | **SFXCTL_3DFountainPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed65c ; ret` |
+| `0x00463810` | **SFXObj_Fountain__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed670] ; ret` |
+| `0x00463AC0` | **EAXTunerCar__Play** | `ACC_CONST: xor eax, eax ; ret 4` |
+| `0x004643F0` | **CSTATE_Plane__GetStateInfo** | `ACC_CONST: mov eax, 0x7ed67c ; ret` |
+| `0x00464400` | **CSTATE_Plane__GetStateName** | `ACC_GETG: mov eax, dword ptr [0x7ed680] ; ret` |
+| `0x004645F0` | **CSTATE_Train__GetStateName** | `ACC_GETG: mov eax, dword ptr [0x7ed788] ; ret` |
+| `0x004649C0` | **CSTATE_Base__GetStateInfo** | `ACC_CONST: mov eax, 0x7ecb48 ; ret` |
+| `0x00464BA0` | **CSTATE_Base__ConnectCar** | `ACC_SET32: mov eax, dword ptr [esp + 4] ; mov dword ptr [ecx + 0x30], eax ; ret 4` |
+| `0x00464DA0` | **CSTATE_Collision__GetStateName** | `ACC_GETG: mov eax, dword ptr [0x7ed8cc] ; ret` |
+| `0x00464E20` | **CSTATE_Main__GetStateName** | `ACC_GETG: mov eax, dword ptr [0x7ed8dc] ; ret` |
+| `0x004674C0` | **NFSMixCtl__GetScaleID** | `ACC_GET32: mov eax, dword ptr [ecx + 0x10] ; ret` |
+| `0x004674D0` | **NFSMixCtl__SetScalePtr** | `ACC_SET32: mov eax, dword ptr [esp + 4] ; mov dword ptr [ecx + 0x20], eax ; ret 4` |
+| `0x004796F0` | **EAXCar__GetDriverInfo** | `ACC_GET32: mov eax, dword ptr [ecx + 0x74] ; ret` |
+| `0x00479700` | **EAXCar__GetEngineUpgradeLevel** | `ACC_GET32: mov eax, dword ptr [ecx + 0x94] ; ret` |
 
 ### Chunks — 7
 
@@ -135,7 +295,7 @@ Size of each system = functions in EA's matching source files of the GameCube bu
 | `0x0043FBC0` | **bVSPrintf** | `int __cdecl(char* dst, const char* fmt, va_list)` |
 | `0x004400D0` | **bSPrintf** | `int __cdecl(char* dst, const char* fmt, ...)` |
 
-### Lists & pools — 49
+### Lists & pools — 50
 
 | Address | Function | Signature |
 |---|---|---|
@@ -156,6 +316,7 @@ Size of each system = functions in EA's matching source files of the GameCube bu
 | `0x0043CDF0` | **SlotPool::Free** | `void __thiscall(void* slot)` |
 | `0x0043E060` | **SpeedScript::~SpeedScript** | `thiscall` |
 | `0x0043E0A0` | **SpeedScript::ResizeEntryTable** | `void thiscall(int n) (knowledge.db: AddEntry)` |
+| `0x0043E120` | **SpeedScript::ParseNextWord** | `bool __stdcall(char* out, const char* text, int size, int* pos, int* line)` |
 | `0x0043E200` | **SpeedScript::Init** | `void thiscall(const char* name, const char* text, int size)` |
 | `0x0043E430` | **SpeedScript::GetNextCommand** | `char* thiscall() any command (unnamed in knowledge.db)` |
 | `0x0043E4A0` | **SpeedScript::GetNextCommand** | `char* thiscall(const char* name)` |
@@ -189,7 +350,7 @@ Size of each system = functions in EA's matching source files of the GameCube bu
 | `0x00440EC0` | **bPNode::Malloc** | `void* __cdecl()` |
 | `0x00440EF0` | **bPNode::Free** | `void __cdecl(void*)` |
 
-### Camera — 8
+### Camera — 13
 
 | Address | Function | Signature |
 |---|---|---|
@@ -199,7 +360,12 @@ Size of each system = functions in EA's matching source files of the GameCube bu
 | `0x00441270` | **Noise** | `nfsu2-gcpc rewrite` |
 | `0x004412E0` | **Camera::FovRelativeAngle** | `nfsu2-gcpc rewrite` |
 | `0x00441340` | **Camera::ApplyNoise** | `nfsu2-gcpc rewrite` |
+| `0x00444180` | **CameraMover__MinDistToWall** | `ACC_FLDG: fld dword ptr [0x787090] ; ret` |
 | `0x00447280` | **Camera::SetCameraMatrix** | `nfsu2-gcpc rewrite` |
+| `0x0044B220` | **OrbitCarCameraMover__GetCarToFollow** | `ACC_GET32: mov eax, dword ptr [ecx + 0xb0] ; ret` |
+| `0x0044BA70` | **RearViewMirrorCameraMover___RearViewMirr** | `ACC_GET32: mov eax, dword ptr [ecx + 0x2c] ; ret` |
+| `0x0044C240` | **TrackCarCameraMover__GetCarToFollow** | `ACC_GET32: mov eax, dword ptr [ecx + 0x438] ; ret` |
+| `0x0044DE80` | **CubicCameraMover__GetPovType** | `ACC_GET32: mov eax, dword ptr [ecx + 0x4c] ; ret` |
 | `0x0044F5A0` | **Camera::Camera** | `nfsu2-gcpc rewrite` |
 
 ### File layer — 41
@@ -248,11 +414,18 @@ Size of each system = functions in EA's matching source files of the GameCube bu
 | `0x006F87C5` | **FILESYS_sizesync** | `int __cdecl(int filehandle, int priority)` |
 | `0x006F87EA` | **FILESYS_existssync** | `bool32 __cdecl(const char* name, int priority)` |
 
-### Menu engine (FEng) — 585
+### Menu engine (FEng) — 603
 
 | Address | Function | Signature |
 |---|---|---|
+| `0x00408CD0` | **FEToggleWidget__DetermineSoundTrigger** | `ACC_CONST: mov eax, 2 ; ret` |
+| `0x0040CA50` | **FEInputWidget__DetermineSoundTrigger** | `ACC_CONST: mov eax, 3 ; ret` |
+| `0x0040CB20` | **FESliderWidget__DetermineSoundTrigger** | `ACC_CONST: mov eax, 1 ; ret` |
+| `0x0040CBB0` | **FEButtonWidget__DetermineSoundTrigger** | `ACC_CONST: mov eax, 4 ; ret` |
+| `0x00423560` | **FEDateWidget__GetHeaderText** | `ACC_CONST: mov eax, 0x783fe5 ; ret` |
+| `0x00430660` | **SCMagazineDatabase__GetNumMagazineSetups** | `ACC_GET32: mov eax, dword ptr [ecx + 8] ; ret` |
 | `0x0043BE60` | **bList::GetNode** | `nfsu2-gcpc rewrite` |
+| `0x0045D300` | **FESliderWidget__GetValue** | `ACC_FLD: fld dword ptr [ecx + 0x84] ; ret` |
 | `0x00495570` | **FEngGetObjectColor packed** | `nfsu2-gcpc rewrite` |
 | `0x004956A0` | **FEString::~FEString** | `nfsu2-gcpc rewrite` |
 | `0x004957B0` | **cSlider scalar dtor** | `nfsu2-gcpc rewrite` |
@@ -332,6 +505,7 @@ Size of each system = functions in EA's matching source files of the GameCube bu
 | `0x004A78B0` | **CarViewer::ShowCarScreen** | `nfsu2-gcpc rewrite` |
 | `0x004A7BC0` | **PauseMenu::OkToHandleInput** | `nfsu2-gcpc rewrite` |
 | `0x004A7F70` | **UIPauseOptions::ReadyToExit** | `nfsu2-gcpc rewrite` |
+| `0x004AE9B0` | **FEWidget__SetPosY** | `ACC_SET32: mov eax, dword ptr [esp + 4] ; mov dword ptr [ecx + 0x10], eax ; ret 4` |
 | `0x004AE9C0` | **FEButtonWidget::SetPos** | `nfsu2-gcpc rewrite` |
 | `0x004AEA10` | **FEWidget scalar dtor** | `nfsu2-gcpc rewrite` |
 | `0x004AEB70` | **IconOption scalar dtor** | `nfsu2-gcpc rewrite` |
@@ -379,6 +553,8 @@ Size of each system = functions in EA's matching source files of the GameCube bu
 | `0x004B7C40` | **POTrannyPrompt::Act** | `nfsu2-gcpc rewrite` |
 | `0x004B7C90` | **POTrannyPrompt::Draw** | `nfsu2-gcpc rewrite` |
 | `0x004B7CD0` | **UIOptionsScreen::SetupPlayer** | `nfsu2-gcpc rewrite` |
+| `0x004BA370` | **FEDateWidget__DetermineSoundTrigger** | `ACC_CONST: mov eax, 6 ; ret` |
+| `0x004BF980` | **FEStatWidget__DetermineSoundTrigger** | `ACC_CONST: mov eax, 5 ; ret` |
 | `0x004C0050` | **cPostRaceScreenManager::NeedToSeePostRaceTournamentResults** | `nfsu2-gcpc rewrite` |
 | `0x004C00C0` | **cPostRaceScreenManager::NeedToSeePostRaceTournamentStandings** | `nfsu2-gcpc rewrite` |
 | `0x004C2100` | **CarViewer::SetLookAtPart** | `nfsu2-gcpc rewrite` |
@@ -426,7 +602,10 @@ Size of each system = functions in EA's matching source files of the GameCube bu
 | `0x004FF530` | **cSlider::Draw** | `nfsu2-gcpc rewrite` |
 | `0x004FF550` | **cSlider::SetCurValue** | `nfsu2-gcpc rewrite` |
 | `0x004FF590` | **ThreeStageSlider::Update** | `nfsu2-gcpc rewrite` |
+| `0x004FF970` | **GetCurrentLanguage** | `ACC_GETG: mov eax, dword ptr [0x7f70d0] ; ret` |
 | `0x004FF980` | **WideToCharString** | `nfsu2-gcpc rewrite` |
+| `0x00500070` | **GetNumPerformancePackages** | `ACC_GETG: mov eax, dword ptr [0x8383fc] ; ret` |
+| `0x00500F90` | **CareerWallet__GetBalance** | `ACC_GET32: mov eax, dword ptr [ecx] ; ret` |
 | `0x005026F0` | **QuickRaceSettings::GetNumPlayers** | `nfsu2-gcpc rewrite` |
 | `0x00502710` | **QuickRaceSettings::GetNumOpponents** | `nfsu2-gcpc rewrite` |
 | `0x00502730` | **QuickRaceSettings::GetAISkill** | `nfsu2-gcpc rewrite` |
@@ -561,6 +740,7 @@ Size of each system = functions in EA's matching source files of the GameCube bu
 | `0x0050D2A0` | **FEngMapJoyParamToJoyport** | `nfsu2-gcpc rewrite` |
 | `0x0050D2D0` | **FEngMapPortToControlMask** | `nfsu2-gcpc rewrite` |
 | `0x0050D460` | **FEWidget::DetermineSound** | `nfsu2-gcpc rewrite` |
+| `0x0050D510` | **FEWidget__DetermineSoundTrigger** | `ACC_CONST: xor eax, eax ; ret` |
 | `0x0050D530` | **FEButtonWidget::Show** | `nfsu2-gcpc rewrite` |
 | `0x0050D550` | **FEButtonWidget::Hide** | `nfsu2-gcpc rewrite` |
 | `0x0050D570` | **FEStatWidget::Show** | `nfsu2-gcpc rewrite` |
@@ -584,6 +764,7 @@ Size of each system = functions in EA's matching source files of the GameCube bu
 | `0x0050DCB0` | **CTextScroller::FindEND** | `nfsu2-gcpc rewrite` |
 | `0x0050FE90` | **GetNameHashForTuningType** | `nfsu2-gcpc rewrite (ECX/EDX preserved)` |
 | `0x0050FFB0` | **GetUnitsHashForTuningType** | `nfsu2-gcpc rewrite` |
+| `0x00510040` | **GetCurrentDynoMenuName** | `ACC_GETG: mov eax, dword ptr [0x83a650] ; ret` |
 | `0x00510120` | **TuningSlidersMenu::GetTipHash** | `nfsu2-gcpc rewrite` |
 | `0x00510C30` | **MagazineViewer::GetCurrentMode** | `nfsu2-gcpc rewrite` |
 | `0x00510EB0` | **CarTunePauseScreen::NotifySoundMessage** | `nfsu2-gcpc rewrite` |
@@ -699,6 +880,7 @@ Size of each system = functions in EA's matching source files of the GameCube bu
 | `0x0051E9E0` | **FEInputWidget::FEInputWidget** | `nfsu2-gcpc rewrite` |
 | `0x0051EA90` | **FEInputWidget::Disable** | `nfsu2-gcpc rewrite` |
 | `0x0051EB60` | **FEInputWidget::SetInputFocus** | `nfsu2-gcpc rewrite` |
+| `0x0051EC00` | **FEDateWidget__GetMaxYear** | `ACC_CONST: mov eax, 0x7df ; ret` |
 | `0x0051EC90` | **FEInputWidget::Enable** | `nfsu2-gcpc rewrite` |
 | `0x0051ED60` | **FEInputWidget::UnsetFocus** | `nfsu2-gcpc rewrite` |
 | `0x0051F670` | **IconOption::IconOption** | `nfsu2-gcpc rewrite` |
@@ -834,6 +1016,8 @@ Size of each system = functions in EA's matching source files of the GameCube bu
 | `0x00555EB0` | **FEngShowPackageModal** | `nfsu2-gcpc rewrite` |
 | `0x00555F10` | **FEngShowPackage** | `nfsu2-gcpc rewrite` |
 | `0x00555F50` | **FEngPushPackageSpecial** | `nfsu2-gcpc rewrite` |
+| `0x00570A70` | **MenuScreen__NotifySoundMessage** | `ACC_CONST: xor eax, eax ; ret 0x14` |
+| `0x005B9680` | **cFrontendDatabase__GetUserProfileSaveSiz** | `ACC_CONST: mov eax, 0x43e ; ret` |
 | `0x005BB1C0` | **ePoly::ePoly** | `nfsu2-gcpc rewrite` |
 | `0x006F45B0` | **FEngFindGlyph (bsearch)** | `nfsu2-gcpc rewrite` |
 | `0x006F45F0` | **FEngFontData::GetKerning** | `nfsu2-gcpc rewrite` |
@@ -859,12 +1043,11 @@ Size of each system = functions in EA's matching source files of the GameCube bu
 | `0x00440540` | **bWareFree** | `void __cdecl(void* p)` |
 | `0x00440820` | **bMalloc** | `void* __cdecl(int size, int flags)` |
 
-### misc — 317
+### misc — 135
 
 | Address | Function | Signature |
 |---|---|---|
 | `0x004017E0` | **MenuCarInstance__Get_10_2E0** | `ACC_LEA: lea eax, [ecx + 0x2f0] ; ret` |
-| `0x00401890` | **Car__IsActive** | `ACC_LEA: lea eax, [ecx + 0x60] ; ret` |
 | `0x004018A0` | **FUN_004018a0** | `ACC_LEA: lea eax, [ecx + 0x70] ; ret` |
 | `0x004018B0` | **FUN_004018b0** | `ACC_LEA: lea eax, [ecx + 0x90] ; ret` |
 | `0x00401D30` | **FUN_00401d30** | `ACC_FLDG: fld dword ptr [0x7d7d3c] ; ret 4` |
@@ -873,206 +1056,43 @@ Size of each system = functions in EA's matching source files of the GameCube bu
 | `0x00405B30` | **FUN_00405b30** | `ACC_GET32: mov eax, dword ptr [ecx + 0x1e8] ; ret` |
 | `0x00405B40` | **FUN_00405b40** | `ACC_SET32: mov eax, dword ptr [esp + 4] ; mov dword ptr [ecx + 0x1e4], eax ; ret 4` |
 | `0x00405B50` | **FUN_00405b50** | `ACC_SET32: mov eax, dword ptr [esp + 4] ; mov dword ptr [ecx + 0x1e8], eax ; ret 4` |
-| `0x00405BA0` | **DriftDriver__GetDesiredSpeed** | `ACC_FLD: fld dword ptr [ecx + 0x22c] ; ret` |
-| `0x00405BB0` | **DriftDriver__GetDesiredTimeToSpeed** | `ACC_FLDG: fld dword ptr [0x7844c0] ; ret` |
 | `0x00405BC0` | **FUN_00405bc0** | `ACC_LEA: lea eax, [ecx + 0x224] ; ret` |
-| `0x00408380` | **RaceCarController__GetNumberOfRoutesToUs** | `ACC_GETG: mov eax, dword ptr [0x88d218] ; ret` |
-| `0x00408C70` | **TrafficController__GetLookaheadTime** | `ACC_FLDG: fld dword ptr [0x783b80] ; ret` |
-| `0x00408CD0` | **FEToggleWidget__DetermineSoundTrigger** | `ACC_CONST: mov eax, 2 ; ret` |
-| `0x00408DD0` | **TrafficController__GetMinLifetimeForGetU** | `ACC_FLDG: fld dword ptr [0x783628] ; ret` |
-| `0x0040A240` | **RealController__GetLookaheadTime** | `ACC_FLDG: fld dword ptr [0x783c38] ; ret` |
-| `0x0040BDE0` | **StreamingTrafficCarManager__GetDummyRide** | `ACC_LEA: lea eax, [ecx + 0x10] ; ret` |
 | `0x0040CA40` | **AIGoalWinRoadRace__GetName** | `ACC_CONST: mov eax, 0x7847b8 ; ret` |
-| `0x0040CA50` | **FEInputWidget__DetermineSoundTrigger** | `ACC_CONST: mov eax, 3 ; ret` |
 | `0x0040CA60` | **FUN_0040ca60** | `ACC_CONST: mov eax, 1 ; ret 4` |
-| `0x0040CA90` | **AIGoalWinDragRace__GetName** | `ACC_CONST: mov eax, 0x784820 ; ret` |
 | `0x0040CAA0` | **FUN_0040caa0** | `ACC_CONST: mov eax, 2 ; ret 4` |
-| `0x0040CAD0` | **AIGoalSteerPlayerInDragRace__GetName** | `ACC_CONST: mov eax, 0x784880 ; ret` |
-| `0x0040CB10` | **AIGoalBeTrafficCar__GetName** | `ACC_CONST: mov eax, 0x7848f0 ; ret` |
-| `0x0040CB20` | **FESliderWidget__DetermineSoundTrigger** | `ACC_CONST: mov eax, 1 ; ret` |
-| `0x0040CB50` | **AIGoalBeCrossTrafficCar__GetName** | `ACC_CONST: mov eax, 0x784950 ; ret` |
-| `0x0040CB60` | **AIGoalBeCrossTrafficCar__GetSpeedLimit** | `ACC_FLDG: fld dword ptr [0x7845a4] ; ret 4` |
 | `0x0040CBA0` | **FUN_0040cba0** | `ACC_CONST: mov eax, 0x7849b8 ; ret` |
-| `0x0040CBB0` | **FEButtonWidget__DetermineSoundTrigger** | `ACC_CONST: mov eax, 4 ; ret` |
-| `0x0040DAB0` | **AIGoalRollingStart__GetSpeedLimit** | `ACC_FLD: fld dword ptr [ecx + 0x18] ; ret 4` |
-| `0x0040DDD0` | **AIGoalRollingRoadblock__GetSpeedLimit** | `ACC_FLDG: fld dword ptr [0x7847c8] ; ret 4` |
-| `0x0040FFF0` | **PsychoDriver__GetDesiredSpeed** | `ACC_FLD: fld dword ptr [ecx + 0x230] ; ret` |
-| `0x00410000` | **PsychoDriver__GetDesiredTimeToSpeed** | `ACC_FLD: fld dword ptr [ecx + 0x234] ; ret` |
-| `0x00410420` | **RealDriver__SetJoystickPort** | `ACC_SET32: mov eax, dword ptr [esp + 4] ; mov dword ptr [ecx + 0x2ac], eax ; ret 4` |
-| `0x00410460` | **RealDriver__GetPort** | `ACC_GET32: mov eax, dword ptr [ecx + 0x2ac] ; ret` |
-| `0x00418560` | **RealController__GetFuturePoints** | `ACC_LEA: lea eax, [ecx + 0x68] ; ret` |
-| `0x0041BE90` | **AICarController__GetFuturePoints** | `ACC_GET32: mov eax, dword ptr [ecx + 0x6e8] ; ret` |
-| `0x0041E780` | **TrafficController__GetSkillLevel** | `ACC_SX8: movsx eax, byte ptr [ecx + 0x799] ; ret` |
 | `0x004233C0` | **NullDriver__GetDriverNumber** | `ACC_CONST: mov eax, 0xfffe7961 ; ret` |
-| `0x00423560` | **FEDateWidget__GetHeaderText** | `ACC_CONST: mov eax, 0x783fe5 ; ret` |
-| `0x004235D0` | **AIActionJustDrive__GetName** | `ACC_CONST: mov eax, 0x7856a8 ; ret` |
-| `0x004236D0` | **AIActionPass__GetName** | `ACC_CONST: mov eax, 0x7856fc ; ret` |
-| `0x00423960` | **AIActionBlock__GetName** | `ACC_CONST: mov eax, 0x78574c ; ret` |
-| `0x00423C20` | **AIActionPullOver__GetName** | `ACC_CONST: mov eax, 0x785778 ; ret` |
-| `0x00423CB0` | **AIActionGetUnstuck__GetName** | `ACC_CONST: mov eax, 0x7857a8 ; ret` |
-| `0x00423D70` | **AIActionIJustGotHit__GetName** | `ACC_CONST: mov eax, 0x7857d8 ; ret` |
-| `0x00424200` | **AIActionAccidentRecovery__GetName** | `ACC_CONST: mov eax, 0x78580c ; ret` |
-| `0x004242C0` | **AIActionDriveTrafficLane__GetName** | `ACC_CONST: mov eax, 0x785844 ; ret` |
-| `0x004244B0` | **AIActionAvoidAvoidable__GetName** | `ACC_CONST: mov eax, 0x78587c ; ret` |
-| `0x00424600` | **AIActionIJustGotHitDragRace__GetName** | `ACC_CONST: mov eax, 0x7858b0 ; ret` |
-| `0x004249B0` | **AIActionHitWallDragRace__GetName** | `ACC_CONST: mov eax, 0x7858f8 ; ret` |
-| `0x00424B30` | **AIActionStopDriving__GetName** | `ACC_CONST: mov eax, 0x785940 ; ret` |
-| `0x00424C00` | **AIActionAvoidAvoidableAsTraffic__GetName** | `ACC_CONST: mov eax, 0x785974 ; ret` |
-| `0x00425140` | **AIActionObeyTrafficIntersections__GetNam** | `ACC_CONST: mov eax, 0x7859b4 ; ret` |
-| `0x004255C0` | **AIActionPickRouteToAvoidAnimation__GetNa** | `ACC_CONST: mov eax, 0x7859f8 ; ret` |
-| `0x00425620` | **AIActionDriveAtOffset__GetName** | `ACC_CONST: mov eax, 0x785a3c ; ret` |
-| `0x00425670` | **AIActionRollingRoadblock__GetName** | `ACC_CONST: mov eax, 0x785a70 ; ret` |
-| `0x00425850` | **AIActionRollingStart__GetName** | `ACC_CONST: mov eax, 0x784b48 ; ret` |
 | `0x00430650` | **CBasicCharacterAnimEntity__GetTypeID** | `ACC_GET32: mov eax, dword ptr [ecx + 4] ; ret` |
-| `0x00430660` | **SCMagazineDatabase__GetNumMagazineSetups** | `ACC_GET32: mov eax, dword ptr [ecx + 8] ; ret` |
 | `0x00430670` | **CAnimPlayer__GetWorldAnimScene** | `ACC_GET32: mov eax, dword ptr [ecx + 0xc] ; ret` |
 | `0x004306F0` | **GetAnimLoader_MaxSize** | `ACC_CONST: mov eax, 0x186a00 ; ret` |
 | `0x00431790` | **FUN_00431790** | `ACC_SET32: mov eax, dword ptr [esp + 4] ; mov dword ptr [ecx + 4], eax ; ret 4` |
 | `0x0043CB10` | **FUN_0043cb10** | `ACC_GETG: mov eax, dword ptr [0x828504] ; ret` |
-| `0x0043E120` | **SpeedScript::ParseNextWord** | `bool __stdcall(char* out, const char* text, int size, int* pos, int* line)` |
 | `0x00441890` | **FUN_00441890** | `ACC_LEA: lea eax, [ecx + 0x50] ; ret` |
-| `0x00444180` | **CameraMover__MinDistToWall** | `ACC_FLDG: fld dword ptr [0x787090] ; ret` |
-| `0x0044B220` | **OrbitCarCameraMover__GetCarToFollow** | `ACC_GET32: mov eax, dword ptr [ecx + 0xb0] ; ret` |
-| `0x0044BA70` | **RearViewMirrorCameraMover___RearViewMirr** | `ACC_GET32: mov eax, dword ptr [ecx + 0x2c] ; ret` |
-| `0x0044C240` | **TrackCarCameraMover__GetCarToFollow** | `ACC_GET32: mov eax, dword ptr [ecx + 0x438] ; ret` |
-| `0x0044DE80` | **CubicCameraMover__GetPovType** | `ACC_GET32: mov eax, dword ptr [ecx + 0x4c] ; ret` |
 | `0x00458E50` | **FUN_00458e50** | `ACC_CONST: mov eax, 0x7ecb38 ; ret` |
-| `0x00458E60` | **EAXAITunerCar__GetStateName** | `ACC_GETG: mov eax, dword ptr [0x7ecb3c] ; ret` |
-| `0x00458FE0` | **EAXTunerCar__GetStateInfo** | `ACC_CONST: mov eax, 0x7ecb68 ; ret` |
-| `0x00458FF0` | **EAXTunerCar__GetStateName** | `ACC_GETG: mov eax, dword ptr [0x7ecb6c] ; ret` |
-| `0x00459390` | **EAXCar__GetStateInfo** | `ACC_CONST: mov eax, 0x7ecb28 ; ret` |
-| `0x004593A0` | **EAXCar__GetStateName** | `ACC_GETG: mov eax, dword ptr [0x7ecb2c] ; ret` |
 | `0x0045AF70` | **FUN_0045af70** | `ACC_GETG: mov eax, dword ptr [0x82ba40] ; ret` |
 | `0x0045B0B0` | **FUN_0045b0b0** | `ACC_GETG: mov eax, dword ptr [0x82ba5c] ; ret` |
-| `0x0045BAA0` | **SndBase__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed138 ; ret` |
-| `0x0045BAB0` | **SndBase__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed13c] ; ret` |
-| `0x0045BAE0` | **SFXCTL_Skid__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed244 ; ret` |
-| `0x0045BAF0` | **SFXCTL_Skid__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed248] ; ret` |
 | `0x0045BEE0` | **FUN_0045bee0** | `ACC_CONST: mov eax, 0x7ed254 ; ret` |
-| `0x0045C050` | **SFXCTL_3DRightWheelPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed27c ; ret` |
-| `0x0045C060` | **SFXCTL_3DRightWheelPos__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed280] ; ret` |
-| `0x0045C070` | **SFXCTL_3DLeftWheelPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed28c ; ret` |
-| `0x0045C080` | **SFXCTL_3DLeftWheelPos__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed290] ; ret` |
 | `0x0045C0B0` | **FUN_0045c0b0** | `ACC_CONST: mov eax, 0x7ed2a4 ; ret` |
-| `0x0045C0C0` | **SFXCTL_Shifting__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed2a8] ; ret` |
 | `0x0045C470` | **FUN_0045c470** | `ACC_CONST: mov eax, 0x7ed2b4 ; ret` |
-| `0x0045C480` | **SFXCTL_AIShifting__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed2b8] ; ret` |
-| `0x0045C4B0` | **SFXCTL_Engine__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed2c4 ; ret` |
-| `0x0045C4C0` | **SFXCTL_Engine__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed2c8] ; ret` |
-| `0x0045C530` | **SFXCTL_Engine__GetEngRPM** | `ACC_FLD: fld dword ptr [ecx + 0x128] ; ret` |
-| `0x0045C540` | **SFXCTL_Engine__GetEngTorque** | `ACC_FLD: fld dword ptr [ecx + 0x130] ; ret` |
-| `0x0045CE00` | **SFXCTL_HybridMotor__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed2e4 ; ret` |
-| `0x0045CE10` | **SFXCTL_HybridMotor__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed2e8] ; ret` |
-| `0x0045D1F0` | **SFXCTL_Physics__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed2f4 ; ret` |
-| `0x0045D200` | **SFXCTL_Physics__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed2f8] ; ret` |
-| `0x0045D300` | **FESliderWidget__GetValue** | `ACC_FLD: fld dword ptr [ecx + 0x84] ; ret` |
-| `0x0045D3D0` | **SFXCTL_AIPhysics__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed304 ; ret` |
-| `0x0045D3E0` | **SFXCTL_AIPhysics__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed308] ; ret` |
-| `0x0045DC40` | **SFXCTL_3DTunnelPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed324 ; ret` |
-| `0x0045DCE0` | **SFXCTL_3DColPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed348 ; ret` |
-| `0x0045DCF0` | **SFXCTL_3DColPos__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed34c] ; ret` |
-| `0x0045DD00` | **SFXCTL_3DScrapePos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed358 ; ret` |
-| `0x0045DD10` | **SFXCTL_3DScrapePos__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed35c] ; ret` |
-| `0x0045DD20` | **SFXCTL_3DCarPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed368 ; ret` |
-| `0x0045DD30` | **SFXCTL_3DCarPos__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed36c] ; ret` |
-| `0x0045DD40` | **SFXCTL_3DObjPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed26c ; ret` |
-| `0x0045DD50` | **SFXCTL_3DObjPos__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed270] ; ret` |
-| `0x0045E1D0` | **SFXCTL_3DObjPos__AssignPositionVector** | `ACC_SET32: mov eax, dword ptr [esp + 4] ; mov dword ptr [ecx + 0x70], eax ; ret 4` |
-| `0x0045E1E0` | **SFXCTL_3DObjPos__AssignDirectionVector** | `ACC_SET32: mov eax, dword ptr [esp + 4] ; mov dword ptr [ecx + 0x74], eax ; ret 4` |
-| `0x0045E410` | **SFX_Common__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed380 ; ret` |
-| `0x0045E420` | **SFX_Common__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed384] ; ret` |
-| `0x0045E630` | **CARSFX_Shift__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed394 ; ret` |
-| `0x0045E640` | **CARSFX_Shift__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed398] ; ret` |
-| `0x0045EAC0` | **CARSFX_Turbo__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed3a8 ; ret` |
-| `0x0045EAD0` | **CARSFX_Turbo__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed3ac] ; ret` |
-| `0x0045F1C0` | **CARSFX_Nitrous__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed3b8 ; ret` |
-| `0x0045F1D0` | **CARSFX_Nitrous__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed3bc] ; ret` |
-| `0x0045F690` | **CARSFX_SparkChatter__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed3c8 ; ret` |
-| `0x0045F6A0` | **CARSFX_SparkChatter__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed3cc] ; ret` |
-| `0x0045FA20` | **CARSFX_RoadNoise__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed3dc ; ret` |
-| `0x0045FA30` | **CARSFX_RoadNoise__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed3e0] ; ret` |
-| `0x0045FCF0` | **SFXCTL_3DLeftWindPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed3f0 ; ret` |
-| `0x0045FD50` | **SFXCTL_3DRightWindPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed400 ; ret` |
-| `0x0045FDB0` | **CARSFX_WindNoise__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed410 ; ret` |
-| `0x0045FDC0` | **CARSFX_WindNoise__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed414] ; ret` |
-| `0x00460660` | **CARSFX_WindWeather__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed420 ; ret` |
-| `0x00460670` | **CARSFX_WindWeather__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed424] ; ret` |
-| `0x004607F0` | **CARSFX_Skids__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed430 ; ret` |
-| `0x00460800` | **CARSFX_Skids__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed434] ; ret` |
-| `0x00461040` | **CARSFX_AIEngine__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed444 ; ret` |
-| `0x00461050` | **CARSFX_AIEngine__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed448] ; ret` |
-| `0x00461470` | **CARSFX_PlayerEngine__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed454 ; ret` |
-| `0x00461480` | **CARSFX_PlayerEngine__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed458] ; ret` |
-| `0x00461590` | **CARSFX_Hydraulics__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed464 ; ret` |
-| `0x004615A0` | **CARSFX_Hydraulics__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed468] ; ret` |
-| `0x00461730` | **CARSFX_Rain__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed474 ; ret` |
-| `0x00461740` | **CARSFX_Rain__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed478] ; ret` |
 | `0x004619D0` | **FUN_004619d0** | `ACC_CONST: mov eax, 0x7ed484 ; ret` |
-| `0x004619E0` | **CARSFX_DriveBy__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed488] ; ret` |
-| `0x00461A60` | **SFXCTL_3DWooshPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed494 ; ret` |
-| `0x00461AC0` | **SFXObj_Collision__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed4a4 ; ret` |
-| `0x00461AD0` | **SFXObj_Collision__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed4a8] ; ret` |
 | `0x00461E70` | **FUN_00461e70** | `ACC_CONST: mov eax, 0x7ed4b4 ; ret` |
-| `0x00461E80` | **SFXObj_Woosh__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed4b8] ; ret` |
 | `0x00461F80` | **FUN_00461f80** | `ACC_CONST: mov eax, 0x7ed4c4 ; ret` |
-| `0x00461F90` | **SFXObj_Music__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed4c8] ; ret` |
 | `0x00461FA0` | **FUN_00461fa0** | `ACC_CONST: mov eax, 0x7ed4d4 ; ret` |
-| `0x00461FB0` | **SFXObj_Ambience__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed4d8] ; ret` |
 | `0x00461FC0` | **FUN_00461fc0** | `ACC_CONST: mov eax, 0x7ed4e4 ; ret` |
-| `0x00461FD0` | **SFXObj_Speech__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed4e8] ; ret` |
 | `0x00461FE0` | **FUN_00461fe0** | `ACC_CONST: mov eax, 0x7ed4f4 ; ret` |
-| `0x00461FF0` | **SFXObj_Movies__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed4f8] ; ret` |
-| `0x00462000` | **SFXObj_NISStream__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed504 ; ret` |
-| `0x00462010` | **SFXObj_NISStream__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed508] ; ret` |
 | `0x00462030` | **FUN_00462030** | `ACC_CONST: mov eax, 0x7ed514 ; ret` |
-| `0x00462040` | **SFXObj_FEHUD__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed518] ; ret` |
-| `0x00462050` | **CARSFX_TrafficEngine__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed524 ; ret` |
-| `0x00462060` | **CARSFX_TrafficEngine__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed528] ; ret` |
-| `0x00462440` | **SFXCTL_3DTrafficPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed534 ; ret` |
-| `0x00462450` | **SFXCTL_3DTrafficPos__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed538] ; ret` |
-| `0x00462460` | **CARSFX_TrafficHorn__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed544 ; ret` |
-| `0x00462470` | **CARSFX_TrafficHorn__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed548] ; ret` |
-| `0x00462630` | **CARSFX_TrafficWoosh__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed554 ; ret` |
-| `0x00462640` | **CARSFX_TrafficWoosh__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed558] ; ret` |
 | `0x004626E0` | **FUN_004626e0** | `ACC_CONST: mov eax, 0x7ed568 ; ret` |
-| `0x004626F0` | **CARSFX_BottomOut__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed56c] ; ret` |
 | `0x00462750` | **FUN_00462750** | `ACC_CONST: mov eax, 0x7ed578 ; ret` |
-| `0x00462760` | **CARSFX_TrafficBottomOut__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed57c] ; ret` |
-| `0x00462790` | **SFXObj_Plane__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed588 ; ret` |
-| `0x004627A0` | **SFXObj_Plane__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed58c] ; ret` |
-| `0x004627B0` | **SFXCTL_3DEnviroObjPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed598 ; ret` |
-| `0x00462FA0` | **SFXObj_Train__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed5a8 ; ret` |
-| `0x00462FB0` | **SFXObj_Train__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed5ac] ; ret` |
-| `0x00462FC0` | **SFXCTL_3DTrainObjPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed5b8 ; ret` |
-| `0x00463270` | **SFXObj_Reverb__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed5c8 ; ret` |
-| `0x00463280` | **SFXObj_Reverb__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed5cc] ; ret` |
-| `0x004634E0` | **CARSFX_Stereo__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed63c ; ret` |
-| `0x004634F0` | **CARSFX_Stereo__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed640] ; ret` |
 | `0x00463760` | **FUN_00463760** | `ACC_CONST: mov eax, 0x7ed64c ; ret` |
-| `0x00463770` | **CARSFX_TrafficStereo__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed650] ; ret` |
-| `0x004637A0` | **SFXCTL_3DFountainPos__GetTypeInfo** | `ACC_CONST: mov eax, 0x7ed65c ; ret` |
 | `0x00463800` | **FUN_00463800** | `ACC_CONST: mov eax, 0x7ed66c ; ret` |
-| `0x00463810` | **SFXObj_Fountain__GetTypeName** | `ACC_GETG: mov eax, dword ptr [0x7ed670] ; ret` |
-| `0x00463AC0` | **EAXTunerCar__Play** | `ACC_CONST: xor eax, eax ; ret 4` |
-| `0x004643F0` | **CSTATE_Plane__GetStateInfo** | `ACC_CONST: mov eax, 0x7ed67c ; ret` |
-| `0x00464400` | **CSTATE_Plane__GetStateName** | `ACC_GETG: mov eax, dword ptr [0x7ed680] ; ret` |
 | `0x004645E0` | **FUN_004645e0** | `ACC_CONST: mov eax, 0x7ed784 ; ret` |
-| `0x004645F0` | **CSTATE_Train__GetStateName** | `ACC_GETG: mov eax, dword ptr [0x7ed788] ; ret` |
-| `0x004649C0` | **CSTATE_Base__GetStateInfo** | `ACC_CONST: mov eax, 0x7ecb48 ; ret` |
-| `0x00464BA0` | **CSTATE_Base__ConnectCar** | `ACC_SET32: mov eax, dword ptr [esp + 4] ; mov dword ptr [ecx + 0x30], eax ; ret 4` |
 | `0x00464D90` | **FUN_00464d90** | `ACC_CONST: mov eax, 0x7ed8c8 ; ret` |
-| `0x00464DA0` | **CSTATE_Collision__GetStateName** | `ACC_GETG: mov eax, dword ptr [0x7ed8cc] ; ret` |
 | `0x00464E10` | **FUN_00464e10** | `ACC_CONST: mov eax, 0x7ed8d8 ; ret` |
-| `0x00464E20` | **CSTATE_Main__GetStateName** | `ACC_GETG: mov eax, dword ptr [0x7ed8dc] ; ret` |
 | `0x00464E30` | **FUN_00464e30** | `ACC_CONST: mov eax, 0x7ed8e8 ; ret` |
 | `0x00464E40` | **FUN_00464e40** | `ACC_GETG: mov eax, dword ptr [0x7ed8ec] ; ret` |
 | `0x00467400` | **FUN_00467400** | `ACC_SET32: mov eax, dword ptr [esp + 4] ; mov dword ptr [ecx + 0x14], eax ; ret 4` |
 | `0x00467410` | **FUN_00467410** | `ACC_GET32: mov eax, dword ptr [ecx + 0x14] ; ret` |
-| `0x004674C0` | **NFSMixCtl__GetScaleID** | `ACC_GET32: mov eax, dword ptr [ecx + 0x10] ; ret` |
-| `0x004674D0` | **NFSMixCtl__SetScalePtr** | `ACC_SET32: mov eax, dword ptr [esp + 4] ; mov dword ptr [ecx + 0x20], eax ; ret 4` |
 | `0x004688F0` | **FUN_004688f0** | `ACC_LEA: lea eax, [ecx + 0x18] ; ret 4` |
-| `0x004796F0` | **EAXCar__GetDriverInfo** | `ACC_GET32: mov eax, dword ptr [ecx + 0x74] ; ret` |
-| `0x00479700` | **EAXCar__GetEngineUpgradeLevel** | `ACC_GET32: mov eax, dword ptr [ecx + 0x94] ; ret` |
 | `0x00485C40` | **FUN_00485c40** | `ACC_GETG: mov eax, dword ptr [0x82ba4c] ; ret` |
 | `0x00485C50` | **FUN_00485c50** | `ACC_GETG: mov eax, dword ptr [0x82ba50] ; ret` |
 | `0x00485C60` | **FUN_00485c60** | `ACC_GETG: mov eax, dword ptr [0x82ba54] ; ret` |
@@ -1081,26 +1101,16 @@ Size of each system = functions in EA's matching source files of the GameCube bu
 | `0x00485DB0` | **FUN_00485db0** | `ACC_GETG: mov eax, dword ptr [0x82ba70] ; ret` |
 | `0x0048AC50` | **FUN_0048ac50** | `ACC_GETG: mov eax, dword ptr [0x7f399c] ; ret` |
 | `0x004A32D0` | **FUN_004a32d0** | `ACC_GETG: mov eax, dword ptr [0x836538] ; ret` |
-| `0x004AE9B0` | **FEWidget__SetPosY** | `ACC_SET32: mov eax, dword ptr [esp + 4] ; mov dword ptr [ecx + 0x10], eax ; ret 4` |
-| `0x004BA370` | **FEDateWidget__DetermineSoundTrigger** | `ACC_CONST: mov eax, 6 ; ret` |
 | `0x004BA510` | **FUN_004ba510** | `ACC_CONST: mov eax, 0x7d0 ; ret` |
-| `0x004BF980` | **FEStatWidget__DetermineSoundTrigger** | `ACC_CONST: mov eax, 5 ; ret` |
-| `0x004FF970` | **GetCurrentLanguage** | `ACC_GETG: mov eax, dword ptr [0x7f70d0] ; ret` |
 | `0x004FFD80` | **FUN_004ffd80** | `ACC_GETG: mov eax, dword ptr [0x8383e4] ; ret` |
-| `0x00500070` | **GetNumPerformancePackages** | `ACC_GETG: mov eax, dword ptr [0x8383fc] ; ret` |
-| `0x00500F90` | **CareerWallet__GetBalance** | `ACC_GET32: mov eax, dword ptr [ecx] ; ret` |
 | `0x00503A30` | **StockCar__GetCarIndex** | `ACC_GET32: mov eax, dword ptr [ecx + 0x18] ; ret` |
 | `0x00503B00` | **TunedCar__GetCarNameHash** | `ACC_GET32: mov eax, dword ptr [ecx + 0x20] ; ret` |
 | `0x0050CEA0` | **GetHelpBarFNGName** | `ACC_CONST: mov eax, 0x790000 ; ret` |
-| `0x0050D510` | **FEWidget__DetermineSoundTrigger** | `ACC_CONST: xor eax, eax ; ret` |
-| `0x00510040` | **GetCurrentDynoMenuName** | `ACC_GETG: mov eax, dword ptr [0x83a650] ; ret` |
 | `0x005100A0` | **FUN_005100a0** | `ACC_GETG: mov eax, dword ptr [0x83a63c] ; ret` |
 | `0x00510AD0` | **FUN_00510ad0** | `ACC_CONST: mov eax, 0x140 ; ret` |
 | `0x00510AE0` | **FUN_00510ae0** | `ACC_CONST: mov eax, 0x1b0 ; ret` |
-| `0x0051EC00` | **FEDateWidget__GetMaxYear** | `ACC_CONST: mov eax, 0x7df ; ret` |
 | `0x005701D0` | **QuickSpline::SetNumControlPoints** | `void QuickSpline::SetNumControlPoints(u16 n)` |
 | `0x00570A30` | **GetBuildRegion** | `ACC_GETG: mov eax, dword ptr [0x864f24] ; ret` |
-| `0x00570A70` | **MenuScreen__NotifySoundMessage** | `ACC_CONST: xor eax, eax ; ret 0x14` |
 | `0x00570AA0` | **RealFile__DeviceDriver__GetName** | `ACC_LEA: lea eax, [ecx + 4] ; ret` |
 | `0x00570AE0` | **tCubic3D::SetVal** | `void tCubic3D::SetVal(float x, float y, float z)` |
 | `0x00571250` | **GameFlowManager::IsPaused** | `bool __cdecl GameFlowManager::IsPaused()` |
@@ -1135,24 +1145,16 @@ Size of each system = functions in EA's matching source files of the GameCube bu
 | `0x00593D80` | **FUN_00593d80** | `ACC_CONST: mov eax, 0x86b390 ; ret` |
 | `0x0059E590` | **FUN_0059e590** | `ACC_GET32: mov eax, dword ptr [ecx + 0xc] ; ret 4` |
 | `0x005A80C0` | **FUN_005a80c0** | `ACC_LEA: lea eax, [ecx + 0x20] ; ret` |
-| `0x005A9D60` | **DynamicCollisionBody__GetMaxRadius** | `ACC_FLD: fld dword ptr [ecx + 0x1c] ; ret` |
 | `0x005AA050` | **FUN_005aa050** | `ACC_FLDG: fld dword ptr [0x78435c] ; ret 4` |
 | `0x005AA700` | **FUN_005aa700** | `ACC_LEA: lea eax, [ecx + 0x14] ; ret` |
 | `0x005AEED0` | **FUN_005aeed0** | `ACC_CONST: mov eax, 0x1c ; ret` |
-| `0x005B9680` | **cFrontendDatabase__GetUserProfileSaveSiz** | `ACC_CONST: mov eax, 0x43e ; ret` |
 | `0x005B96E0` | **FUN_005b96e0** | `ACC_GET32: mov eax, dword ptr [ecx + 0x74] ; ret 4` |
-| `0x005B98A0` | **eGetCurrentViewMode** | `ACC_GETG: mov eax, dword ptr [0x8707dc] ; ret` |
 | `0x005BA600` | **eGetEnvMap** | `ACC_CONST: mov eax, 0x871bc0 ; ret` |
 | `0x005BC1F0` | **FUN_005bc1f0** | `ACC_GETG: mov eax, dword ptr [0x870980] ; ret` |
 | `0x005BC200` | **FUN_005bc200** | `ACC_GETG: mov eax, dword ptr [0x870984] ; ret` |
 | `0x005C0D20` | **FUN_005c0d20** | `ACC_GETG: mov eax, dword ptr [0x86ff28] ; ret` |
-| `0x005EB8F0` | **CarDriver__SetBrake** | `ACC_SET32: mov eax, dword ptr [esp + 4] ; mov dword ptr [ecx + 0x214], eax ; ret 4` |
-| `0x005EB900` | **CarDriver__SetEBrake** | `ACC_SET32: mov eax, dword ptr [esp + 4] ; mov dword ptr [ecx + 0x210], eax ; ret 4` |
-| `0x005EB910` | **CarDriver__SetThrottle** | `ACC_SET32: mov eax, dword ptr [esp + 4] ; mov dword ptr [ecx + 0x20c], eax ; ret 4` |
 | `0x005EFAB0` | **FUN_005efab0** | `ACC_FLD: fld dword ptr [ecx + 0x284] ; ret` |
 | `0x0060FE00` | **FUN_0060fe00** | `ACC_GETG: mov eax, dword ptr [0x8a1c94] ; ret` |
-| `0x00610170` | **CarTypeInfo__GetManufacturerName** | `ACC_LEA: lea eax, [ecx + 0xc0] ; ret` |
-| `0x00610300` | **RideInfo__GetCompositeSkinNameHash** | `ACC_GET32: mov eax, dword ptr [ecx + 0x584] ; ret` |
 | `0x00647A3A` | **FUN_00647a3a** | `ACC_CONST: xor eax, eax ; ret 0x10` |
 | `0x0064B5F7` | **FUN_0064b5f7** | `ACC_CONST: mov eax, 0x8876086c ; ret 0xc` |
 | `0x0065E52E` | **FUN_0065e52e** | `ACC_CONST: mov eax, 0x80004005 ; ret 4` |
@@ -1181,7 +1183,7 @@ Size of each system = functions in EA's matching source files of the GameCube bu
 | `0x0073478B` | **Snd__CMTBLKDecf__SetCodecVersion** | `ACC_SET32: mov eax, dword ptr [esp + 4] ; mov dword ptr [ecx + 0xd64], eax ; ret 4` |
 | `0x00736DC0` | **FUN_00736dc0** | `ACC_CONST: mov eax, 0x8b5164 ; ret` |
 
-### physics — 59
+### physics — 61
 
 | Address | Function | Signature |
 |---|---|---|
@@ -1212,6 +1214,7 @@ Size of each system = functions in EA's matching source files of the GameCube bu
 | `0x005A8740` | **GetState** | `void* GetState() this+0x1C` |
 | `0x005A8750` | **GetState** | `void GetState(out) [+0x1C..+0x20]` |
 | `0x005A8770` | **SetState** | `void SetState(in) [+0x1C..+0x20]` |
+| `0x005A9D60` | **DynamicCollisionBody__GetMaxRadius** | `ACC_FLD: fld dword ptr [ecx + 0x1c] ; ret` |
 | `0x005A9D70` | **GetMaxBackupTime** | `float GetMaxBackupTime() [+0x6C]` |
 | `0x005A9D80` | **GetMassInverse** | `float GetMassInverse() body+0x168` |
 | `0x005A9D90` | **GetInertiaTensorInverse** | `bMatrix4* GetInertiaTensorInverse() body+0x1B0/+0x170` |
@@ -1244,6 +1247,7 @@ Size of each system = functions in EA's matching source files of the GameCube bu
 | `0x005B1CB0` | **GetBounciness** | `float GetBounciness(...) [+0x148]+0xCC` |
 | `0x005B1CC0` | **GetFriction** | `float GetFriction(...) [+0x148]+0xE0` |
 | `0x005B7680` | **GetMassInverse** | `float GetMassInverse() 0` |
+| `0x005B98A0` | **eGetCurrentViewMode** | `ACC_GETG: mov eax, dword ptr [0x8707dc] ; ret` |
 
 ### Resource files — 12
 
@@ -1261,6 +1265,17 @@ Size of each system = functions in EA's matching source files of the GameCube bu
 | `0x00577D80` | **ResourceFile::Unload** | `void __thiscall()` |
 | `0x00577DE0` | **ResourceFile::LoadResourceIfFileTransferFinished** | `void __thiscall()` |
 | `0x00577EB0` | **FindResourceFile** | `ResourceFile* __cdecl(const char* name)` |
+
+### world — 6
+
+| Address | Function | Signature |
+|---|---|---|
+| `0x00401890` | **Car__IsActive** | `ACC_LEA: lea eax, [ecx + 0x60] ; ret` |
+| `0x005EB8F0` | **CarDriver__SetBrake** | `ACC_SET32: mov eax, dword ptr [esp + 4] ; mov dword ptr [ecx + 0x214], eax ; ret 4` |
+| `0x005EB900` | **CarDriver__SetEBrake** | `ACC_SET32: mov eax, dword ptr [esp + 4] ; mov dword ptr [ecx + 0x210], eax ; ret 4` |
+| `0x005EB910` | **CarDriver__SetThrottle** | `ACC_SET32: mov eax, dword ptr [esp + 4] ; mov dword ptr [ecx + 0x20c], eax ; ret 4` |
+| `0x00610170` | **CarTypeInfo__GetManufacturerName** | `ACC_LEA: lea eax, [ecx + 0xc0] ; ret` |
+| `0x00610300` | **RideInfo__GetCompositeSkinNameHash** | `ACC_GET32: mov eax, dword ptr [ecx + 0x584] ; ret` |
 
 ## Not done yet
 

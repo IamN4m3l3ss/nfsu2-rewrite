@@ -45,11 +45,15 @@ def patched_constants(pe):
     rd = section(pe, b".rdata")
     start, size = 0x400000 + rd.VirtualAddress, min(rd.Misc_VirtualSize, rd.SizeOfRawData)
     disk, mem = pe.get_data(rd.VirtualAddress, size), mem_bytes(start, size)
-    iat = pe.OPTIONAL_HEADER.DATA_DIRECTORY[12]  # IMAGE_DIRECTORY_ENTRY_IAT
-    iat_lo, iat_hi = 0x400000 + iat.VirtualAddress, 0x400000 + iat.VirtualAddress + iat.Size
+    # import slots: filled in by the Windows loader, always differ from disk. This exe has no IAT data directory, so
+    # take every slot from the import descriptors.
+    slots = set()
+    for d in getattr(pe, "DIRECTORY_ENTRY_IMPORT", []):
+        for imp in d.imports:
+            slots.add(imp.address)
     out = set()
     for i in range(0, size - 3, 4):
-        if disk[i:i + 4] != mem[i:i + 4] and not iat_lo <= start + i < iat_hi:
+        if disk[i:i + 4] != mem[i:i + 4] and start + i not in slots:
             out.add(start + i)
     return out
 

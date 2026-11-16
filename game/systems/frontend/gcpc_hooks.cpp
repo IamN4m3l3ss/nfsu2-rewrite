@@ -49,16 +49,7 @@ const uint32_t kRegExclude[] = {
 // Never registered: the user's required mods (WidescreenFix, HD UI support) patch code INSIDE these functions;
 // replacing them undid the mods (garbled menu text, 4:3 HUD - user report 2026-11-15). Found by comparing every
 // byte of each function in memory with the exe on disk.
-const uint32_t kModPatched[] = {0x00505150 /* FELerpVector3 */, 0x0051D620 /* FEngGetCenter */,
-                                0x0051B0B0 /* cFEngRender::MakeRenderMatrix */, 0x0051B3A0 /* cFEngRender::GenerateClipInfo */,
-                                0x0049B600 /* PCResolution791F30::Act */,
-    // ...and every rewrite whose original reaches mod-patched code through direct calls (transitively): the
-    // rewritten C++ calls its own C++ versions directly and would skip the mods' patches (garbled pause-menu text).
-    0x0049C690, 0x004B8470, 0x004CF750, 0x00504910, 0x0051C110, 0x0051D170, 0x0051D9F0, 0x0051EC10,
-    0x00527170, 0x0052BDC0, 0x0052D020, 0x0052D6B0, 0x0052D800, 0x0052D9F0, 0x0052DAC0, 0x0052DCC0,
-    0x0052E320, 0x00530AA0, 0x005354F0, 0x005378C0, 0x00538080, 0x005390E0, 0x00539370, 0x00539650,
-    0x00540D20, 0x00540E90, 0x00541DB0, 0x0054CE60, 0x0054D190, 0x00551DE0, 0x00556020,
-};
+const uint32_t kModPatched[] = {0};  // clean game (16 Nov 2026): no mod-patched code to avoid
 
 constexpr size_t kSlot = 128;
 uint8_t* g_thunks = nullptr;

@@ -854,3 +854,25 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
 - Every batch: 10,000+ random cases per test, 0 mismatches, plus a _BROKEN self-check caught. Accessors: 7 x 10,000.
 - 1,166 verified, 1,165 on; driving (170 km/h) and the HUD normal with everything on.
 
+## 2026-11-16 — Clean game install
+
+**Changed**
+- Game folder is a clean install (only the ASI loader + our probe). Disc-2 check passes via an empty `foobar` file in
+  `work/profile/` (the game's own fallback, 0x5C0D30), no patching. DXVK 3.1.1 moved into the Wine prefix.
+- Probe loader: optional borderless window at the desktop size (`NFSU2_BORDERLESS=1`, default in run_game.sh;
+  GetRacingResolution 0x5BF610 + windowed CreateDevice/Reset + WS_POPUP). Stage 1 of 3 (aspect + UI layout next).
+- `tools/re/modcheck.py`: the .rdata check counted the import slots (filled by the Windows loader) as patched
+  constants, because this exe has no IAT data directory; it now takes the slots from the import descriptors. On the
+  clean game only our own hooks show up.
+- nfsu2-gcpc lists regenerated without mod exclusions: verified tier 592 -> 630 (+37 enabled: FEPackage::Update,
+  FELerpVector3, FEngGetCenter, MakeRenderMatrix, GenerateClipInfo, ...), unverified pool 382 -> 576. Register audit
+  over all 1,206: same 9 preserve, 1 excluded.
+
+**Broke / learned**
+- Saves made with the mods: the clean game only lists profile names up to 7 characters (folder and the name inside);
+  "Nameless" (8) was hidden. Fixed by the user (renamed to "Nameles"). Enter on an empty load list crashes the
+  original game; Esc reaches the main menu.
+
+**Verified**
+- 1,203 verified, 1,202 on; free roam on the user's save, HUD normal (stretched until the aspect stage).
+

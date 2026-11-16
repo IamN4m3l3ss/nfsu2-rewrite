@@ -70,6 +70,8 @@ bool core_init(const LoaderApi* a, const char* state_json) {
             }
             rewrite_init(st);
             modules(true);
+            // repeatable menu timing from the first frame (A/B tests): NFSU2_FIXED_DT=1 pins RealTimeElapsed to 1/60
+            if (const char* fdt = std::getenv("NFSU2_FIXED_DT"); fdt && *fdt == '1') fe_fixed_dt(true, 1.0f / 60.0f);
         }
     }
     server_start(port);

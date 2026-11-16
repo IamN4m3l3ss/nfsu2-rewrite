@@ -535,6 +535,10 @@ void cFEng::PackageWasLoaded(FEPackage *pkg)
     if (FEPackageData *d = bridge::TheFEPackageManager()->FindFEPackageData(pkg->mpcName)) d->Activate(pkg, arg);
     struct { void *vtable; } movies = {bridge::FEngMovieStarterVTable()};
     pkg->ForAllObjects(reinterpret_cast<FEObjectCallback *>(&movies));
+    // nfsu2-rewrite patch: the PC build runs a second pass, FEngHidePCObjects (vtable 0x79AB8C, callback 0x51C860),
+    // which hides other platforms' objects; without it those stay visible (found by our menu A/B walk, 16 Nov 2026)
+    struct { void *vtable; } hide = {bridge::FEngHidePCObjectsVTable()};
+    pkg->ForAllObjects(reinterpret_cast<FEObjectCallback *>(&hide));
     pkg->mi32Priority = s->mi32Level;
 }
 

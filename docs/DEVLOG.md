@@ -884,4 +884,10 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   reproduced in the 10 after. Likely the original game's heap race (allocations from the I/O thread; the lock is
   missing in the original too, and our rewrite copies it). Fix belongs to an optional crash-fix layer, not the
   faithful rewrite.
+- Boot A/B of the 575 UNVERIFIED nfsu2-gcpc menu rewrites on the clean game caught a real bug: their
+  cFEng::InitPackage (PC inlines PackageWasLoaded) skips the PC-only second object pass FEngHidePCObjects
+  (vtable 0x79AB8C), so other platforms' objects stayed visible (each menu's first group differed). Patched in
+  third_party (marked "nfsu2-rewrite patch"). A help-bar difference was timing: `NFSU2_FIXED_DT=1` (new, core) pins
+  the frame time from the first frame for A/B boots (it fast-forwards the game; normal runs don't set it). After
+  that: 7 screens + free roam identical; 26 ran -> verified.
 

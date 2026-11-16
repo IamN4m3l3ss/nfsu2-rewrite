@@ -148,6 +148,7 @@ void *FixupTextureInfoNull(void *tex, uint32_t hash, uint32_t a, uint32_t b);   
 void *FEGameInterfaceVTable();                   // PC 0x79BCD8 (cFEng)
 void *FEObjectInitializerVTable();               // PC 0x79AAEC
 void *FEngMovieStarterVTable();                  // PC 0x79AB84
+void *FEngHidePCObjectsVTable();                 // PC 0x79AB8C (nfsu2-rewrite patch)
 void *FEngMovieStopperVTable();                  // PC 0x79AB94
 void *FEDirtyMakerVTable();                      // PC 0x79ABF0
 ::SlotPool **LevelSorterSlotsPtr();              // PC 0x8384B0

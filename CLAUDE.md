@@ -98,8 +98,8 @@ its (transitive) calls - rewritten code calls our own versions directly and woul
 jumps) and exclude those. Our functions stay byte-for-byte faithful to the original; mod features come later as a
 separate optional layer on top (user wants a "Mods" tab in the panel), never inside rewritten functions.
 
-**nfsu2-gcpc code in the build:** `third_party/nfsu2-gcpc/` (CC0, 3 marked patches) is built as its own library
-(C++17, `-mlong-double-80`: their maths mirrors x87 extended precision; MSVC's C++20 <cmath> breaks with it) and
+**nfsu2-gcpc code in the build:** `third_party/nfsu2-gcpc/` (CC0) is built as its own library
+(4 marked patches incl. ours: the missing FEngHidePCObjects pass in cFEng::InitPackage; C++17, `-mlong-double-80`: their maths mirrors x87 extended precision; MSVC's C++20 <cmath> breaks with it) and
 registered at run time by `game/systems/frontend/gcpc_hooks.cpp` from their replacement table + an allowlist
 (their verified frontend/camera entries) minus the mod-conflict list. Their referee, built with our toolchain and
 run in 8 Wine shards against a copy of the exe: 1,672,945 checks, 0 mismatches.

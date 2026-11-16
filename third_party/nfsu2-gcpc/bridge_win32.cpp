@@ -374,6 +374,7 @@ void *FixupTextureInfoNull(void *t, uint32_t h, uint32_t a, uint32_t b) { return
 void *FEGameInterfaceVTable() { return reinterpret_cast<void *>(0x79BCD8); }
 void *FEObjectInitializerVTable() { return reinterpret_cast<void *>(0x79AAEC); }
 void *FEngMovieStarterVTable() { return reinterpret_cast<void *>(0x79AB84); }
+void *FEngHidePCObjectsVTable() { return reinterpret_cast<void *>(0x79AB8C); }  // nfsu2-rewrite patch
 void *FEngMovieStopperVTable() { return reinterpret_cast<void *>(0x79AB94); }
 void *FEDirtyMakerVTable() { return reinterpret_cast<void *>(0x79ABF0); }
 ::SlotPool **LevelSorterSlotsPtr() { return reinterpret_cast<::SlotPool **>(0x8384B0); }

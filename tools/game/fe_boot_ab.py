@@ -66,7 +66,7 @@ def boot(label, enabled_names):
     ENABLED.write_text(json.dumps(sorted(enabled_names)))
     dump = OUT / f"{label}.json"
     dump.unlink(missing_ok=True)
-    env = dict(os.environ, NFSU2_FE_DUMP=str(dump))
+    env = dict(os.environ, NFSU2_FE_DUMP=str(dump), NFSU2_FIXED_DT="1")  # pinned frame time from the first frame
     if WALK:
         env["BOOT_STOP_AT"] = "main"
     t = time.monotonic()
@@ -108,8 +108,12 @@ def main(argv):
         subprocess.run([str(ROOT / "nfsu2"), "freeroam"], capture_output=True)
     rl = rewrites()
     global WALK
-    if argv[:1] == ["--walk"]:
-        WALK, argv = argv[1], argv[2:]
+    reuse = False
+    while argv[:1] in (["--walk"], ["--reuse-baseline"]):
+        if argv[0] == "--walk":
+            WALK, argv = argv[1], argv[2:]
+        else:
+            reuse, argv = True, argv[1:]
     normal = set(json.loads(backup))
     unverified = {x["addr"]: x["name"] for x in rl if x["signature"].startswith("UNVERIFIED")}
     if argv[:1] == ["--only"]:
@@ -118,8 +122,12 @@ def main(argv):
     normal -= set(unverified.values())
     print(f"{len(unverified)} UNVERIFIED under test, {len(normal)} normally enabled", flush=True)
     try:
-        ok_a, a, _ = boot("orig_a", normal)
-        ok_b, b, _ = boot("orig_b", normal)
+        if reuse and (OUT / "orig_a.json").exists() and (OUT / "orig_b.json").exists():  # bisecting: same baseline
+            ok_a, a = True, json.loads((OUT / "orig_a.json").read_text())
+            ok_b, b = True, json.loads((OUT / "orig_b.json").read_text())
+        else:
+            ok_a, a, _ = boot("orig_a", normal)
+            ok_b, b, _ = boot("orig_b", normal)
         ok_t, t, called = boot("rewrites", normal | set(unverified.values()))
     finally:
         ENABLED.write_text(backup)

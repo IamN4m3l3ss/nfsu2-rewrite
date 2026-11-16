@@ -33,6 +33,14 @@ struct RegOutThis {
 };
 RegOutThis call_regs_this(const void* fn, const void* self, const uint32_t* args, int nargs);
 
+// Any convention (cdecl / stdcall / thiscall when self != nullptr): sentinel EAX/ECX/EDX, ESP restored from a saved
+// copy, so `popped` tells cdecl (0) from callee-pops; st0 is popped into `st0` when returns_float.
+struct RegOutAny {
+    uint32_t eax, ecx, edx, popped;
+    float st0;
+};
+RegOutAny call_any(const void* fn, const void* self, const uint32_t* args, int nargs, bool returns_float);
+
 inline uint32_t bits(float f) {
     uint32_t u;
     memcpy(&u, &f, 4);

@@ -82,6 +82,42 @@ RegOutThis call_regs_this(const void* fn, const void* self, const uint32_t* args
     return {ra, rd, after - (before - static_cast<uint32_t>(nargs) * 4)};
 }
 
+RegOutAny call_any(const void* fn, const void* self, const uint32_t* args, int nargs, bool returns_float) {
+    uint32_t ra = 0, rc = 0, rd = 0, before = 0, after = 0;
+    float f = 0.0f;
+    const uint8_t rf = returns_float ? 1 : 0;
+    const uint32_t ecx_in = self ? static_cast<uint32_t>(reinterpret_cast<uintptr_t>(self)) : 0xC0C0C0C0u;
+    __asm {
+        mov ebx, fn
+        mov esi, args
+        mov edi, nargs
+        mov ecx, edi
+    push_loop:
+        test ecx, ecx
+        jz do_call
+        dec ecx
+        push dword ptr [esi + ecx*4]
+        jmp push_loop
+    do_call:
+        lea eax, [esp + edi*4]
+        mov before, eax
+        mov ecx, ecx_in
+        mov eax, 0xA0A0A0A0
+        mov edx, 0xD0D0D0D0
+        call ebx
+        mov ra, eax
+        mov rc, ecx
+        mov rd, edx
+        mov after, esp
+        mov esp, before
+        cmp rf, 0
+        je no_float
+        fstp f
+    no_float:
+    }
+    return {ra, rc, rd, after - (before - static_cast<uint32_t>(nargs) * 4), f};
+}
+
 namespace {
 
 using json = nlohmann::json;

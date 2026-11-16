@@ -61,8 +61,8 @@ working directory, which `run_game.sh` creates in `work/profile/`. Saves made wi
 game (empty load list; Enter there crashes the original - Esc goes to the main menu): a fresh career is needed.
 Things the mods used to do come back as our probe's own optional layer (never inside rewrites): borderless window at
 the desktop size (`NFSU2_BORDERLESS=1`, default in run_game.sh, `--fullscreen` off; loader hooks GetRacingResolution
-0x5BF610 + CreateDevice/Reset windowed + WS_POPUP), then 3D aspect, 4:3 UI layout, intro skip. Reference for which code
-to touch: ThirteenAG's FusionFix sources (read only, write our own). `tools/re/modcheck.py` still works if mods return.
+0x5BF610 + CreateDevice/Reset windowed + WS_POPUP), then 3D aspect, 4:3 UI layout, intro skip.
+`tools/re/modcheck.py` still works if mods return.
 
 **Floating point (measured 14 Nov 2026):** on the game thread the x87 control word is `0x007F` — 24-bit (single)
 precision, round to nearest, exceptions masked (D3D9 default); MXCSR `0x1FA0`. So x87 `+ - * / fsqrt` round like

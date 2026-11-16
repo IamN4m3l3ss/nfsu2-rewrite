@@ -328,6 +328,31 @@ void borderless_window(HWND wnd) {
     SetWindowLongA(wnd, GWL_EXSTYLE, 0);
     SetWindowPos(wnd, HWND_TOP, 0, 0, g_desk_w, g_desk_h, SWP_FRAMECHANGED | SWP_SHOWWINDOW);
 }
+// ---------------------------------------------------------------- mod: skip the intro movies (NFSU2_SKIP_INTRO=1)
+// The intro screens push their movie's name as an immediate; a name with no movie file behind it ("SkipThis") makes
+// the game skip it. Each operand is patched only if it still holds the original string's address.
+const char kSkipThis[] = "SkipThis";
+void skip_intro_init() {
+    const char* e = std::getenv("NFSU2_SKIP_INTRO");
+    if (!(e && *e == '1')) return;
+    struct Site {
+        uintptr_t operand, original;
+        const char* what;
+    };
+    const Site sites[] = {{0x004A888B, 0x007907E8, "FMVOpening"}, {0x004A895B, 0x00790804, "ealogo"},
+                          {0x004A8B74, 0x00790848, "PSA"}, {0x004A8CEB, 0x00790878, "THX_logo"}};
+    int done = 0;
+    for (const Site& s : sites) {
+        uint32_t* p = reinterpret_cast<uint32_t*>(s.operand);
+        if (*p != s.original) {
+            logf("skip_intro: %s at %p holds %08x, expected %08x - left alone", s.what, p, *p, unsigned(s.original));
+            continue;
+        }
+        if (write_ptr(reinterpret_cast<void**>(p), const_cast<char*>(kSkipThis))) ++done;
+    }
+    logf("skip_intro: %d of 4 intro movies skipped", done);
+}
+
 void borderless_init() {
     const char* e = std::getenv("NFSU2_BORDERLESS");
     g_borderless = e && *e == '1';
@@ -468,6 +493,7 @@ void init(HMODULE self) {
         if (s == MH_OK) s = MH_EnableHook(MH_ALL_HOOKS);
         logf("loader hooks (Direct3DCreate9, WndProc keep_active=%d): %s", g_keep_active.load(), MH_StatusToString(s));
         borderless_init();
+        skip_intro_init();
     } else {
         logf("ERROR: unsupported SPEED2.EXE build: no hooks; the core still loads for read-only diagnostics");
     }

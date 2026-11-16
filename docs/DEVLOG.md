@@ -875,4 +875,13 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
 
 **Verified**
 - 1,203 verified, 1,202 on; free roam on the user's save, HUD normal (stretched until the aspect stage).
+- Probe loader: optional intro skip (`NFSU2_SKIP_INTRO=1`, default in run_game.sh, `--intro` keeps them): the four
+  intro screens' movie-name operands (FMVOpening 0x4A888B, ealogo 0x4A895B, PSA 0x4A8B74, THX_logo 0x4A8CEB) point
+  at "SkipThis" (no such movie); each only if it still holds the original pointer. Boot to the title: ~4 s.
+- `boot_freeroam.py` for the clean game: one profile loads straight from the title (no load list), new reference
+  screens (work/boot_refs, gitignored). `./nfsu2 freeroam`: ~11 s, 10 of 11 boots ok.
+- Known issue: one crash in our PoolAllocate (pool.cpp:206) during the load into free roam, 1 in 11 boots, not
+  reproduced in the 10 after. Likely the original game's heap race (allocations from the I/O thread; the lock is
+  missing in the original too, and our rewrite copies it). Fix belongs to an optional crash-fix layer, not the
+  faithful rewrite.
 

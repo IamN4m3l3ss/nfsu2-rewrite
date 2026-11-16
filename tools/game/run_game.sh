@@ -51,6 +51,7 @@ while [[ $# -gt 0 ]]; do
     --freeroam) freeroam=1; shift ;;
     --no-traffic) export NFSU2_NO_TRAFFIC=1; shift ;;
     --fullscreen) export NFSU2_BORDERLESS=0; shift ;;
+    --intro) export NFSU2_SKIP_INTRO=0; shift ;;
     --timeout) probe_timeout="$2"; shift 2 ;;
     --kill)
       kill_game || { echo "game still running after kill" >&2; exit 6; }
@@ -97,6 +98,8 @@ ln -sfn "$log" "$LOG_DIR/game_latest.log"
 export WINEDLLOVERRIDES="dinput8=n,b;d3d9=n,b"
 # borderless window at the desktop size (our probe's optional mod layer); --fullscreen turns it off
 export NFSU2_BORDERLESS="${NFSU2_BORDERLESS:-1}"
+# skip the intro movies (FMV opening, EA logo, PSA, THX); --intro keeps them
+export NFSU2_SKIP_INTRO="${NFSU2_SKIP_INTRO:-1}"
 # The loader (scripts/nfsu2_probe.asi) loads the core straight from the build output and reloads it whenever
 # out/nfsu2_core.dll changes: rebuild while the game runs.
 if [[ -f "$ROOT/out/nfsu2_core.dll" ]]; then

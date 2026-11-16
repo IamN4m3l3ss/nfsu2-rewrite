@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Drive the frontend from the title screen into free roam (Explore Mode) with injected keys.
 
-Key sequence (from the user, verified by screenshots in work/oracle/m4/):
-  title -Enter-> Load "Nameless" -Enter-> Load complete -Enter-> Main Menu (Quick Race)
+Key sequence (clean game, 16 Nov 2026; with one profile the title loads it directly, intro movies skipped by the probe):
+  title -Enter-> Load complete -Enter-> Main Menu (Quick Race)
   -Left-> Career -Enter-> Resume Career -Enter-> The Garage -Enter-> "Return to Explore Mode?" (No)
   -Left-> Yes -Enter-> LOADING -> free roam
 Needs a save in the prefix (C:\\users\\<user>\\AppData\\Local\\NFS Underground 2\\<profile>).
@@ -52,7 +52,7 @@ def diff(a: Image.Image, b: Image.Image) -> float:
 
 REFS = Path(__file__).resolve().parents[2] / "work" / "boot_refs"  # 320x180 shots of each screen (gitignored)
 # screen class -> reference images (the two Left steps only move a highlight, so they share a class)
-CLASSES = {"title": ["title"], "load": ["load"], "load_complete": ["load_complete"],
+CLASSES = {"title": ["title"], "load_complete": ["load_complete"],
            "main": ["main_quickrace", "main_career"], "career": ["career"], "garage": ["garage"],
            "explore": ["explore_no", "explore_yes"]}
 YESNO_STRIP = (48, 100, 278, 134)  # Yes/No buttons of the Explore dialog, in 320x180 coordinates
@@ -128,7 +128,7 @@ def main() -> int:
         # The title ignores Enter for a few seconds. Re-press only while it is still showing the title, so a
         # late-reacting first press can't be followed by a second Enter on the next screen.
         prev = "title"
-        for key, expect in [("enter", "load"), ("enter", "load_complete"), ("enter", "main"), ("left", None),
+        for key, expect in [("enter", "load_complete"), ("enter", "main"), ("left", None),
                             ("enter", "career"), ("enter", "garage"), ("enter", "explore"), ("left", None)]:
             step = f"{key} -> {expect or 'highlight'}"
             if key == "left":

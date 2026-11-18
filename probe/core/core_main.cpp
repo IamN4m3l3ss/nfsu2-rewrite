@@ -82,6 +82,7 @@ void core_on_frame(uint64_t frame) {
     if (g_hooks) rewrite_on_frame(frame);
     input_frame_tick(frame);
     run_tasks();
+    camrec_frame(frame);
     overlay_frame();
 }
 

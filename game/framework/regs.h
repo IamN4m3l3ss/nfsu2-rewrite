@@ -153,6 +153,37 @@ extern "C" volatile long nfsu2_inflight;
 // After push ecx/edx/eax, arg i of N is at [esp + 16 + 4*i]; pushed last-to-first the offset is 12 + 4*N.
 #define NFSU2_PUSH_ARGS_E1 __asm push dword ptr [esp + 16]
 #define NFSU2_PUSH_ARGS_E2 __asm push dword ptr [esp + 20] __asm push dword ptr [esp + 20]
+
+#define NFSU2_PUSH_ARGS_E0
+#define NFSU2_PUSH_ARGS_E3 __asm push dword ptr [esp + 24] __asm push dword ptr [esp + 24] __asm push dword ptr [esp + 24]
+#define NFSU2_PUSH_ARGS_E4 __asm push dword ptr [esp + 28] __asm push dword ptr [esp + 28] __asm push dword ptr [esp + 28] __asm push dword ptr [esp + 28]
+#define NFSU2_PUSH_ARGS_E5 __asm push dword ptr [esp + 32] __asm push dword ptr [esp + 32] __asm push dword ptr [esp + 32] __asm push dword ptr [esp + 32] __asm push dword ptr [esp + 32]
+#define NFSU2_PUSH_ARGS_E6 __asm push dword ptr [esp + 36] __asm push dword ptr [esp + 36] __asm push dword ptr [esp + 36] __asm push dword ptr [esp + 36] __asm push dword ptr [esp + 36] __asm push dword ptr [esp + 36]
+#define NFSU2_PUSH_ARGS_E7 __asm push dword ptr [esp + 40] __asm push dword ptr [esp + 40] __asm push dword ptr [esp + 40] __asm push dword ptr [esp + 40] __asm push dword ptr [esp + 40] __asm push dword ptr [esp + 40] __asm push dword ptr [esp + 40]
+#define NFSU2_PUSH_ARGS_E8 __asm push dword ptr [esp + 44] __asm push dword ptr [esp + 44] __asm push dword ptr [esp + 44] __asm push dword ptr [esp + 44] __asm push dword ptr [esp + 44] __asm push dword ptr [esp + 44] __asm push dword ptr [esp + 44] __asm push dword ptr [esp + 44]
+
+// ---- __thiscall / __stdcall stubs that hand the caller's EAX to our function as an extra LAST argument (for
+// originals that leave EAX untouched or only change part of it): R __cdecl fn(T* self, args..., uint32_t eax_in)
+#define NFSU2_REWRITE_THIS_EAX(addr, fn, nargs, sig, original)                                           \
+    static void* const g_impl_##fn = reinterpret_cast<void*>(&fn);                                       \
+    static volatile uint32_t g_calls_##fn = 0;                                                           \
+    extern "C" __declspec(naked) void nfsu2_entry_##fn() {                                               \
+        __asm lock inc dword ptr [g_calls_##fn] __asm lock inc dword ptr [nfsu2_inflight] __asm push ecx __asm push edx __asm push eax \
+            NFSU2_PUSH_ARGS_E##nargs __asm push ecx __asm call dword ptr [g_impl_##fn] __asm add esp, 4 * (nargs + 2) \
+                __asm pop edx __asm pop ecx __asm lock dec dword ptr [nfsu2_inflight] __asm ret 4 * nargs        \
+    }                                                                                                    \
+    static ::game::Registrar g_reg_##fn(addr, #fn, sig, reinterpret_cast<void*>(&nfsu2_entry_##fn),      \
+                                        reinterpret_cast<void**>(&original), __FILE__, &g_calls_##fn)
+#define NFSU2_REWRITE_STD_EAX(addr, fn, nargs, sig, original)                                            \
+    static void* const g_impl_##fn = reinterpret_cast<void*>(&fn);                                       \
+    static volatile uint32_t g_calls_##fn = 0;                                                           \
+    extern "C" __declspec(naked) void nfsu2_entry_##fn() {                                               \
+        __asm lock inc dword ptr [g_calls_##fn] __asm lock inc dword ptr [nfsu2_inflight] __asm push ecx __asm push edx __asm push eax \
+            NFSU2_PUSH_ARGS_E##nargs __asm call dword ptr [g_impl_##fn] __asm add esp, 4 * (nargs + 1)          \
+                __asm pop edx __asm pop ecx __asm lock dec dword ptr [nfsu2_inflight] __asm ret 4 * nargs        \
+    }                                                                                                    \
+    static ::game::Registrar g_reg_##fn(addr, #fn, sig, reinterpret_cast<void*>(&nfsu2_entry_##fn),      \
+                                        reinterpret_cast<void**>(&original), __FILE__, &g_calls_##fn)
 #define NFSU2_REWRITE_N_EAX(addr, fn, nargs, sig, original)                                          \
     static void* const g_impl_##fn = reinterpret_cast<void*>(&fn);                          \
     static volatile uint32_t g_calls_##fn = 0;                                   \

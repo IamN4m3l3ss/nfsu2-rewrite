@@ -4,8 +4,11 @@
 // with the same arguments; compared: EAX (pointers as block+offset), ECX/EDX where the original preserves them,
 // stack pops, st0 for float returns, and every block (link slots skipped, copied pointers compared by place).
 #pragma once
+#include <cstddef>
 #include <cstdint>
+#include <algorithm>
 #include <cstring>
+#include <type_traits>
 #include <initializer_list>
 #include <string>
 #include <vector>
@@ -17,10 +20,35 @@
 namespace game::leaf {
 
 template <class T> inline T& at(void* p, uint32_t off) { return *reinterpret_cast<T*>(static_cast<uint8_t*>(p) + off); }
-inline uint8_t* ptr(void* p, uint32_t off) { return at<uint8_t*>(p, off); }
+template <class T> inline T& at(const void* p, uint32_t off) { return at<T>(const_cast<void*>(p), off); }
+template <class T> inline T& at(uint32_t p, uint32_t off) { return at<T>(reinterpret_cast<void*>(static_cast<uintptr_t>(p)), off); }
+// a pointer field: converts to any pointer type (uint8_t*, uint32_t*, float*, ...), byte arithmetic with +
+struct P {
+    uint8_t* p;
+    template <class T> operator T*() const { return reinterpret_cast<T*>(p); }
+    operator uint32_t() const { return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(p)); }
+    template <class I, std::enable_if_t<std::is_integral_v<I>, int> = 0> uint8_t* operator+(I n) const { return p + n; }
+    explicit operator bool() const { return p != nullptr; }
+    bool operator==(std::nullptr_t) const { return p == nullptr; }
+    bool operator!=(std::nullptr_t) const { return p != nullptr; }
+};
+inline P ptr(void* p, uint32_t off) { return {at<uint8_t*>(p, off)}; }
+inline P ptr(const P& p, uint32_t off) { return ptr(p.p, off); }
+inline P ptr(const void* p, uint32_t off) { return ptr(const_cast<void*>(p), off); }
+template <class T> inline T& at(const P& p, uint32_t off) { return at<T>(p.p, off); }
+inline uint32_t u(const P& p) { return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(p.p)); }
+inline float gf(const P& p) { return *reinterpret_cast<const float*>(p.p); }
+inline uint32_t gu(const P& p) { return *reinterpret_cast<const uint32_t*>(p.p); }
+// gf(p, off) / gu(p, off): a float / dword field (what the models often mean)
+template <class Q> inline float gf(const Q& p, uint32_t off) { return at<float>(p, off); }
+template <class Q> inline uint32_t gu(const Q& p, uint32_t off) { return at<uint32_t>(p, off); }
+inline P ptr(uint32_t p, uint32_t off) { return ptr(reinterpret_cast<void*>(static_cast<uintptr_t>(p)), off); }
 inline float gf(uintptr_t a) { return *reinterpret_cast<const float*>(a); }
 inline uint32_t gu(uintptr_t a) { return *reinterpret_cast<const uint32_t*>(a); }
+inline float gf(const void* a) { return *static_cast<const float*>(a); }
+inline uint32_t gu(const void* a) { return *static_cast<const uint32_t*>(a); }
 inline uint32_t u(const void* p) { return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(p)); }
+inline uint32_t u(uint32_t v) { return v; }
 
 struct Link {
     int from;
@@ -120,7 +148,60 @@ struct Graph {
     }
 };
 
-inline DiffResult run(const DiffCtx& ctx, const char* test, const Spec& spec, const std::vector<Fn>& fns) {
+// a bad Spec must fail the test with a message, not write outside the blocks
+inline std::string check_spec(const Spec& s, const std::vector<Fn>& fns) {
+    char t[160];
+    if (s.blocks < 1 || s.blocks > 32 || s.size < 0x10 || s.size > 0x10000) return "Spec: blocks 1..32, size 0x10..0x10000";
+    for (const Link& l : s.links)
+        if (l.from < 0 || l.from >= s.blocks || l.to < 0 || l.to >= s.blocks || l.off + 4 > s.size) {
+            snprintf(t, sizeof t, "Spec: Link {%d, 0x%X, %d} is outside %d blocks of 0x%X bytes", l.from,
+                     static_cast<unsigned>(l.off), l.to, s.blocks, static_cast<unsigned>(s.size));
+            return t;
+        }
+    for (const IntField& f : s.ints)
+        if (f.blk < 0 || f.blk >= s.blocks || (f.size != 1 && f.size != 2 && f.size != 4) || f.off + f.size > s.size || f.range == 0) {
+            snprintf(t, sizeof t, "Spec: IntField {%d, 0x%X, %d, %u} is outside the blocks or has size not 1/2/4 or range 0",
+                     f.blk, static_cast<unsigned>(f.off), f.size, static_cast<unsigned>(f.range));
+            return t;
+        }
+    for (const Fn& f : fns)
+        for (const Arg& a : f.args)
+            if ((a.kind == 'p' && a.v >= static_cast<uint32_t>(s.blocks)) ) {
+                snprintf(t, sizeof t, "Spec: argument {'%c', %u} of %s: 'p' needs an existing block, 'i' a range > 0", a.kind,
+                         static_cast<unsigned>(a.v), f.name);
+                return t;
+            }
+    return {};
+}
+
+// forgive bookkeeping slips: enough blocks for every link/argument, blocks big enough for every offset
+inline Spec grown(Spec s, const std::vector<Fn>& fns) {
+    int nb = s.blocks;
+    uint32_t sz = s.size;
+    for (const Link& l : s.links) nb = std::max({nb, l.from + 1, l.to + 1}), sz = std::max(sz, l.off + 0x100);
+    for (IntField& f : s.ints) {
+        if (f.size != 1 && f.size != 2 && f.size != 4) f.size = 4;
+        if (f.range == 0) f.range = 0xFFFFFFFFu;
+        nb = std::max(nb, f.blk + 1), sz = std::max(sz, f.off + 0x100);
+    }
+    for (const Fn& f : fns)
+        for (const Arg& a : f.args)
+            if (a.kind == 'p') nb = std::max(nb, static_cast<int>(a.v) + 1);
+    s.blocks = std::min(nb, 32);
+    s.size = std::min((std::max(sz, 0x100u) + 0xFF) & ~0xFFu, 0x10000u);
+    return s;
+}
+
+inline DiffResult run(const DiffCtx& ctx, const char* test, const Spec& spec_in, const std::vector<Fn>& fns) {
+    static std::vector<Spec> keep;  // the lambda below holds a reference
+    keep.push_back(grown(spec_in, fns));
+    const Spec& spec = keep.back();
+    if (std::string e = check_spec(spec, fns); !e.empty()) {
+        DiffResult r;
+        r.name = test;
+        r.error = e;
+        return r;
+    }
     const void* anchor = nullptr;
     for (const Fn& f : fns)
         if (*f.orig) anchor = *f.orig;
@@ -138,7 +219,7 @@ inline DiffResult run(const DiffCtx& ctx, const char* test, const Spec& spec, co
             const Arg& g = f.args[i];
             switch (g.kind) {
                 case 'p': aa[i] = u(a.blk[g.v].data()), ab[i] = u(b.blk[g.v].data()); break;
-                case 'i': aa[i] = ab[i] = r.below(g.v); break;
+                case 'i': aa[i] = ab[i] = g.v ? r.below(g.v) : r.next(); break;
                 case 'f': aa[i] = ab[i] = 0x3F800000u + r.below(0x01000000) - (r.below(4) << 30); break;
                 default: aa[i] = ab[i] = r.next(); break;
             }
@@ -148,12 +229,22 @@ inline DiffResult run(const DiffCtx& ctx, const char* test, const Spec& spec, co
         const RegOutAny x = call_any(*f.orig, sa, aa, n, f.ret == FLT);
         const RegOutAny y = call_any(f.mine, sb, ab, n, f.ret == FLT);
         std::string bad;
+        char t[200];
         if (f.ret == FLT) {
-            if (!same_float(x.st0, y.st0)) bad += " st0";
+            if (!same_float(x.st0, y.st0)) {
+                snprintf(t, sizeof t, " st0 (float result: original %g, rewrite %g)", x.st0, y.st0);
+                bad += t;
+            }
         } else if (a.rel(x.eax) != b.rel(y.eax)) {
-            bad += " eax";
+            snprintf(t, sizeof t, " eax (return value: original 0x%X, rewrite 0x%X; 0xA0A0A0A0 = the caller's EAX untouched)",
+                     static_cast<unsigned>(x.eax), static_cast<unsigned>(y.eax));
+            bad += t;
         }
-        if (x.popped != y.popped) bad += " pops";
+        if (x.popped != y.popped) {
+            snprintf(t, sizeof t, " pops (original removes %u bytes of stack arguments, rewrite %u: fix nargs / THIS-CDECL-STD)",
+                     static_cast<unsigned>(x.popped), static_cast<unsigned>(y.popped));
+            bad += t;
+        }
         if (x.edx == kSentEDX && y.edx != kSentEDX) bad += " edx";
         if (f.conv != THIS && x.ecx == kSentECX && y.ecx != kSentECX) bad += " ecx";
         bad += a.diff(b);
@@ -165,13 +256,38 @@ inline DiffResult run(const DiffCtx& ctx, const char* test, const Spec& spec, co
 
 // Register a rewrite and get its table entry: LEAF_THIS(addr, fn, nargs, sig) after the function definition;
 // in the test: {"fn", (void**)&o_fn, NFSU2_ENTRY(fn), THIS, INT, {{'i', 4}}}
-#define LEAF_THIS(addr, fn, nargs, sig) \
+#define LEAF_SIG_(sig, ...) sig
+#define LEAF_THIS(addr, fn, nargs, ...) \
     namespace { void* o_##fn = nullptr; } \
-    NFSU2_REWRITE_THIS(addr, fn, nargs, sig, o_##fn)
-#define LEAF_CDECL(addr, fn, nargs, sig) \
+    NFSU2_REWRITE_THIS(addr, fn, nargs, LEAF_SIG_(__VA_ARGS__, ""), o_##fn);  /* ends itself: a missing ; after LEAF_* is fine */
+#define LEAF_CDECL(addr, fn, nargs, ...) \
     namespace { void* o_##fn = nullptr; } \
-    NFSU2_REWRITE_N(addr, fn, nargs, sig, o_##fn)
-#define LEAF_STD(addr, fn, nargs, sig) \
+    NFSU2_REWRITE_N(addr, fn, nargs, LEAF_SIG_(__VA_ARGS__, ""), o_##fn);  /* ends itself: a missing ; after LEAF_* is fine */
+#define LEAF_STD(addr, fn, nargs, ...) \
     namespace { void* o_##fn = nullptr; } \
-    NFSU2_REWRITE_STD(addr, fn, nargs, sig, o_##fn)
+    NFSU2_REWRITE_STD(addr, fn, nargs, LEAF_SIG_(__VA_ARGS__, ""), o_##fn);  /* ends itself: a missing ; after LEAF_* is fine */
+// the original leaves EAX (partly) as the caller had it: our function gets it as an extra LAST parameter
+#define LEAF_THIS_EAX(addr, fn, nargs, ...) \
+    namespace { void* o_##fn = nullptr; } \
+    NFSU2_REWRITE_THIS_EAX(addr, fn, nargs, LEAF_SIG_(__VA_ARGS__, ""), o_##fn);  /* ends itself: a missing ; after LEAF_* is fine */
+#define LEAF_CDECL_EAX(addr, fn, nargs, ...) \
+    namespace { void* o_##fn = nullptr; } \
+    NFSU2_REWRITE_N_EAX(addr, fn, nargs, LEAF_SIG_(__VA_ARGS__, ""), o_##fn);  /* ends itself: a missing ; after LEAF_* is fine */
+#define LEAF_STD_EAX(addr, fn, nargs, ...) \
+    namespace { void* o_##fn = nullptr; } \
+    NFSU2_REWRITE_STD_EAX(addr, fn, nargs, LEAF_SIG_(__VA_ARGS__, ""), o_##fn);  /* ends itself: a missing ; after LEAF_* is fine */
 #define LEAF_FN(fn, conv, ...) ::game::leaf::Fn(#fn, &o_##fn, NFSU2_ENTRY(fn), ::game::leaf::conv, ::game::leaf::__VA_ARGS__)
+
+using namespace game::leaf;  // the rewrite files use the helpers unqualified
+
+// Ghidra's type names, which drafts copy from the decompilation (MSVC: long double is a 64-bit double)
+using undefined = uint8_t;
+using undefined1 = uint8_t;
+using undefined2 = uint16_t;
+using undefined4 = uint32_t;
+using undefined8 = uint64_t;
+using float10 = long double;
+using byte = uint8_t;
+using ushort = uint16_t;
+using uint = uint32_t;
+using ulong = uint32_t;

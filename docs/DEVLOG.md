@@ -891,3 +891,24 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   the frame time from the first frame for A/B boots (it fast-forwards the game; normal runs don't set it). After
   that: 7 screens + free roam identical; 26 ran -> verified.
 
+## 2026-11-18 — Local-model drafting: benchmark, parked
+
+**Changed**
+- `tools/re/llm/llm_batch.py`: OpenAI-compatible backend (llama-server, Vulkan) next to Ollama; parallel drafting
+  workers, one serial tester (one game); retries first; `--bench` (measure only), `--context` (EA names + Ghidra
+  decompilation from the RE kit), `--thinking`, `--max-tokens`, `--template-kwargs`; detailed reject reasons, every
+  failed try kept in work/llm/failed/; link errors and "test not loaded" handled without killing the run.
+- `game/framework/leaf.h`: spec checked (no out-of-block writes) and auto-grown, looser helpers (`P` pointer proxy,
+  gf/gu/at/u overloads, Ghidra type names), self-terminating LEAF_* macros, `*_EAX` variants (regs.h: THIS/STD stubs
+  that pass the caller's EAX), mismatch messages with values.
+- `tools/re/llm/dashboard.py` (reasons, filters, per-try code, benchmark table), `bench_all.sh`.
+
+**Learned**
+- Benchmarks (47 leaf functions, 3 tries, game running; budget ~13.2 GB VRAM): Qwen3.5-9B Q6 6 passes (20/h),
+  Gemma 4 12B Q5 10 (28.6/h), Mellum2.1-12B-A2.5B Q6 6 (25/h, fastest 61 tok/s); gpt-oss-20b mostly cut off by its
+  reasoning; Mellum + context + thinking: better quality per draft, ~1.5-2 min per draft. All far too slow to be
+  worth it (~20-30 verified/h, mostly medium/low functions). Parked; revisit with a stronger model or a fine-tune.
+- During LLM runs the game must have all rewrites OFF: ~80 hot reloads of the rewrite DLL reset the live
+  (nfsu2-gcpc) rewrites' state -> broken UI/audio. Diff tests of originals that write fixed game addresses change
+  the real game: such functions are excluded from LLM lists.
+

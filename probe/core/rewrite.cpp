@@ -3,6 +3,7 @@
 // changes. All hook changes happen on the render thread (on_frame / run_on_main), per CLAUDE.md.
 #include "probe.h"
 
+#include <algorithm>
 #include <cstring>
 #include <set>
 #include <stdexcept>
@@ -321,17 +322,54 @@ json rewrite_reload() {
         10000);
 }
 
+// Diff tests run on the game thread (they call original game code). By default a test is time-sliced: chunks of
+// `slice` cases (seed + chunk index), one chunk per frame, so the game keeps running while a long test is going;
+// slice 0 runs everything inside one frame (the old behaviour). Results are merged per test name.
 json diff_test(const json& p) {
     const std::string name = p.value("name", std::string("*"));
     const uint32_t iterations = p.value("iterations", 10000u);
     const uint32_t seed = p.value("seed", 12345u);
-    return run_on_main(
-        [name, iterations, seed] {
-            if (!g_game) throw std::runtime_error("no game DLL loaded");
-            if (name == "list") return json::parse(g_game->diff_list());
-            return json::parse(g_game->diff(name.c_str(), iterations, seed));
-        },
-        30000);
+    const uint32_t slice = p.value("slice", 2000u);
+    auto run = [&name](uint32_t n, uint32_t sd) {
+        return run_on_main(
+            [name, n, sd] {
+                if (!g_game) throw std::runtime_error("no game DLL loaded");
+                if (name == "list") return json::parse(g_game->diff_list());
+                return json::parse(g_game->diff(name.c_str(), n, sd));
+            },
+            30000);
+    };
+    if (name == "list" || slice == 0 || iterations <= slice) return run(iterations, seed);
+    json merged = json::array();  // by name, in first-seen order
+    auto merge = [&merged](const json& r) {
+        for (json& m : merged)
+            if (m["name"] == r["name"]) {
+                m["iterations"] = m["iterations"].get<uint32_t>() + r.value("iterations", 0u);
+                m["mismatches"] = m["mismatches"].get<uint32_t>() + r.value("mismatches", 0u);
+                for (const auto& e : r.value("examples", json::array()))
+                    if (m["examples"].size() < 5) m["examples"].push_back(e);
+                if (r.contains("error") && !m.contains("error")) m["error"] = r["error"];
+                return;
+            }
+        json c = r;
+        if (!c.contains("examples")) c["examples"] = json::array();
+        merged.push_back(c);
+    };
+    uint32_t done = 0;
+    for (uint32_t k = 0; done < iterations; ++k) {
+        const uint32_t n = std::min(slice, iterations - done);
+        const json r = run(n, seed + k);
+        if (r.is_array())
+            for (const auto& x : r) merge(x);
+        else
+            merge(r);
+        done += n;
+        bool stop = false;  // a crashed test (error) stops: running it again would crash again
+        for (const auto& m : merged) stop |= m.contains("error");
+        if (stop) break;
+    }
+    if (merged.size() == 1 && name != "*") return merged[0];
+    return merged;
 }
 
 }  // namespace probe

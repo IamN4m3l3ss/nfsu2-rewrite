@@ -86,6 +86,7 @@ struct SchedEvent {
 std::vector<SchedEvent> g_sched;
 size_t g_sched_next = 0;
 uint64_t g_sched_base = 0;
+uint64_t g_sync_frame = 0;  // schedule {"time_sync": true}: sync the game clocks on this frame (the drive's first)
 
 // Recording of the real keyboard's action events (relative frame, uAppData, dwData).
 struct RecEvent {
@@ -495,6 +496,10 @@ json input_state() {
 
 void input_frame_tick(uint64_t frame) {
     std::lock_guard lk(g_mu);
+    if (g_sync_frame && frame >= g_sync_frame) {
+        time_sync_apply();
+        g_sync_frame = 0;
+    }
     while (g_sched_next < g_sched.size() && g_sched_base + g_sched[g_sched_next].f <= frame) {
         const SchedEvent& e = g_sched[g_sched_next++];
         if (e.is_action)
@@ -530,6 +535,7 @@ json input_schedule(const json& p) {
     g_sched = std::move(evs);
     g_sched_next = 0;
     g_sched_base = current_frame() + 1;
+    g_sync_frame = p.value("time_sync", false) ? g_sched_base : 0;
     if (p.contains("trace_every")) {  // start a trace on the same base frame, so samples line up with the script
         g_trace.clear();
         g_trace_every = std::max<uint64_t>(1, p["trace_every"].get<uint64_t>());

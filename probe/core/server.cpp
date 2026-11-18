@@ -80,6 +80,7 @@ json dispatch(const std::string& method, const json& p) {
     if (method == "fe_state") return fe_state(p);
     if (method == "modules") return modules(false);
     if (method == "fixed_dt") return fixed_dt(p);
+    if (method == "cam_record") return cam_record(p);
     if (method == "fpu_state") {  // x87 control word + MXCSR as seen by game code on the render thread
         return run_on_main(
             [] {

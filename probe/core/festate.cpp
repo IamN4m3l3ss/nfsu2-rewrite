@@ -36,6 +36,27 @@ __declspec(naked) void fe_timer_hook() {
 
 namespace probe {
 
+// Clock sync for in-game A/B drives (main thread, at the drive's first frame): the boot to free roam takes a
+// different number of frames each time (its waits are wall-clock), so the game clocks start the drive at different
+// values. Things like the camera shake (Camera::ApplyNoise at world time 0x86518C * 1/4000) then run at a different
+// phase. This sets every clock to the same values: real ticks 0x8651AC (+ fraction 0x865144), the world timer
+// 0x89CF48 (its last real tick +0x54, accumulated world ticks 0x869234), world time 0x86518C / seconds 0x7FB718,
+// frame counters 0x7FB704 / 0x7FB708 / 0x86514C. Only for test drives: gameplay timers jump.
+void time_sync_apply() {
+    constexpr uint32_t kReal = 0x00100000, kWorld = 400000, kFrames = 6000;  // kFrames % 16 == 0 (ring index)
+    *reinterpret_cast<volatile uint32_t*>(0x008651ACu) = kReal;
+    *reinterpret_cast<volatile float*>(0x00865144u) = 0.0f;
+    volatile uint32_t& last = *reinterpret_cast<volatile uint32_t*>(0x0089CF48u + 0x54);
+    if (last != 0 && last != 0x7FFFFFFFu) last = kReal;
+    *reinterpret_cast<volatile uint32_t*>(0x00869234u) = kWorld;
+    *reinterpret_cast<volatile uint32_t*>(0x0086518Cu) = kWorld;
+    *reinterpret_cast<volatile float*>(0x007FB718u) = 100.0f;  // kWorld / 4000
+    *reinterpret_cast<volatile uint32_t*>(0x007FB704u) = kFrames;
+    *reinterpret_cast<volatile uint32_t*>(0x007FB708u) = kFrames;
+    *reinterpret_cast<volatile uint32_t*>(0x0086514Cu) = kFrames;
+    logf("time_sync: game clocks set (real %u, world %u, frames %u)", kReal, kWorld, kFrames);
+}
+
 bool fe_fixed_dt(bool on, float dt) {  // main thread
     static bool hooked = false;
     if (on && !hooked) {

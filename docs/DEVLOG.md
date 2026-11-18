@@ -993,3 +993,27 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
 - camera_calls1 (+ _drag/_group/_data): 3 seeds x 30,000 cases per spec, 0 mismatches; _BROKEN catches. Full
   suite 507 passed, 0 failed. 1,325 verified, all on.
 
+## 2026-11-18 — In-game camera A/B, time-sliced tests, game clock sync
+
+**Changed**
+- Probe core: diff tests are time-sliced (`slice`, default 2000 cases per frame, seed + chunk), so the game keeps
+  rendering during long tests (measured: 15 frames during a 30,000-case test instead of a frozen game).
+- Probe core `cam_record` (camrec.cpp): per frame, the camera of a view (view table 0x832DE0, camera at +0x40;
+  player = view 1) - view matrix, eye position - plus world time and real ticks.
+- `time_sync` (schedule option, festate.cpp): on the drive's first frame, every game clock is set to fixed values:
+  real ticks 0x8651AC (+ fraction 0x865144), world timer 0x89CF48 (+0x54 last tick, 0x869234 accumulated), world
+  time 0x86518C / 0x7FB718, frame counters 0x7FB704 / 0x7FB708 / 0x86514C.
+- `tools/game/cam_ab.py`: boots with the frame time pinned from the first frame, plays a frame-locked drive with
+  camera view changes (tests/drives/camera_ab.script.json), records the player camera, compares orig/orig (baseline)
+  and orig/rewrites bit for bit; `--system camera` or `--names`.
+
+**Learned**
+- The car is deterministic under the pinned frame time; the camera was not: the boot to free roam takes a different
+  number of frames each time (wall-clock waits), so the clocks start the drive at different values, and the camera
+  shake (Camera::ApplyNoise, time = world time 0x86518C / 4000, called from TerrainVelocityNoise / IceCameraMover)
+  ran at another phase (only matrix row 3 y / eye z differed). World time is accumulated from the real ticks
+  0x8651AC (0x57A050), which follow the pinned frame time.
+
+**Verified**
+- Baseline orig vs orig: identical (720 frames). Camera rewrites (system camera) vs original: identical.
+

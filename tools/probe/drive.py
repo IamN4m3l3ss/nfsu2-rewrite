@@ -45,10 +45,11 @@ def script_events(script: dict) -> list[dict]:
     return evs
 
 
-def run_events(events: list[dict], every: int = 30, tail: int = 60) -> dict:
-    """Schedule events (key or action), trace on the same base frame, wait until done + tail frames."""
+def run_events(events: list[dict], every: int = 30, tail: int = 60, time_sync: bool = False) -> dict:
+    """Schedule events (key or action), trace on the same base frame, wait until done + tail frames.
+    time_sync: set the game clocks to fixed values on the first frame (repeatable A/B drives)."""
     last = max((e["f"] for e in events), default=0)
-    pc.call("schedule", {"events": events, "trace_every": every})
+    pc.call("schedule", {"events": events, "trace_every": every, "time_sync": time_sync})
     while True:
         st = pc.call("schedule_status")
         if st["done"] and st["rel_frame"] >= last + tail:

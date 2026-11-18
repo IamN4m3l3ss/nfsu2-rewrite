@@ -971,3 +971,25 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
 - camera_leaf1 (+ _plain/_drag/_track): 6 seeds x 50,000 cases per spec, 0 mismatches; _BROKEN catches. Full
   suite 492 passed, 0 failed. 1,311 verified, all on; free roam normal.
 
+## 2026-11-18 — Camera batch 2 (14): functions calling verified helpers
+
+**Changed**
+- `game/systems/camera/camera_calls1.cpp`: lens <-> FOV conversions (bATan / bSin / bCos), SinController,
+  DragCameraManager GetDragIndex / GetIntervalSize / KeysShared / GetNextValidHandleIndex, DragCameraGroup::GetTrack
+  (bStrCmp), DragCameraData::GetEye / GetLook (FixAnimElevation on the live manager), select-car step count
+  (bEqual), IceCameraMover::GetFxGain (tCubic2D getters + bScaleAdd), CameraInfo::GetPov (eGetCurrentViewMode).
+  Callees go through their game addresses, so both sides run the same callee.
+- Deferred: GenericNosScore / GenericPowerSlideScore / OutsidePOV / MinDistToWall (call unverified car code that
+  reads car internals), GetDragCamera / bClamp / bScale (unknown helpers), constructors / destructors (attach to
+  the live view: need fixtures).
+
+**Learned**
+- A diff test runs inside one frame on the game thread, so the game pauses while it runs (by design). Inputs the
+  game never produces can hang or crash the ORIGINAL: GetNextValidHandleIndex(0) with the index past the count
+  loops forever (froze the game once); the live section table 0x88A334 has 1500 entries and the next global
+  follows. Test specs keep inputs inside what the game produces.
+
+**Verified**
+- camera_calls1 (+ _drag/_group/_data): 3 seeds x 30,000 cases per spec, 0 mismatches; _BROKEN catches. Full
+  suite 507 passed, 0 failed. 1,325 verified, all on.
+

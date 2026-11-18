@@ -72,9 +72,11 @@ struct Spec {
 };
 
 enum Conv { THIS, CDECL, STD };
-enum Ret { INT, PTR, FLT, NONE, LOW16 };  // LOW16: only AX compared (upper EAX = a pointer's high half)  // NONE: EAX still compared (the caller's EAX passes through or is clobbered alike)
+enum Ret { INT, PTR, FLT, NONE, LOW16, LOW8 };  // LOW8: only AL (bools whose upper EAX is leftover pointer bits)  // LOW16: only AX compared (upper EAX = a pointer's high half)  // NONE: EAX still compared (the caller's EAX passes through or is clobbered alike)
 struct Arg {
-    char kind = 0;  // 'i' below(v), 'p' pointer to block v, 'f' random float bits, 'r' random dword
+    // 'i' below(v), 'j' signed: below(2v) - v, 'p' pointer to block v, 'q' pointer into block (v & 0xFF) at offset
+    // ((v >> 8) & 0xFFF) + stride (v >> 20) * below(8), 'f' random float bits, 'r' random dword
+    char kind = 0;
     uint32_t v = 0;
 };
 struct Fn {
@@ -92,19 +94,34 @@ struct Fn {
     }
 };
 
+// A block: `size` usable bytes with a zeroed guard gap of kGuard bytes on each side, so pointers the code computes
+// just before / past a block (handled with 0x100 slack in rel()) can never land in a neighbouring block, and a
+// stray write into the gap shows up as a difference.
+constexpr size_t kGuard = 0x200;
+struct Blk {
+    uint8_t* p;
+    size_t n;
+    uint8_t* data() const { return p; }
+    size_t size() const { return n; }
+};
+
 struct Graph {
     const Spec* sp;
-    std::vector<std::vector<uint8_t>> blk;
+    std::vector<std::vector<uint8_t>> raw;
+    std::vector<Blk> blk;
     void fill(const Spec& s, Rng& r, uint32_t nullmask) {
         sp = &s;
+        raw.assign(s.blocks, {});
         blk.assign(s.blocks, {});
-        for (auto& b : blk) {
-            b.resize(s.size);
+        for (size_t k = 0; k < raw.size(); ++k) {
+            raw[k].assign(s.size + 2 * kGuard, 0);
+            blk[k] = {raw[k].data() + kGuard, s.size};
+            const Blk& b = blk[k];
             for (size_t i = 0; i < b.size(); i += 4) {
-                const uint32_t k = r.below(8);
-                const uint32_t x = k < 2 ? 0u
-                                 : k < 6 ? 0x3F800000u + r.below(0x01000000) - (r.below(4) << 30)  // floats around +-1..4
-                                 : k < 7 ? r.below(16)
+                const uint32_t kind = r.below(8);
+                const uint32_t x = kind < 2 ? 0u
+                                 : kind < 6 ? 0x3F800000u + r.below(0x01000000) - (r.below(4) << 30)  // floats +-1..4
+                                 : kind < 7 ? r.below(16)
                                          : r.next();
                 std::memcpy(b.data() + i, &x, 4);
             }
@@ -119,21 +136,24 @@ struct Graph {
             std::memcpy(blk[l.from].data() + l.off, &p, 4);
         }
     }
-    // a pointer as (block, offset): inside a block first, then up to 0x100 past its end (one-past-the-end
-    // pointers); blocks can sit back to back, so the exact pass must come first
+    // a pointer as (block, offset): inside a block first, then up to 0x100 before its start or past its end
+    // (one-before / one-past-the-end pointers the code computes); blocks can sit back to back, so the exact pass
+    // must come first
     int64_t rel(uint32_t v) const {
         for (uint32_t slack : {0u, 0x100u})
             for (size_t k = 0; k < blk.size(); ++k) {
                 const uintptr_t b = reinterpret_cast<uintptr_t>(blk[k].data());
-                if (v >= b && v < b + blk[k].size() + slack) return (static_cast<int64_t>(k + 1) << 32) | (v - b);
+                if (v + slack >= b + 0 && v >= b - slack && v < b + blk[k].size() + slack)
+                    return (static_cast<int64_t>(k + 1) << 32) | static_cast<uint32_t>(v - b);
             }
         return v;
     }
     std::string diff(const Graph& o) const {
         for (size_t k = 0; k < blk.size(); ++k) {
-            // pointer fields (links, and pointers the code wrote) compare by where they point (block + offset)
-            const std::vector<uint8_t>& a = blk[k];
-            const std::vector<uint8_t>& b = o.blk[k];
+            // pointer fields (links, and pointers the code wrote) compare by where they point (block + offset);
+            // the guard gaps are compared too
+            const std::vector<uint8_t>& a = raw[k];
+            const std::vector<uint8_t>& b = o.raw[k];
             for (size_t i = 0; i + 4 <= a.size(); i += 4) {
                 if (!std::memcmp(a.data() + i, b.data() + i, 4)) continue;
                 float x, y;
@@ -145,7 +165,8 @@ struct Graph {
                 std::memcpy(&uy, &y, 4);
                 if (rel(ux) == o.rel(uy) && rel(ux) > 0xFFFFFFFFll) continue;  // a copied pointer, same place
                 char t[64];
-                snprintf(t, sizeof t, " mem[%d+0x%X] %08X/%08X", static_cast<int>(k), static_cast<unsigned>(i), ux, uy);
+                snprintf(t, sizeof t, " mem[%d+0x%X] %08X/%08X", static_cast<int>(k),
+                         static_cast<unsigned>(i - kGuard), ux, uy);
                 return t;
             }
         }
@@ -171,7 +192,7 @@ inline std::string check_spec(const Spec& s, const std::vector<Fn>& fns) {
         }
     for (const Fn& f : fns)
         for (const Arg& a : f.args)
-            if ((a.kind == 'p' && a.v >= static_cast<uint32_t>(s.blocks)) ) {
+            if ((a.kind == 'p' && a.v >= static_cast<uint32_t>(s.blocks)) || (a.kind == 'q' && (a.v & 0xFF) >= static_cast<uint32_t>(s.blocks))) {
                 snprintf(t, sizeof t, "Spec: argument {'%c', %u} of %s: 'p' needs an existing block, 'i' a range > 0", a.kind,
                          static_cast<unsigned>(a.v), f.name);
                 return t;
@@ -192,6 +213,7 @@ inline Spec grown(Spec s, const std::vector<Fn>& fns) {
     for (const Fn& f : fns)
         for (const Arg& a : f.args)
             if (a.kind == 'p') nb = std::max(nb, static_cast<int>(a.v) + 1);
+            else if (a.kind == 'q') nb = std::max(nb, static_cast<int>(a.v & 0xFF) + 1);
     s.blocks = std::min(nb, 32);
     s.size = std::min((std::max(sz, 0x100u) + 0xFF) & ~0xFFu, 0x10000u);
     return s;
@@ -225,6 +247,12 @@ inline DiffResult run(const DiffCtx& ctx, const char* test, const Spec& spec_in,
             switch (g.kind) {
                 case 'p': aa[i] = u(a.blk[g.v].data()), ab[i] = u(b.blk[g.v].data()); break;
                 case 'i': aa[i] = ab[i] = g.v ? r.below(g.v) : r.next(); break;
+                case 'j': aa[i] = ab[i] = r.below(2 * g.v) - g.v; break;
+                case 'q': {
+                    const uint32_t off = ((g.v >> 8) & 0xFFF) + (g.v >> 20) * r.below(8);
+                    aa[i] = u(a.blk[g.v & 0xFF].data()) + off, ab[i] = u(b.blk[g.v & 0xFF].data()) + off;
+                    break;
+                }
                 case 'f': aa[i] = ab[i] = 0x3F800000u + r.below(0x01000000) - (r.below(4) << 30); break;
                 default: aa[i] = ab[i] = r.next(); break;
             }
@@ -234,15 +262,19 @@ inline DiffResult run(const DiffCtx& ctx, const char* test, const Spec& spec_in,
         const RegOutAny x = call_any(*f.orig, sa, aa, n, f.ret == FLT);
         const RegOutAny y = call_any(f.mine, sb, ab, n, f.ret == FLT);
         std::string bad;
-        char t[200];
+        char t[300];
         if (f.ret == FLT) {
             if (!same_float(x.st0, y.st0)) {
                 snprintf(t, sizeof t, " st0 (float result: original %g, rewrite %g)", x.st0, y.st0);
                 bad += t;
             }
-        } else if (f.ret == LOW16 ? (x.eax & 0xFFFF) != (y.eax & 0xFFFF) : a.rel(x.eax) != b.rel(y.eax)) {
-            snprintf(t, sizeof t, " eax (return value: original 0x%X, rewrite 0x%X; 0xA0A0A0A0 = the caller's EAX untouched)",
-                     static_cast<unsigned>(x.eax), static_cast<unsigned>(y.eax));
+        } else if (f.ret == LOW8    ? (x.eax & 0xFF) != (y.eax & 0xFF)
+                   : f.ret == LOW16 ? (x.eax & 0xFFFF) != (y.eax & 0xFFFF)
+                                    : (x.eax != y.eax && a.rel(x.eax) != b.rel(y.eax))) {  // equal bits are equal
+            const int64_t ra = a.rel(x.eax), rb = b.rel(y.eax);
+            snprintf(t, sizeof t, " eax (return value: original 0x%X, rewrite 0x%X; 0xA0A0A0A0 = the caller's EAX untouched; "
+                     "as block:offset %d:%X / %d:%X)", static_cast<unsigned>(x.eax), static_cast<unsigned>(y.eax),
+                     static_cast<int>(ra >> 32) - 1, static_cast<unsigned>(ra), static_cast<int>(rb >> 32) - 1, static_cast<unsigned>(rb));
             bad += t;
         }
         if (x.popped != y.popped) {

@@ -950,3 +950,24 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
 - zmisc_leaf1 (+ _plain/_avg/_dev/_eggs/_joy): 3 seeds x 50,000 cases, 0 mismatches; _BROKEN catches. Full suite
   477 passed, 0 failed. 1,283 verified, all on; free roam normal.
 
+## 2026-11-18 — Tracker rework, camera leaf batch 1 (28)
+
+**Changed**
+- `tools/progress.py` + `docs/progress.svg`: every PC game function is assigned to a system through the GameCube
+  source file it matches (knowledge.db), size and verified count are both PC functions (cached in
+  `docs/pc_systems.json` for clones without the RE kit); PC functions without a GameCube match get their own row
+  (8,204). New card: hero with goal ring, whole-game bar, systems as a two-column grid; milestones removed from the
+  card and PROGRESS.md. Core utilities show their real state: 127/134 (the 7 left are name mismatches / a stub).
+- `game/systems/camera/camera_leaf1.cpp`: camera mover targets / car to follow, POV type, generic categories,
+  select-car / cubic / showcase mover setters and resets, track-car spring force, FOV cubic init, drag-camera key
+  tables (NIS groups, current track, parameters, neighbours, shared keys, key number, tangent backup). Skipped:
+  CameraMoverRestartRace (writes a global), two 9-argument setters (stubs copy at most 8), a tail jump.
+- `leaf.h`: argument kinds 'j' (signed small) and 'q' (pointer into a block at a stride), LOW8 return kind; blocks
+  now have 0x200-byte guard gaps (compared too) and rel() accepts pointers just before a block: the drag camera
+  returns `base - 0x14` for an empty table with index -1, and with back-to-back allocations that pointer was
+  attributed to the neighbouring block; identical EAX bits always count as equal.
+
+**Verified**
+- camera_leaf1 (+ _plain/_drag/_track): 6 seeds x 50,000 cases per spec, 0 mismatches; _BROKEN catches. Full
+  suite 492 passed, 0 failed. 1,311 verified, all on; free roam normal.
+

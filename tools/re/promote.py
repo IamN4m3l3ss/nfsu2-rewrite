@@ -14,6 +14,7 @@ import probe_client as pc  # noqa: E402
 src, note = sys.argv[1], sys.argv[2]
 text = (ROOT / src).read_text()
 regs = re.findall(r'NFSU2_REWRITE_\w+\(\s*(0x[0-9A-Fa-f]+),\s*\w+,\s*\d+,\s*"([^"]*)"', text)
+regs += re.findall(r'LEAF_(?:THIS|CDECL|STD)(?:_EAX)?\(\s*(0x[0-9A-Fa-f]+),\s*\w+,\s*\d+,\s*"([^"]*)"', text)
 regs += re.findall(r'Registrar \w+\((0x[0-9A-Fa-f]+),\s*"\w+",\s*"([^"]*)"', text)
 rows = list(csv.DictReader((ROOT / "docs/symbols.csv").open()))
 have = {int(r["addr"], 16): r for r in rows}

@@ -98,7 +98,7 @@ def load_symbols():
 def rewrite_folders():
     """address -> game/systems folder, from every rewrite registration (NFSU2_REWRITE*, ACC_* accessors, Registrar)."""
     out = {}
-    pat = re.compile(r'(?:NFSU2_REWRITE(?:_N(?:_EAX)?|_THIS|_STD)?|ACC_\w+|Registrar\s+\w+)\(\s*(0x[0-9A-Fa-f]+)')
+    pat = re.compile(r'(?:NFSU2_REWRITE(?:_N(?:_EAX)?|_THIS|_STD)?|ACC_\w+|LEAF_\w+|Registrar\s+\w+)\(\s*(0x[0-9A-Fa-f]+)')
     for p in (ROOT / "game" / "systems").rglob("*.cpp"):
         folder = p.parent.name if p.parent.name != "systems" else "misc"
         for m in pat.finditer(p.read_text()):

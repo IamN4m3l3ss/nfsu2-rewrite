@@ -912,3 +912,17 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   (nfsu2-gcpc) rewrites' state -> broken UI/audio. Diff tests of originals that write fixed game addresses change
   the real game: such functions are excluded from LLM lists.
 
+## 2026-11-18 — Physics leaf batch 1 (16)
+
+**Changed**
+- `game/systems/physics/leaf1.cpp`: SetWheelTouchingGround, SetWheelTerrain, Collision::Update / IsTwoCarCollision /
+  GetCollidingCars / IsSmokeableInvolved / GetSmokeable, IsYawControlInducingCollisionBody, GetShiftDownRPM,
+  ClutchMatched, Mellovator::SetState, RigidBody::ApplyMoment, Wheel::GetHorizontalGroundForceInCarFrame,
+  bRotateVector, GJKWafer::GetPoint, StaticCollisionBody::GetTestImpulseVelocities. x87 maths through x87.h.
+  Written with the leaf harness (one table test). promote.py and progress.py know the LEAF_* macros.
+- Left out: GetMinMaxPerformanceMeasure and IsTuningActive (index real game tables), IsGroundInvolved (EAX keeps
+  the x87 status word), GJKPrimitive::GetBoundingBox (tail calls).
+
+**Verified**
+- physics_leaf1: 2 x 50,000 cases, 0 mismatches; physics_leaf1_BROKEN catches a wrong function. 1,245 verified.
+

@@ -9,7 +9,9 @@ from __future__ import annotations
 import csv
 import datetime
 import html
+import json
 import re
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,34 +20,26 @@ ROOT = Path(__file__).resolve().parents[1]
 TOTAL_FUNCTIONS = 14450
 
 # Milestones from CLAUDE.md, with their state. Update when one completes.
-MILESTONES = [
-    ("M0", "Game runs under Wine", "done"),
-    ("M1", "Probe + MCP bridge", "done"),
-    ("M2", "Unattended launcher", "done"),
-    ("M3", "Input injection", "done"),
-    ("M4", "Boot straight to free roam", "done"),
-    ("M5", "Telemetry + scripted driving", "done"),
-    ("M6", "Rewrite DLL + hot reload", "done"),
-    ("M7", "Diff harness", "done"),
-    ("M8", "System-by-system rewrite", "in progress"),
-]
 
-# Planned systems in order (CLAUDE.md M8+): (name, our game/systems folders, description, size, size source).
-# Sizes = function counts of EA's matching source files in the GameCube build (Speed.elf symbols via knowledge.db,
-# counted 2026-11-15; the GameCube build has 14,666 functions vs 14,450 game functions on PC, so it's a good
-# per-system estimate). Rendering is the GameCube platform layer: a rough estimate only (PC uses Direct3D).
+# Planned systems in order (CLAUDE.md M8+): (name, GameCube source files that belong to it (regex), description).
+# Every PC game function counts in the system of the GameCube source file it matches (knowledge.db matches from the
+# RE kit); size and verified count are both PC functions, so the percentages are exact for the mapped part. PC
+# functions with no GameCube match are shown as their own row until they get mapped. The mapping is cached in
+# docs/pc_systems.json so the tracker also works without the RE kit.
 SYSTEMS = [
-    ("Core utilities", ["bstring", "bmath", "memory", "bware"], "strings, maths, memory, lists, slot pools", 216, "zBWare"),
-    ("Files & data loading", ["file", "resource", "bchunk", "misc"], "file system, resource files, chunks (+ misc helpers)", 629,
-     "filesys, syncfile, FSasync, zMisc"),
-    ("Frontend / menus", ["frontend"], "menus, shops, career screens", 3826, "zFe, zFe2"),
-    ("Camera", ["camera"], "chase / bumper / photo cameras", 322, "zCamera"),
-    ("Car physics & handling", ["car", "physics"], "engine, tyres, suspension, collisions", 738, "zPhysics"),
-    ("World streaming", ["world"], "loading Bayview around the player", 1494, "zWorld, zWorld2, zTrack"),
-    ("AI racers & traffic", ["ai"], "opponents, traffic cars", 1190, "zAI"),
-    ("Audio", ["audio"], "engine sounds, music, effects", 1808, "zEAXSound"),
-    ("Rendering", ["render"], "last: the future port boundary (size: rough estimate)", 305, "zPlatform (GameCube)"),
+    ("Core utilities", [r"zBWare"], "strings, maths, memory, lists, slot pools"),
+    ("Files & data loading", [r"filesys", r"syncfile", r"FSasync", r"zMisc", r"hlafile", r"memcard", r"dlopen"],
+     "file system, resource files, chunks, misc helpers"),
+    ("Frontend / menus", [r"zFe2?\.cpp"], "menus, shops, career screens"),
+    ("Camera", [r"zCamera"], "chase / bumper / photo cameras"),
+    ("Car physics & handling", [r"zPhysics"], "engine, tyres, suspension, collisions"),
+    ("World streaming", [r"zWorld", r"zTrack"], "loading Bayview around the player"),
+    ("AI, traffic & race rules", [r"zAI", r"zGameModes"], "opponents, traffic cars, game modes"),
+    ("Animation", [r"zAnim", r"Blender"], "skeletal animation, blenders"),
+    ("Audio & video", [r"zEAXSound", r"\.c$", r"mad", r"codec", r"mtdec"], "engine sounds, music, speech, movies"),
+    ("Rendering", [r"zPlatform"], "last: the future port boundary"),
 ]
+UNMAPPED = "Not mapped to a system yet"
 FOLDER_LABEL = {"bstring": "Strings", "bmath": "Maths", "memory": "Memory", "bware": "Lists & pools", "frontend": "Menu engine (FEng)", "camera": "Camera",
                 "bchunk": "Chunks", "resource": "Resource files", "file": "File layer"}
 
@@ -58,6 +52,35 @@ GREEN, AMBER, BLUE = "#3fb950", "#d29922", "#58a6ff"
 
 
 GAME_END = 0x75BBFA  # first non-game address (Winsock stubs, then the MSVC runtime)
+
+
+def pc_systems():
+    """{system: {gc source file: [pc addresses]}} - computed from the RE kit when present, else the cached json."""
+    cache = ROOT / "docs" / "pc_systems.json"
+    try:
+        sys.path.insert(0, str(ROOT / "tools" / "re"))
+        import sqlite3
+        import kb
+        if not kb.DB:
+            raise RuntimeError("no RE kit")
+        db = sqlite3.connect(f"file:{kb.DB}?mode=ro", uri=True)
+        out = {name: {} for name, _, _ in SYSTEMS}
+        seen = set()  # a PC function matched to several GameCube functions counts once (first match)
+        for pa, sf in db.execute("select m.pc_addr, g.src_file from matches m join gc_functions g on g.addr = m.gc_addr "
+                                 "order by m.rowid"):
+            if not sf or pa >= GAME_END or pa in seen:
+                continue
+            seen.add(pa)
+            f = re.sub(r".*[/\\\\]", "", sf)
+            for name, pats, _ in SYSTEMS:
+                if any(re.search(p, f) for p in pats):
+                    out[name].setdefault(f, set()).add(pa)
+                    break
+        out = {n: {f: sorted(f"{a:06X}" for a in v) for f, v in d.items()} for n, d in out.items()}
+        cache.write_text(json.dumps(out, indent=0, sort_keys=True))
+        return out
+    except Exception:  # noqa: BLE001
+        return json.loads(cache.read_text()) if cache.exists() else {name: {} for name, _, _ in SYSTEMS}
 
 
 def ea_named():
@@ -123,15 +146,6 @@ def bar(x, y, w, h, segs, bg=LINE):
     return "".join(t)
 
 
-def check(x, y, done, current=False):
-    if done:
-        return (f'<circle cx="{x}" cy="{y}" r="8" fill="{GREEN}"/>'
-                f'<path d="M{x-4} {y} l3 3 l5 -6" stroke="{BG}" stroke-width="2" fill="none" stroke-linecap="round"/>')
-    if current:
-        return f'<circle cx="{x}" cy="{y}" r="8" fill="none" stroke="{AMBER}" stroke-width="2"/><circle cx="{x}" cy="{y}" r="3.5" fill="{AMBER}"/>'
-    return f'<circle cx="{x}" cy="{y}" r="8" fill="none" stroke="{FAINT}" stroke-width="2"/>'
-
-
 def pill(x, y, text, col):
     w = 9 + 6.6 * len(text)
     return (f'<rect x="{x - w:.1f}" y="{y - 13}" width="{w:.1f}" height="18" rx="9" fill="{col}" fill-opacity="0.15" '
@@ -139,82 +153,92 @@ def pill(x, y, text, col):
             f'fill="{col}" text-anchor="middle">{esc(text)}</text>')
 
 
-def make_svg(verified, mapped, per_system, per_folder_counts):
-    W, M = 840, 28
-    # next goal: the first step of the ladder not reached yet
+def make_svg(verified, mapped, per_system, _counts=None):
+    """The tracker card: hero (count, share, next goal), whole-game bar, systems as a two-column grid."""
+    W, M, G = 880, 28, 14
+    pct = 100.0 * verified / TOTAL_FUNCTIONS
     goal_pct = next((g for g in (1, 2, 5, 10, 25, 50, 100) if verified < round(TOTAL_FUNCTIONS * g / 100)), 100)
     goal = round(TOTAL_FUNCTIONS * goal_pct / 100)
-    rows = len(per_system)
-    H = 470 + rows * 46
+    systems = [r for r in per_system if r[0] != UNMAPPED]
+    unmapped = next((r for r in per_system if r[0] == UNMAPPED), None)
+    rows = (len(systems) + 1) // 2
+    CH = 74                                     # system card height
+    y_sys = 320
+    H = y_sys + 34 + rows * (CH + G) + (70 if unmapped else 0) + 24
     t = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" '
          f'font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif">',
-         f'<rect width="{W}" height="{H}" rx="12" fill="{BG}" stroke="{LINE}"/>',
-         f'<text x="{M}" y="42" font-size="21" font-weight="700" fill="{TXT}">Need for Speed: Underground 2 rewrite</text>',
-         f'<text x="{W-M}" y="42" font-size="12" fill="{DIM}" text-anchor="end">updated {datetime.date.today().isoformat()}</text>',
-         f'<text x="{M}" y="64" font-size="13" fill="{DIM}">Our own C++ replacing the game one function at a time, each proven identical to the original before it counts.</text>']
+         '<defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#2ea043"/>'
+         f'<stop offset="1" stop-color="{GREEN}"/></linearGradient></defs>',
+         f'<rect width="{W}" height="{H}" rx="14" fill="{BG}" stroke="{LINE}"/>']
+    # header
+    t.append(f'<text x="{M}" y="44" font-size="22" font-weight="800" fill="{TXT}">NFS Underground 2 — rewrite</text>')
+    t.append(f'<text x="{M}" y="66" font-size="12.5" fill="{DIM}">Our own C++ replacing the game function by function; '
+             f'each one proven identical to the original before it counts.</text>')
+    t.append(f'<text x="{W-M}" y="44" font-size="12" fill="{DIM}" text-anchor="end">updated {datetime.date.today().isoformat()}</text>')
 
-    # --- hero: big number + next goal
-    y0 = 88
-    t.append(f'<rect x="{M}" y="{y0}" width="{W-2*M}" height="118" rx="10" fill="{PANEL}" stroke="{LINE}"/>')
-    t.append(f'<text x="{M+22}" y="{y0+62}" font-size="52" font-weight="800" fill="{GREEN}">{verified}</text>')
-    nx = M + 22 + 31 * len(str(verified)) + 14
-    t.append(f'<text x="{nx}" y="{y0+44}" font-size="16" font-weight="600" fill="{TXT}">functions rewritten &amp; verified</text>')
-    t.append(f'<text x="{nx}" y="{y0+64}" font-size="13" fill="{DIM}">running in the game right now, switchable back to the original</text>')
-    gx, gw = M + 22, W - 2 * M - 44
-    t.append(f'<text x="{gx}" y="{y0+92}" font-size="12" fill="{TXT}">Next goal: {goal_pct}% of the game ({goal:,} functions)</text>')
-    t.append(f'<text x="{gx+gw}" y="{y0+92}" font-size="12" font-weight="700" fill="{GREEN}" text-anchor="end">'
-             f'{verified} / {goal} · {100*verified/goal:.0f}%</text>')
-    t.append(bar(gx, y0 + 100, gw, 8, [(min(1, verified / goal), GREEN)]))
+    # hero panel
+    hy, hh = 86, 120
+    t.append(f'<rect x="{M}" y="{hy}" width="{W-2*M}" height="{hh}" rx="12" fill="{PANEL}" stroke="{LINE}"/>')
+    t.append(f'<text x="{M+24}" y="{hy+68}" font-size="56" font-weight="800" fill="url(#g)">{verified:,}</text>')
+    t.append(f'<text x="{M+26}" y="{hy+96}" font-size="13.5" fill="{TXT}">functions verified · '
+             f'<tspan font-weight="700" fill="{GREEN}">{pct:.1f}%</tspan> of the game</text>')
+    # goal ring
+    cx, cy, r = W - M - 78, hy + hh / 2, 40
+    frac = min(1.0, verified / goal)
+    circ = 2 * 3.14159265 * r
+    t.append(f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="{LINE}" stroke-width="9"/>')
+    t.append(f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="{GREEN}" stroke-width="9" stroke-linecap="round" '
+             f'stroke-dasharray="{circ*frac:.1f} {circ:.1f}" transform="rotate(-90 {cx} {cy})"/>')
+    t.append(f'<text x="{cx}" y="{cy+6}" font-size="17" font-weight="800" fill="{TXT}" text-anchor="middle">{100*frac:.0f}%</text>')
+    t.append(f'<text x="{cx-r-18}" y="{cy-8}" font-size="12" fill="{DIM}" text-anchor="end">next goal</text>')
+    t.append(f'<text x="{cx-r-18}" y="{cy+10}" font-size="13" font-weight="700" fill="{TXT}" text-anchor="end">'
+             f'{goal_pct}% · {goal:,}</text>')
+    t.append(f'<text x="{cx-r-18}" y="{cy+27}" font-size="11.5" fill="{DIM}" text-anchor="end">{max(goal-verified, 0):,} to go</text>')
 
-    # --- whole game
-    y1 = y0 + 146
-    pct_v = 100.0 * verified / TOTAL_FUNCTIONS
-    t.append(f'<text x="{M}" y="{y1}" font-size="14" font-weight="600" fill="{TXT}">Whole game</text>')
-    t.append(f'<text x="{W-M}" y="{y1}" font-size="12" fill="{DIM}" text-anchor="end">~{TOTAL_FUNCTIONS:,} game functions in SPEED2.EXE (runtime libraries not counted)</text>')
-    t.append(bar(M, y1 + 10, W - 2 * M, 14, [(verified / TOTAL_FUNCTIONS, GREEN), (mapped / TOTAL_FUNCTIONS, AMBER)]))
-    ly = y1 + 44
-    t.append(f'<rect x="{M}" y="{ly-10}" width="10" height="10" rx="2" fill="{GREEN}"/>'
-             f'<text x="{M+16}" y="{ly}" font-size="12" fill="{TXT}">verified {verified} ({pct_v:.2f}%)</text>')
-    t.append(f'<rect x="{M+190}" y="{ly-10}" width="10" height="10" rx="2" fill="{AMBER}"/>'
-             f'<text x="{M+206}" y="{ly}" font-size="12" fill="{TXT}">EA name known, not rewritten yet: {mapped:,}</text>')
-    t.append(f'<rect x="{M+470}" y="{ly-10}" width="10" height="10" rx="2" fill="{LINE}"/>'
-             f'<text x="{M+486}" y="{ly}" font-size="12" fill="{DIM}">no name yet</text>')
+    # whole game bar + three figures
+    wy = hy + hh + 34
+    t.append(f'<text x="{M}" y="{wy}" font-size="13" font-weight="700" fill="{TXT}">Whole game</text>')
+    t.append(f'<text x="{W-M}" y="{wy}" font-size="11.5" fill="{DIM}" text-anchor="end">{TOTAL_FUNCTIONS:,} game functions in '
+             f'SPEED2.EXE (runtime libraries not counted)</text>')
+    t.append(bar(M, wy + 12, W - 2 * M, 12, [(verified / TOTAL_FUNCTIONS, GREEN), (mapped / TOTAL_FUNCTIONS, AMBER)]))
+    unnamed = max(TOTAL_FUNCTIONS - verified - mapped, 0)
+    fx = M
+    for col, num, label in ((GREEN, verified, "verified"), (AMBER, mapped, "EA name known, still to do"),
+                            (LINE, unnamed, "no name yet")):
+        t.append(f'<rect x="{fx}" y="{wy+40}" width="10" height="10" rx="3" fill="{col}"/>'
+                 f'<text x="{fx+16}" y="{wy+49}" font-size="12" fill="{TXT}"><tspan font-weight="700">{num:,}</tspan> '
+                 f'<tspan fill="{DIM}">{label}</tspan></text>')
+        fx += 250
 
-    # --- milestones (3 columns)
-    y2 = ly + 40
-    done = sum(1 for m in MILESTONES if m[2] == "done")
-    t.append(f'<text x="{M}" y="{y2}" font-size="14" font-weight="600" fill="{TXT}">Milestones</text>')
-    t.append(f'<text x="{W-M}" y="{y2}" font-size="12" fill="{DIM}" text-anchor="end">{done} of {len(MILESTONES)} done · tools first (M0–M7), then the rewrite itself</text>')
-    colw = (W - 2 * M) / 3
-    for i, (mid, name, st) in enumerate(MILESTONES):
-        cx = M + (i % 3) * colw
-        cy = y2 + 28 + (i // 3) * 28
-        t.append(check(cx + 9, cy - 4, st == "done", st == "in progress"))
-        col = TXT if st != "todo" else DIM
-        t.append(f'<text x="{cx+26}" y="{cy}" font-size="12.5" fill="{col}"><tspan font-weight="700">{mid}</tspan> {esc(name)}</text>')
-
-    # --- systems
-    y3 = y2 + 28 + ((len(MILESTONES) + 2) // 3) * 28 + 18
-    t.append(f'<text x="{M}" y="{y3}" font-size="14" font-weight="600" fill="{TXT}">Systems</text>')
-    t.append(f'<text x="{W-M}" y="{y3}" font-size="12" fill="{DIM}" text-anchor="end">verified / functions in that part of the game, in planned order</text>')
-    y = y3 + 14
-    for sname, n, note, flds, total in per_system:
-        t.append(f'<rect x="{M}" y="{y}" width="{W-2*M}" height="38" rx="8" fill="{PANEL}" stroke="{LINE}"/>')
-        started = n > 0
-        t.append(f'<text x="{M+14}" y="{y+17}" font-size="13" font-weight="600" fill="{TXT if started else DIM}">{esc(sname)}</text>')
-        parts = " · ".join(f"{FOLDER_LABEL.get(f, f)} {per_folder_counts.get(f, 0)}" for f in flds if per_folder_counts.get(f, 0))
-        t.append(f'<text x="{M+14}" y="{y+31}" font-size="11" fill="{DIM}">{esc(parts if parts else note)}</text>')
-        bx, bw = M + 280, W - 2 * M - 280 - 250
-        frac = n / total if total else 0
-        t.append(bar(bx, y + 15, bw, 8, [(frac, GREEN if started else LINE)]))
-        t.append(f'<text x="{bx+bw+92}" y="{y+23}" font-size="12.5" font-weight="700" fill="{TXT if started else FAINT}" '
-                 f'text-anchor="end">{n} / {total:,}</text>')
-        if started:
-            t.append(f'<text x="{bx+bw+132}" y="{y+23}" font-size="11.5" fill="{DIM}" text-anchor="end">{100*frac:.0f}%</text>')
+    # systems grid
+    t.append(f'<text x="{M}" y="{y_sys}" font-size="13" font-weight="700" fill="{TXT}">Systems</text>')
+    t.append(f'<text x="{W-M}" y="{y_sys}" font-size="11.5" fill="{DIM}" text-anchor="end">verified / PC functions, '
+             f'in planned order</text>')
+    cw = (W - 2 * M - G) / 2
+    for k, (sname, n, parts, total) in enumerate(systems):
+        x = M + (k % 2) * (cw + G)
+        y = y_sys + 16 + (k // 2) * (CH + G)
+        fr = n / total if total else 0
         done = total and n >= total
-        t.append(pill(W - M - 12, y + 24, "done" if done else ("in progress" if started else "not started"),
-                      GREEN if done else (AMBER if started else FAINT)))
-        y += 46
+        col = GREEN if (done or fr >= 0.5) else (BLUE if n else FAINT)
+        t.append(f'<rect x="{x:.1f}" y="{y}" width="{cw:.1f}" height="{CH}" rx="10" fill="{PANEL}" stroke="{LINE}"/>')
+        t.append(f'<text x="{x+14:.1f}" y="{y+24}" font-size="13.5" font-weight="700" fill="{TXT if n else DIM}">'
+                 f'<tspan fill="{FAINT}">{k+1:02d}</tspan>  {esc(sname)}</text>')
+        t.append(f'<text x="{x+cw-14:.1f}" y="{y+24}" font-size="15" font-weight="800" fill="{col if n else FAINT}" '
+                 f'text-anchor="end">{100*fr:.0f}%</text>')
+        t.append(bar(x + 14, y + 34, cw - 28, 7, [(fr, col)]))
+        short = parts if len(parts) <= 46 else parts[:parts.rfind(" · ", 0, 46)] + " …"
+        t.append(f'<text x="{x+14:.1f}" y="{y+61}" font-size="11" fill="{DIM}">{esc(short)}</text>')
+        t.append(f'<text x="{x+cw-14:.1f}" y="{y+61}" font-size="11.5" font-weight="600" fill="{TXT if n else DIM}" '
+                 f'text-anchor="end">{n:,} / {total:,}</text>')
+    if unmapped:
+        sname, n, parts, total = unmapped
+        y = y_sys + 16 + rows * (CH + G)
+        t.append(f'<rect x="{M}" y="{y}" width="{W-2*M}" height="56" rx="10" fill="{BG}" stroke="{LINE}" stroke-dasharray="4 4"/>')
+        t.append(f'<text x="{M+14}" y="{y+22}" font-size="12.5" font-weight="700" fill="{DIM}">{esc(sname)}</text>')
+        t.append(f'<text x="{W-M-14}" y="{y+22}" font-size="11.5" fill="{DIM}" text-anchor="end">{n:,} verified / {total:,} '
+                 f'· no GameCube match yet, still counted in the whole-game total</text>')
+        t.append(bar(M + 14, y + 34, W - 2 * M - 28, 6, [(n / total if total else 0, FAINT)]))
     t.append("</svg>")
     return "\n".join(t)
 
@@ -231,8 +255,19 @@ def main():
         per_folder.setdefault(folders.get(int(r["addr"], 16)) or gcpc_folder(r) or "misc", []).append(r)
     counts = {f: len(v) for f, v in per_folder.items()}
     per_system = []
-    for sname, flds, note, total, _src in SYSTEMS:
-        per_system.append((sname, sum(counts.get(f, 0) for f in flds), note, flds, total))
+    vset = {int(r["addr"], 16) for r in verified}
+    mapping = pc_systems()
+    mapped = set()
+    for sname, _pats, note in SYSTEMS:
+        files = mapping.get(sname, {})
+        addrs = {int(a, 16) for v in files.values() for a in v}
+        mapped |= addrs
+        n = len(addrs & vset)
+        parts = " · ".join(f"{f.rsplit('.', 1)[0]} {len({int(a, 16) for a in v} & vset)}/{len(v):,}"
+                           for f, v in sorted(files.items(), key=lambda kv: -len(kv[1]))[:4])
+        per_system.append((sname, n, parts or note, len(addrs)))
+    per_system.append((UNMAPPED, len(vset - mapped), "PC functions with no GameCube match (yet): counted in the total above",
+                       max(TOTAL_FUNCTIONS - len(mapped), 1)))
     unassigned = [r["name"] for r in verified if folders.get(int(r["addr"], 16)) is None and not gcpc_folder(r)]
     if unassigned:
         print("warning: verified but no rewrite registration found:", ", ".join(unassigned))
@@ -271,20 +306,14 @@ def main():
         "diff harness proves it identical: same results (floats bit-for-bit) and same register behaviour, on "
         "thousands of random and real inputs.",
         "",
-        "## Milestones",
-        "",
-        "| | Milestone | Status |",
-        "|---|---|---|",
     ]
-    icon = {"done": "✅", "in progress": "🟡", "todo": "⬜"}
-    for mid, name, st in MILESTONES:
-        md.append(f"| {mid} | {name} | {icon.get(st, '⬜')} {st} |")
-    md += ["", "## Systems", "", "Size of each system = functions in EA's matching source files of the GameCube build "
-           "(an estimate for the PC exe).", "", "| System | Verified | Size | Done | Status |", "|---|---:|---:|---:|---|"]
-    for (sname, n, note, flds, total), (_, _, _, _, src) in zip(per_system, SYSTEMS):
-        st = "✅ done" if n >= total else ("🟡 in progress" if n else "⬜ not started")
-        parts = ", ".join(f"{FOLDER_LABEL.get(f, f)} {counts.get(f, 0)}" for f in flds if counts.get(f, 0))
-        md.append(f"| **{sname}** — {parts if parts else note} | {n} | {total:,} ({src}) | {100*n/total:.0f}% | {st} |")
+    md += ["", "## Systems", "", "Each PC game function counts in the system of the GameCube source file it matches "
+           "(EA names via nfsu2-gcpc's knowledge base); verified and size are both PC functions. Functions without a "
+           "GameCube match yet have their own row.", "", "| System | Verified | PC functions | Done | Status |",
+           "|---|---:|---:|---:|---|"]
+    for sname, n, parts, total in per_system:
+        st = ("🔍 mapping" if sname == UNMAPPED else "✅ done" if n >= total else ("🟡 in progress" if n else "⬜ not started"))
+        md.append(f"| **{sname}** — {parts} | {n} | {total:,} | {100*n/total:.0f}% | {st} |")
     md += ["", "## Done (verified)", ""]
     by_folder = sorted(per_folder.items(), key=lambda kv: kv[0])
     for fld, rows in by_folder:

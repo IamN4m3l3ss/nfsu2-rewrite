@@ -5,7 +5,8 @@
 
 ADDR: function address (hex). --nargs: stack arguments; --this: bytes of `this` to snapshot (thiscall; 0 = none);
 --args: snapshot size per argument (0 = a value, else the bytes behind that pointer). Records up to --count calls
-(default 2000) while you play, or while the A/B camera drive plays (--drive; needs free roam), or for --seconds.
+(default 2000) while you play (--seconds S), or during the A/B camera drive (--drive: reboots into free roam first,
+so the drive starts at the spawn point).
 The function's rewrite hook is removed while capturing and restored after. Writes work/captures/<ADDR>.cap
 (gitignored: it holds live game memory).
 """
@@ -46,6 +47,11 @@ def main(argv):
     out.mkdir(parents=True, exist_ok=True)
     path = out / f"{addr:06X}.cap"
     winpath = subprocess.run(["winepath", "-w", str(path)], capture_output=True, text=True).stdout.strip()
+    if use_drive:  # the scripted drive only makes sense from the free-roam spawn point: fresh boot first
+        r = subprocess.run([str(ROOT / "nfsu2"), "freeroam"], capture_output=True, text=True)
+        if "free roam after" not in r.stdout:
+            print("boot to free roam failed:\n" + (r.stdout + r.stderr)[-400:])
+            return 1
     pc.call("capture", {"action": "start", "addr": hex(addr), "nargs": opt["nargs"], "this_size": opt["this"],
                         "arg_sizes": sizes, "count": opt["count"], "path": winpath})
     try:

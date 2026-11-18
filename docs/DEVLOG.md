@@ -1063,3 +1063,20 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
 - 15 s standing in free roam, everything checked, normal speed (120 fps): 351,216 real calls, 0 mismatches
   (cubic interpolators, Average::Recalculate, CameraInfo::GetPov, time conversion; physics needs driving).
 
+## 2026-11-18 — Camera batch 3 (8): dependencies of camera functions
+
+**Changed**
+- `game/systems/camera/camera_deps1.cpp`: point transform (0x441000), eGetView, Car::GetPov, tCubic3D value
+  getter (0x574D30), CAnimPlayer::FindHandle, EAXSound::GetSFXBase_Object, matrix copy (0x4012B0) / from rotation +
+  position (0x401340). Chosen because they block the most remaining camera functions. Live specs added.
+
+**Verified**
+- Leaf tests 3 seeds x 30,000 per spec, 0 mismatches; live check 10 s in free roam: 3.1 million real calls,
+  0 mismatches (eGetView 2.0 M, TransformPoint 630 k, CopyMatrix 484 k). 1,332 verified.
+
+**Open**
+- The full suite failed intermittently after this batch: zPhysics1 (283 / 1,249 of 10,000 in two suite runs, 0 in
+  6 single runs with the same seeds) and one SpeedScript printf case crashing in the original (a format that
+  overflows the original's stack frame; time-sliced seeds now reach new cases). To investigate next session
+  (suspect: a zPhysics1 function reading a game global another thread changes).
+

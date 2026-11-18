@@ -1024,4 +1024,8 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   read the live game). physics_leaf1_captured: SetWheelTerrain / ClutchMatched captures replayed, 4,000 cases,
   0 mismatches. These functions are event-driven (terrain change, gear change): few calls per scripted drive;
   recording while a person drives gives more.
+- In-game panel (F8) "Drives" tab: record a drive (name, start/stop; saves tests/drives/NAME.json like
+  `./nfsu2 record`), traffic density slider (0 = none), fixed frame time toggle. `./nfsu2` gained record / replay /
+  cam-ab / capture, `freeroam` passes options (`--no-traffic`); cam_ab.py / capture.py `--recording NAME` replay a
+  recorded human drive (the blind script ran into walls); their boots use no traffic.
 

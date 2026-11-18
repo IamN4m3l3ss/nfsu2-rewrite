@@ -147,8 +147,8 @@ def input_state() -> dict:
 
 @server.tool()
 def no_traffic(enabled: bool | None = None) -> dict:
-    """EXPERIMENTAL, does NOT remove traffic: patches 0x42F910 to return (ZMenu's 'No Traffic' patch); traffic and
-    roaming racers still drive with it on. Unknown side effects; don't use for tests."""
+    """Traffic in free roam (test drives): enabled=True sets the game's traffic density 0x89E7A8 to 0 (no traffic
+    cars, no spawning) for the next free-roam load and stops spawning now; False restores 3. Probe layer only."""
     return pc.call("no_traffic", {} if enabled is None else {"enabled": enabled})
 
 

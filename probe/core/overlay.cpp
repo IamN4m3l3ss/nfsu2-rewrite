@@ -5,6 +5,8 @@
 // (Present / the game's WndProc, which are the same thread), so it calls the rewrite manager directly.
 #include "probe.h"
 
+#include <cstdlib>
+
 #include <d3d9.h>
 
 #include <algorithm>
@@ -289,6 +291,94 @@ void tab_log() {
     ImGui::EndChild();
 }
 
+// ---- Drives: record a drive (same file as `./nfsu2 record`), traffic density, fixed frame time
+std::string repo_path(const char* rel) {  // NFSU2_GAME = <repo>\out\nfsu2_game.dll
+    const char* g = std::getenv("NFSU2_GAME");
+    std::string p = g ? g : "";
+    for (int up = 0; up < 2 && !p.empty(); ++up) p = p.substr(0, p.find_last_of("\\/"));
+    return p + rel;
+}
+
+void tab_drives() {
+    static char name[64] = "route1";
+    static bool recording = false;
+    static double started = 0;
+    static std::string status = "Start at the free-roam spawn point (./nfsu2 freeroam --no-traffic) for test drives.";
+    ImGui::TextWrapped("Record what you drive: keyboard actions frame by frame plus car checkpoints, saved to "
+                       "tests/drives/<name>.json - replay with ./nfsu2 replay NAME, or use it for an A/B "
+                       "(./nfsu2 cam-ab --recording NAME --system camera).");
+    ImGui::Separator();
+    ImGui::BeginDisabled(recording);
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 12);
+    ImGui::InputText("name", name, sizeof name);
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    if (!recording) {
+        if (ImGui::Button("Start recording")) {
+            try {
+                record_start({{"every", 30}});
+                recording = true;
+                started = ImGui::GetTime();
+                status = "Recording - drive now (F8 hides this panel; the game still gets your keys).";
+            } catch (const std::exception& e) {
+                status = std::string("could not start: ") + e.what();
+            }
+        }
+    } else {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.7f, 0.15f, 0.15f, 1));
+        if (ImGui::Button("Stop and save")) {
+            try {
+                const json r = record_stop();
+                const std::string path = repo_path("\\tests\\drives\\") + name + ".json";
+                if (FILE* f = fopen(path.c_str(), "wb")) {
+                    const std::string txt = r.dump(1);
+                    fwrite(txt.data(), 1, txt.size(), f);
+                    fclose(f);
+                    char t[200];
+                    snprintf(t, sizeof t, "Saved %s.json: %zu input events, %llu frames.", name, r["events"].size(),
+                             static_cast<unsigned long long>(r["frames"].get<uint64_t>()));
+                    status = t;
+                } else {
+                    status = "could not write " + path;
+                }
+            } catch (const std::exception& e) {
+                status = std::string("could not stop: ") + e.what();
+            }
+            recording = false;
+        }
+        ImGui::PopStyleColor();
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(1, 0.35f, 0.35f, 1), "REC %.0f s", ImGui::GetTime() - started);
+    }
+    ImGui::TextWrapped("%s", status.c_str());
+
+    ImGui::Separator();
+    ImGui::TextUnformatted("Traffic (free roam)");
+    static int density = -1;
+    if (density < 0) {
+        try {
+            density = static_cast<int>(no_traffic({})["free_roam_density"].get<uint32_t>());
+        } catch (...) {
+            density = 3;
+        }
+    }
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 12);
+    if (ImGui::SliderInt("density", &density, 0, 3, density == 0 ? "0 (none)" : "%d")) {
+        try {
+            no_traffic({{"density", density}});
+        } catch (const std::exception& e) {
+            logf("traffic: %s", e.what());
+        }
+    }
+    ImGui::TextDisabled("Stops new traffic now; cars already on the road go at the next free-roam load.");
+
+    ImGui::Separator();
+    static bool fixed = false;
+    if (ImGui::Checkbox("Fixed frame time (1/60 s per frame)", &fixed)) fe_fixed_dt(fixed, 1.0f / 60.0f);
+    ImGui::TextDisabled("For repeatable runs: the game runs as if every frame took exactly 1/60 s (looks fast-forward "
+                        "when the PC renders faster).");
+}
+
 void draw() {
     if (!g_visible) {
         ImGui::SetNextWindowPos(ImVec2(20, 20));
@@ -309,6 +399,10 @@ void draw() {
             }
             if (ImGui::BeginTabItem("Car")) {
                 tab_car();
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Drives")) {
+                tab_drives();
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Probe")) {

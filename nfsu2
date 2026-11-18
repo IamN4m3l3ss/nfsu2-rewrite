@@ -24,6 +24,13 @@ usage() {
     all-on | all-off    every verified rewrite on / everything back to the original
     test [NAME]         run the diff tests in the running game (all, or one)
 
+  Drives & in-game tests
+    record NAME SECS    record what you drive (start at the free-roam spawn: ./nfsu2 freeroam --no-traffic first)
+    replay NAME         replay a recorded drive and compare the car path against the recording
+    cam-ab [ARGS]       camera A/B: original vs rewrites, same drive, camera compared every frame
+                        (e.g. ./nfsu2 cam-ab --recording NAME --system camera)
+    capture ADDR [ARGS] record a function's real inputs for its diff test (tools/game/capture.py --help)
+
   Project
     progress            regenerate the tracker (docs/progress.svg, PROGRESS.md)
     push                regenerate the tracker, commit it if changed, push to GitHub
@@ -32,7 +39,7 @@ EOF
 
 case "${1:-}" in
     run) tools/game/run_game.sh ;;
-    freeroam) tools/game/run_game.sh --freeroam ;;
+    freeroam) shift; tools/game/run_game.sh --freeroam "$@" ;;
     kill) tools/game/run_game.sh --kill ;;
     status)
         if "$PY" tools/probe/probe.py ping >/dev/null 2>&1; then
@@ -69,6 +76,10 @@ PYEOF
             echo "$out" | grep '^FAIL ' || true
             echo "$(echo "$out" | grep -c '^PASS seed') passed, $(echo "$out" | grep -c '^FAIL seed') failed (3 seeds x every diff test; *_BROKEN self-checks must fail and count as passed)"
         fi ;;
+    record) shift; "$PY" tools/probe/drive.py record "$@" ;;
+    replay) shift; "$PY" tools/probe/drive.py replay "$@" ;;
+    cam-ab) shift; "$PY" tools/game/cam_ab.py "$@" ;;
+    capture) shift; "$PY" tools/game/capture.py "$@" ;;
     progress) "$PY" tools/progress.py ;;
     push)
         "$PY" tools/progress.py

@@ -2,7 +2,10 @@
 """In-game A/B of camera rewrites: the same boot and the same frame-locked drive, once with the original camera code
 and once with the rewrites, comparing the player camera (view matrix + eye position) every frame, bit for bit.
 
-  cam_ab.py [--script FILE] [--names N1,N2,...|--system camera] [--baseline-only] [--frames N]
+  cam_ab.py [--recording NAME|--script FILE] [--names N1,N2,...|--system camera] [--baseline-only]
+
+--recording NAME: replay tests/drives/NAME.json (recorded with tools/probe/drive.py record NAME SECONDS from the
+free-roam spawn point) instead of a drive script - a real driven route.
 
 Each run: boot to free roam with the frame time pinned from the first frame (NFSU2_FIXED_DT=1), start the camera
 recorder (probe `cam_record`), play the drive script (frame-locked input schedule), stop. Runs: orig_a, orig_b
@@ -44,7 +47,7 @@ def rewrites():
 
 def run(label, enabled_names, events, tested=frozenset()):
     ENABLED.write_text(json.dumps(sorted(enabled_names)))
-    env = dict(os.environ, NFSU2_FIXED_DT="1")
+    env = dict(os.environ, NFSU2_FIXED_DT="1", NFSU2_NO_TRAFFIC="1")  # pinned frame time, no traffic cars
     t = time.monotonic()
     r = subprocess.run([str(ROOT / "nfsu2"), "freeroam"], capture_output=True, text=True, env=env)
     if "free roam after" not in r.stdout:
@@ -94,7 +97,7 @@ def compare(a, b, name):
 def main(argv):
     OUT.mkdir(parents=True, exist_ok=True)
     script = DEFAULT_SCRIPT
-    names, system, baseline_only = None, None, False
+    names, system, baseline_only, recording = None, None, False, None
     i = 0
     while i < len(argv):
         if argv[i] == "--script":
@@ -103,6 +106,8 @@ def main(argv):
             names, i = set(argv[i + 1].split(",")), i + 2
         elif argv[i] == "--system":
             system, i = argv[i + 1], i + 2
+        elif argv[i] == "--recording":  # a drive recorded with tools/probe/drive.py record NAME SECONDS
+            recording, i = argv[i + 1], i + 2
         elif argv[i] == "--baseline-only":
             baseline_only, i = True, i + 1
         else:
@@ -111,7 +116,12 @@ def main(argv):
     if not script.exists():
         script.parent.mkdir(parents=True, exist_ok=True)
         script.write_text(json.dumps(DEFAULT_DRIVE, indent=1))
-    events = drive.script_events(json.loads(script.read_text()))
+    if recording:
+        rec = json.loads((drive.DRIVES / f"{recording}.json").read_text())
+        events = rec["events"]
+        script = Path(f"{recording}.json (recorded)")
+    else:
+        events = drive.script_events(json.loads(script.read_text()))
     backup = ENABLED.read_text() if ENABLED.exists() else "[]"
     try:
         pc.call("ping")

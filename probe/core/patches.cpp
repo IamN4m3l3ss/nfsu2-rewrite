@@ -19,39 +19,50 @@ json keep_active(const json& p) {
     return {{"enabled", api().keep_active_get()}, {"g_AppActive", api().app_active()}};
 }
 
-// no_traffic (EXPERIMENTAL, DOES NOT WORK): patches 0x0042F910 (a __thiscall(1 arg) update, only caller 0x00609ED7)
-// to `ret 4`, the same patch ZMenu's "No Traffic" makes (ZMenuU2.asi 0x10057DA0). Verified 2026-11-14 with the user:
-// traffic and roaming racers still drive normally with it on, so 0x42F910 is NOT the traffic system and the effect
-// of skipping it is unknown. Not used by any tool by default; kept only so the finding is reproducible.
+// Traffic density for test drives (probe layer, never inside a rewrite). The game's own setting: global 0x89E7A8
+// (eTrafficDensity, 0 = none .. 3; quick race sets it from its "Traffic Level" option). Free roam hardcodes 3:
+// `mov eax, 3` in RaceStarter::StartCareerFreeRoam (0x540565) and ::StartCareerFreeRoamFromInGame (0x5407D0), then
+// RaceStarter::AddTrafficCars creates no cars at 0 and TrafficTeleporter::DoTimestep spawns none. We patch those two
+// immediates (and the live global) to the wanted density; the next free roam load uses it.
+// (Replaces the 2026-11-14 experiment that turned TrafficTeleporter::DoTimestep into `ret 4`, ZMenu's patch: it
+// skipped that whole update, so existing cars and roaming racers still drove.)
 namespace {
-constexpr uintptr_t kTrafficUpdate = 0x0042F910;
-const uint8_t kTrafficOrig[4] = {0x55, 0x8B, 0xEC, 0x83};  // push ebp; mov ebp, esp; sub esp, ..
-const uint8_t kTrafficOff[4] = {0xC2, 0x04, 0x00, 0x83};   // ret 4
+constexpr uintptr_t kDensity = 0x0089E7A8;
+constexpr uintptr_t kImm[2] = {0x00540566, 0x005407D1};  // imm32 of `mov eax, 3` (B8 03 00 00 00)
 }  // namespace
 
 json no_traffic(const json& p) {
-    uint8_t cur[4];
-    if (!mem_read(kTrafficUpdate, cur, 4)) throw std::runtime_error("cannot read traffic update");
-    const bool on = memcmp(cur, kTrafficOff, 4) == 0;
-    if (!on && memcmp(cur, kTrafficOrig, 4) != 0)
-        throw std::runtime_error("unexpected bytes at traffic update (another mod patched it?): " + to_hex(cur, 4));
-    if (p.contains("enabled") && p["enabled"].get<bool>() != on) {
-        const bool want = p["enabled"].get<bool>();
-        if (!mem_write(kTrafficUpdate, want ? kTrafficOff : kTrafficOrig, 4))
-            throw std::runtime_error("write failed");
-        logf("no_traffic=%d", want);
-        return {{"enabled", want}};
+    uint32_t cur[2];
+    for (int k = 0; k < 2; ++k) {
+        uint8_t op;
+        if (!mem_read(kImm[k] - 1, &op, 1) || op != 0xB8 || !mem_read(kImm[k], &cur[k], 4) || cur[k] > 3)
+            throw std::runtime_error("unexpected code at the free-roam traffic density (another mod?)");
     }
-    return {{"enabled", on}};
+    int want = -1;
+    if (p.contains("density")) want = p["density"].get<int>();
+    else if (p.contains("enabled")) want = p["enabled"].get<bool>() ? 0 : 3;
+    if (want >= 0) {
+        if (want > 3) throw std::runtime_error("density 0..3");
+        const uint32_t v = static_cast<uint32_t>(want);
+        for (uintptr_t a : kImm)
+            if (!mem_write(a, &v, 4)) throw std::runtime_error("write failed");
+        mem_write(kDensity, &v, 4);  // stops new spawns now; cars already on the road stay until the next load
+        logf("traffic density %d (free roam)", want);
+        cur[0] = v;
+    }
+    uint32_t live = 0;
+    mem_read(kDensity, &live, 4);
+    return {{"free_roam_density", cur[0]}, {"live_density", live}, {"enabled", cur[0] == 0}};
 }
 
 void no_traffic_apply_env() {
-    if (const char* env = std::getenv("NFSU2_NO_TRAFFIC"); env && std::atoi(env)) {
-        try {
-            no_traffic({{"enabled", true}});
-        } catch (const std::exception& e) {
-            logf("ERROR: no_traffic: %s", e.what());
-        }
+    const char* d = std::getenv("NFSU2_TRAFFIC");
+    const char* n = std::getenv("NFSU2_NO_TRAFFIC");
+    try {
+        if (d && *d) no_traffic({{"density", std::atoi(d)}});
+        else if (n && std::atoi(n)) no_traffic({{"density", 0}});
+    } catch (const std::exception& e) {
+        logf("ERROR: traffic: %s", e.what());
     }
 }
 

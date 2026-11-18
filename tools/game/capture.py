@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Record the real inputs of a game function during play, for replay in its diff test (leaf::run_captured).
 
-  capture.py ADDR [--nargs N] [--this BYTES] [--args S1,S2,...] [--count N] [--drive] [--seconds S]
+  capture.py ADDR [--nargs N] [--this BYTES] [--args S1,S2,...] [--count N] [--drive|--recording NAME] [--seconds S]
 
 ADDR: function address (hex). --nargs: stack arguments; --this: bytes of `this` to snapshot (thiscall; 0 = none);
 --args: snapshot size per argument (0 = a value, else the bytes behind that pointer). Records up to --count calls
@@ -28,12 +28,14 @@ def main(argv):
         return 2
     addr = int(argv[0], 16)
     opt = {"nargs": 0, "this": 0, "args": "", "count": 2000, "seconds": 20.0}
-    use_drive = False
+    use_drive, recording = False, None
     i = 1
     while i < len(argv):
         k = argv[i].lstrip("-")
         if k == "drive":
             use_drive, i = True, i + 1
+        elif k == "recording":
+            use_drive, recording, i = True, argv[i + 1], i + 2
         elif k in opt:
             v = argv[i + 1]
             opt[k] = v if isinstance(opt[k], str) else (float(v) if isinstance(opt[k], float) else int(v, 0))
@@ -48,7 +50,7 @@ def main(argv):
     path = out / f"{addr:06X}.cap"
     winpath = subprocess.run(["winepath", "-w", str(path)], capture_output=True, text=True).stdout.strip()
     if use_drive:  # the scripted drive only makes sense from the free-roam spawn point: fresh boot first
-        r = subprocess.run([str(ROOT / "nfsu2"), "freeroam"], capture_output=True, text=True)
+        r = subprocess.run([str(ROOT / "nfsu2"), "freeroam", "--no-traffic"], capture_output=True, text=True)
         if "free roam after" not in r.stdout:
             print("boot to free roam failed:\n" + (r.stdout + r.stderr)[-400:])
             return 1
@@ -56,8 +58,11 @@ def main(argv):
                         "arg_sizes": sizes, "count": opt["count"], "path": winpath})
     try:
         if use_drive:
-            script = json.loads((ROOT / "tests" / "drives" / "camera_ab.script.json").read_text())
-            drive.run_events(drive.script_events(script), every=60, tail=60)
+            if recording:
+                events = json.loads((drive.DRIVES / f"{recording}.json").read_text())["events"]
+            else:
+                events = drive.script_events(json.loads((ROOT / "tests" / "drives" / "camera_ab.script.json").read_text()))
+            drive.run_events(events, every=60, tail=60)
         else:
             end = time.monotonic() + opt["seconds"]
             while time.monotonic() < end:

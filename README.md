@@ -73,6 +73,10 @@ Everything goes through one script in the project folder (`./nfsu2` alone lists 
 ./nfsu2 all-on          every verified rewrite back on
 ./nfsu2 test            run every diff test in the running game
 ./nfsu2 kill            stop the game
+./nfsu2 record NAME 40  record 40 s of you driving (start: ./nfsu2 freeroam --no-traffic, at the spawn point)
+./nfsu2 cam-ab --recording NAME --system camera
+                        camera rewrites vs original on that drive, compared every frame
+./nfsu2 capture ADDR …   record a function's real inputs while you play, for its diff test
 ./nfsu2 push            update the progress tracker and publish it
 ```
 

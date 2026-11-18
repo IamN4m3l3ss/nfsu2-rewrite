@@ -104,7 +104,11 @@ void rewrite_shutdown();               // render thread: remove all rewrite hook
 json rewrite_list();
 json rewrite_enable(const json& params);  // {"name"|"addr", "enabled": bool}
 json rewrite_reload();
-json capture(const json& params);  // {"action": "start"|"status"|"stop", ...} (rewrite.cpp)
+json capture(const json& params);
+json live(const json& params);  // live check: {"action": "list"|"start"|"stop"|"reset", "name"|"all"} (rewrite.cpp)
+json live_state();               // main thread: [{"name","addr","on","checked","mismatches","skipped","examples"}]
+bool live_set(uintptr_t addr, bool on);  // main thread
+void live_reset_counts();                // main thread  // {"action": "start"|"status"|"stop", ...} (rewrite.cpp)
 json diff_test(const json& params);
 struct RewriteInfo {
     std::string name, system, signature;

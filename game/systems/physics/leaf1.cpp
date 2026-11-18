@@ -2,6 +2,7 @@
 // drive-train shift RPM / clutch, Mellovator state, rigid-body moment, wheel ground force,
 // bRotateVector, GJK wafer point, static-body test velocities. One table-driven leaf test (game/framework/leaf.h).
 #include "leaf.h"
+#include "live.h"
 #include "x87.h"
 
 namespace {
@@ -251,3 +252,21 @@ NFSU2_DIFF_TEST(physics_leaf1_captured) {
     }
     return all;
 }
+
+// Live check specs (game/framework/live.h): `this` bytes, then bytes behind each pointer argument (0 = a value).
+LEAF_LIVE(0x00592040, SetWheelTouchingGround, THIS, INT, 0x400, 0, 0);
+LEAF_LIVE(0x00592080, SetWheelTerrain, THIS, INT, 0x400, 0, 0);
+LEAF_LIVE(0x00592BD0, CollisionUpdate, THIS, INT, 0x20, 0);
+LEAF_LIVE(0x00592C60, IsTwoCarCollision, THIS, INT, 0x80);
+LEAF_LIVE(0x00592C90, GetCollidingCars, THIS, PTR, 0x80, 4, 4);
+LEAF_LIVE(0x00592D50, IsSmokeableInvolved, THIS, INT, 0x80);
+LEAF_LIVE(0x00592D80, GetSmokeable, THIS, PTR, 0x80);
+LEAF_LIVE(0x00592ED0, IsYawControlInducing, CDECL, INT, 0, 0x64);
+LEAF_LIVE(0x005946E0, GetShiftDownRPM, THIS, FLT, 0x100, 0, 0);
+LEAF_LIVE(0x00594ED0, ClutchMatched, THIS, INT, 0x100);
+LEAF_LIVE(0x00598A70, MellovatorSetState, THIS, PTR, 0xD0, 0, 0, 0, 0);
+LEAF_LIVE(0x0059BC20, ApplyMoment, THIS, PTR, 0x140, 12);
+LEAF_LIVE(0x0059DAF0, GroundForceInCarFrame, THIS, PTR, 0x140, 12);
+LEAF_LIVE(0x0059DB50, RotateVector, CDECL, PTR, 0, 12, 0x40, 12);
+LEAF_LIVE(0x005A2010, WaferGetPoint, THIS, PTR, 0x400, 0, 0x1C);
+LEAF_LIVE(0x005A9FF0, TestImpulseVelocities, THIS, PTR, 0, 12, 12, 0, 0);

@@ -1037,3 +1037,29 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
 - Reverted the same day: the test-mode recording and the frame limiter (they slowed the user's game down). Not
   needed: an A/B only needs orig and rewrite runs identical to EACH OTHER, which pinned replays are; following the
   human route exactly is not a goal. Recording is plain again; replays pin the recorded frame time.
+
+## 2026-11-18 — Live check (shadow test) in the game
+
+**Changed**
+- Live check: while the game runs normally, every real call of a checked function also runs the original and our
+  rewrite on two copies of its inputs and compares them (return value, registers, pops, every byte written,
+  pointers by place); the game itself continues with the original on the real data. No replays, no time tricks.
+  - Game DLL (`game/framework/live.h/.cpp`, GameApi v6 live_list / live_check / live_reset): a rewrite opts in
+    with `LEAF_LIVE(addr, fn, conv, ret, this_bytes, arg bytes...)`; 49 specs (physics leaf1, camera, cubics,
+    Linear / Average / Timer). Only functions that write to `this` / their argument buffers (pointers inside the
+    copies still reach the live game).
+  - Core (rewrite.cpp): per function a 10-byte thunk (`push index; jmp live_common`) as its hook; the rewrite's
+    hook steps aside meanwhile and comes back; all live hooks are removed before the game DLL reloads. RPC `live`.
+  - In-game panel tab "Live check": tick functions / Check all / Stop all / Reset counts, calls checked,
+    mismatches, first mismatch.
+- The drive-replay route (recorded human drives, pinned frame time) stays available but is not the way to check
+  rewrites with real data any more.
+
+**Broke**
+- The core crashed once (c0000409, fail-fast) while hot-reloading out of the frame-limiter build; not reproducible
+  afterwards (4 forced reloads, one with a live check running). Watching for it.
+
+**Verified**
+- 15 s standing in free roam, everything checked, normal speed (120 fps): 351,216 real calls, 0 mismatches
+  (cubic interpolators, Average::Recalculate, CameraInfo::GetPov, time conversion; physics needs driving).
+

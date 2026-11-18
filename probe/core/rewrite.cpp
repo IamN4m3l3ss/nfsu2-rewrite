@@ -106,7 +106,10 @@ std::string exe_disk_bytes(uintptr_t va, size_t n) {
     return "?";
 }
 
+void live_stop_all_locked();  // live check (end of file)
+
 void unload_locked() {
+    live_stop_all_locked();  // live hooks call into the game DLL: remove them before it goes
     // 1. no new calls into the DLL; 2. wait until no thread is still inside one (other game threads call the
     // allocator etc.; one may be blocked on a pool lock inside our code); 3. remove hooks (frees the trampolines
     // those calls may use); 4. unload. If calls don't drain, keep the old DLL loaded (leak) rather than crash.
@@ -525,6 +528,139 @@ json capture(const json& p) {
             fclose(f);
             logf("capture: %u calls of 0x%08x -> %s", c.count, unsigned(c.addr), c.path.c_str());
             return json{{"ok", true}, {"count", c.count}, {"bytes", out.size()}, {"path", c.path}};
+        },
+        10000);
+}
+
+}  // namespace probe
+
+
+// ---- Live check (shadow test, see game/framework/live.h): for each checked function a 10-byte thunk
+// (`push index; jmp live_common`) is its hook. live_common saves everything, lets the game DLL run original and
+// rewrite on copies of the call's inputs (live_check), replaces the pushed index with the trampoline and returns into
+// it, so the game continues with the original on the real data. The function's rewrite hook is out meanwhile.
+namespace probe {
+namespace {
+struct LiveHook {
+    uintptr_t addr = 0;
+    void* tramp = nullptr;
+    bool rewrite_hooked = false, rewrite_enabled = false, on = false;
+};
+constexpr int kMaxLive = 512;
+LiveHook g_live[kMaxLive];
+uint8_t* g_thunks = nullptr;
+}  // namespace
+}  // namespace probe
+
+extern "C" {
+void __cdecl live_record(uint32_t* p) {
+    using namespace probe;
+    LiveHook& h = g_live[p[9] % kMaxLive];
+    p[9] = reinterpret_cast<uint32_t>(h.tramp);
+    if (h.on && g_game && g_game->version >= 6 && g_game->live_check) g_game->live_check(h.addr, p, h.tramp);
+}
+__declspec(naked) void live_common() {
+    __asm {
+        pushad
+        pushfd
+        push esp
+        call live_record
+        add esp, 4
+        popfd
+        popad
+        ret
+    }
+}
+}
+
+namespace probe {
+namespace {
+bool live_start_one(uintptr_t addr) {  // main thread
+    int idx = -1;
+    for (int i = 0; i < kMaxLive; ++i)
+        if (g_live[i].on && g_live[i].addr == addr) return true;
+    for (int i = 0; i < kMaxLive && idx < 0; ++i)
+        if (!g_live[i].on) idx = i;
+    if (idx < 0) return false;
+    if (!g_thunks) {
+        g_thunks = static_cast<uint8_t*>(VirtualAlloc(nullptr, kMaxLive * 16, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+        if (!g_thunks) return false;
+    }
+    uint8_t* t = g_thunks + idx * 16;
+    t[0] = 0x68;  // push imm32
+    memcpy(t + 1, &idx, 4);
+    t[5] = 0xE9;  // jmp rel32
+    const int32_t rel = static_cast<int32_t>(reinterpret_cast<uintptr_t>(&live_common) - reinterpret_cast<uintptr_t>(t + 10));
+    memcpy(t + 6, &rel, 4);
+    LiveHook& h = g_live[idx];
+    h = LiveHook{};
+    h.addr = addr;
+    for (Entry& e : g_entries)
+        if (e.addr == addr && e.hooked) {
+            h.rewrite_hooked = true;
+            h.rewrite_enabled = e.enabled;
+            MH_DisableHook(reinterpret_cast<void*>(addr));
+            MH_RemoveHook(reinterpret_cast<void*>(addr));
+            e.hooked = e.enabled = false;
+        }
+    MH_STATUS s = MH_CreateHook(reinterpret_cast<void*>(addr), t, &h.tramp);
+    if (s == MH_OK) s = MH_EnableHook(reinterpret_cast<void*>(addr));
+    if (s != MH_OK) {
+        logf("live: hook 0x%08x failed: %s", unsigned(addr), MH_StatusToString(s));
+        return false;
+    }
+    h.on = true;
+    return true;
+}
+
+void live_stop_one(LiveHook& h) {  // main thread
+    if (!h.on) return;
+    h.on = false;
+    MH_DisableHook(reinterpret_cast<void*>(h.addr));
+    MH_RemoveHook(reinterpret_cast<void*>(h.addr));
+    for (Entry& e : g_entries)
+        if (e.addr == h.addr && h.rewrite_hooked) {
+            e.hooked = MH_CreateHook(reinterpret_cast<void*>(e.addr), e.replacement, e.original) == MH_OK;
+            if (e.hooked && h.rewrite_enabled) e.enabled = MH_EnableHook(reinterpret_cast<void*>(e.addr)) == MH_OK;
+        }
+    h = LiveHook{};
+}
+void live_stop_all_locked() {  // declared near unload_locked (same anonymous namespace)
+    for (LiveHook& h : g_live) live_stop_one(h);
+}
+}  // namespace
+
+// Panel / RPC front-end. Main thread.
+json live_state() {
+    json funcs = json::array();
+    if (g_game && g_game->version >= 6 && g_game->live_list) funcs = json::parse(g_game->live_list());
+    for (json& f : funcs) {
+        f["on"] = false;
+        for (const LiveHook& h : g_live)
+            if (h.on && h.addr == f["addr"].get<uintptr_t>()) f["on"] = true;
+    }
+    return funcs;
+}
+bool live_set(uintptr_t addr, bool on) {
+    if (on) return live_start_one(addr);
+    for (LiveHook& h : g_live)
+        if (h.on && h.addr == addr) live_stop_one(h);
+    return true;
+}
+void live_reset_counts() {
+    if (g_game && g_game->version >= 6 && g_game->live_reset) g_game->live_reset();
+}
+
+json live(const json& p) {  // RPC {"action": "list"|"start"|"stop"|"reset", "name"|"all"}
+    const std::string action = p.value("action", std::string("list"));
+    const std::string name = p.value("name", std::string());
+    return run_on_main(
+        [action, name] {
+            if (action == "reset") live_reset_counts();
+            if (action == "start" || action == "stop")
+                for (const json& f : live_state())
+                    if (name.empty() || name == "all" || f["name"] == name) live_set(f["addr"].get<uintptr_t>(), action == "start");
+            return live_state();
         },
         10000);
 }

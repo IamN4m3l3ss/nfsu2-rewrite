@@ -6,7 +6,7 @@
 
 namespace probe {
 
-constexpr uint32_t kGameApiVersion = 5;  // v3: GameRewrite.file, v4: GameRewrite.calls, v5: inflight
+constexpr uint32_t kGameApiVersion = 6;  // v3: GameRewrite.file, v4: GameRewrite.calls, v5: inflight, v6: live check
 
 struct GameRewrite {
     uintptr_t addr;         // original function in SPEED2.EXE (NA v1.2)
@@ -28,6 +28,15 @@ struct GameApi {
     const char* (*diff)(const char* name, uint32_t iterations, uint32_t seed);
     // v5: number of calls currently inside an entry stub, all threads (wait for 0 before unloading the DLL)
     volatile long* inflight;
+    // v6 live check (shadow test during normal play). live_list: JSON [{"name","addr","checked","mismatches",
+    // "examples":[...]}] of every rewrite with a live spec (render thread). live_check: called by the core's hook on
+    // a real call of `addr` (any thread): regs = saved registers + stack as laid out by the core's live hook
+    // ([0] eflags, [1..8] edi esi ebp esp ebx edx ecx eax, [9] scratch, [10] return address, [11..] args),
+    // tramp = the original function; runs original and rewrite on copies and records the result. live_reset: zero
+    // the counters.
+    const char* (*live_list)();
+    void (*live_check)(uintptr_t addr, const uint32_t* regs, void* tramp);
+    void (*live_reset)();
     // {"name","iterations","mismatches","examples":[...],"error"} (name "*" = run all -> array)
 };
 

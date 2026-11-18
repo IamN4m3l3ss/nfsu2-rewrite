@@ -379,6 +379,75 @@ void tab_drives() {
                         "when the PC renders faster).");
 }
 
+// ---- Live check: every real call of a ticked function also runs original and rewrite on copies of its inputs
+void tab_live() {
+    static json funcs = json::array();
+    static int tick = 0;
+    if (tick++ % 20 == 0) {
+        try {
+            funcs = live_state();
+        } catch (const std::exception& e) {
+            logf("live: %s", e.what());
+        }
+    }
+    ImGui::TextWrapped("Play normally. For each ticked function, every real call also runs the original and our "
+                       "rewrite on copies of its inputs and compares them (return value, registers, every byte "
+                       "written). The game itself keeps running the original. Nothing is sped up or replayed.");
+    if (ImGui::Button("Check all")) {
+        for (const json& f : funcs) live_set(f["addr"].get<uintptr_t>(), true);
+        tick = 0;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Stop all")) {
+        for (const json& f : funcs) live_set(f["addr"].get<uintptr_t>(), false);
+        tick = 0;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Reset counts")) {
+        live_reset_counts();
+        tick = 0;
+    }
+    uint64_t total = 0, bad = 0;
+    for (const json& f : funcs) total += f.value("checked", 0u), bad += f.value("mismatches", 0u);
+    ImGui::SameLine();
+    ImGui::TextColored(bad ? ImVec4(1, 0.35f, 0.35f, 1) : ImVec4(0.4f, 0.9f, 0.4f, 1), "%llu calls checked, %llu mismatches",
+                       static_cast<unsigned long long>(total), static_cast<unsigned long long>(bad));
+    if (ImGui::BeginTable("live", 5, ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable)) {
+        ImGui::TableSetupScrollFreeze(0, 1);
+        ImGui::TableSetupColumn("check", ImGuiTableColumnFlags_WidthFixed);
+        ImGui::TableSetupColumn("function");
+        ImGui::TableSetupColumn("calls", ImGuiTableColumnFlags_WidthFixed);
+        ImGui::TableSetupColumn("mismatches", ImGuiTableColumnFlags_WidthFixed);
+        ImGui::TableSetupColumn("first mismatch");
+        ImGui::TableHeadersRow();
+        int row = 0;
+        for (json& f : funcs) {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            bool on = f.value("on", false);
+            ImGui::PushID(row++);
+            if (ImGui::Checkbox("##on", &on)) {
+                live_set(f["addr"].get<uintptr_t>(), on);
+                f["on"] = on;
+            }
+            ImGui::PopID();
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(f["name"].get<std::string>().c_str());
+            ImGui::TableNextColumn();
+            ImGui::Text("%u", f.value("checked", 0u));
+            ImGui::TableNextColumn();
+            const uint32_t m = f.value("mismatches", 0u);
+            if (m) ImGui::TextColored(ImVec4(1, 0.35f, 0.35f, 1), "%u", m);
+            else ImGui::TextDisabled("0");
+            ImGui::TableNextColumn();
+            const auto& ex = f["examples"];
+            if (!ex.empty()) ImGui::TextUnformatted(ex[0].get<std::string>().c_str());
+            else if (f.value("skipped", 0u)) ImGui::TextDisabled("%u calls skipped (inputs not readable)", f.value("skipped", 0u));
+        }
+        ImGui::EndTable();
+    }
+}
+
 void draw() {
     if (!g_visible) {
         ImGui::SetNextWindowPos(ImVec2(20, 20));
@@ -399,6 +468,10 @@ void draw() {
             }
             if (ImGui::BeginTabItem("Car")) {
                 tab_car();
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Live check")) {
+                tab_live();
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Drives")) {

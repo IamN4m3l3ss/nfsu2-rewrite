@@ -3,6 +3,7 @@
 // chunk loader, GameFlowManager track load/unload state, joystick / region / loading queries, DeviceDriver ctor.
 // Table-driven leaf tests (game/framework/leaf.h); x87 maths through x87.h.
 #include "leaf.h"
+#include "live.h"
 #include "x87.h"
 
 namespace {
@@ -485,3 +486,23 @@ NFSU2_DIFF_TEST(zmisc_leaf1_BROKEN) {  // harness self-check: tCubic2D::GetVal c
     static const std::vector<Fn> fns{Fn("GetVal_vs_GetdVal", &o_Cubic2D_GetVal, NFSU2_ENTRY(Cubic2D_GetdVal), THIS, PTR, {'p', 1})};
     return run(ctx, "zmisc_leaf1_BROKEN", spec, fns);
 }
+
+// Live check specs (game/framework/live.h): `this` bytes, then bytes behind each pointer argument (0 = a value).
+LEAF_LIVE(0x00574830, Cubic1D_MakeCoeffs, THIS, INT, 0x30);
+LEAF_LIVE(0x00574890, Cubic1D_GetddVal, THIS, FLT, 0x30, 0);
+LEAF_LIVE(0x00574B10, Cubic2D_SetVal, THIS, LOW16, 0x60, 8);
+LEAF_LIVE(0x00574B50, Cubic2D_SetdVal, THIS, LOW16, 0x60, 8);
+LEAF_LIVE(0x00574B90, Cubic2D_SetValDesired, THIS, LOW16, 0x60, 8);
+LEAF_LIVE(0x00574BD0, Cubic2D_SetdValDesired, THIS, INT, 0x60, 8);
+LEAF_LIVE(0x00574CF0, Cubic3D_SetdValDesired, THIS, INT, 0x90, 12);
+LEAF_LIVE(0x00574BF0, Cubic2D_GetVal, THIS, PTR, 0x60, 8);
+LEAF_LIVE(0x00574C10, Cubic2D_GetdVal, THIS, PTR, 0x60, 8);
+LEAF_LIVE(0x00574C70, Cubic2D_GetValDesired, THIS, PTR, 0x60, 8);
+LEAF_LIVE(0x00574DD0, Cubic3D_GetValDesired, THIS, PTR, 0x90, 12);
+LEAF_LIVE(0x00574C30, Cubic2D_GetValAt, THIS, PTR, 0x60, 8, 0);
+LEAF_LIVE(0x00574D70, Cubic3D_GetValAt, THIS, PTR, 0x90, 12, 0);
+LEAF_LIVE(0x00576C60, Linear_Init, THIS, INT, 8, 0, 0, 0, 0);
+LEAF_LIVE(0x00576C90, Linear_GetValue, THIS, FLT, 8, 0);
+LEAF_LIVE(0x00576910, Average_Recalculate, THIS, INT, 0x20);
+LEAF_LIVE(0x005771B0, Timer_GetHMS, THIS, INT, 4, 4, 4, 4, 4);
+LEAF_LIVE(0x00576CE0, RealTimeFromQuantized, CDECL, FLT, 0, 0);

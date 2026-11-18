@@ -3,6 +3,7 @@
 // init, drag-camera key tables (NIS groups, current track, parameters, neighbours, shared keys, key number).
 // Table-driven leaf tests (game/framework/leaf.h); x87 maths through x87.h.
 #include "leaf.h"
+#include "live.h"
 #include "x87.h"
 
 namespace {
@@ -369,3 +370,14 @@ NFSU2_DIFF_TEST(camera_leaf1_BROKEN) {  // harness self-check: OrbitCar target c
     return run(ctx, "camera_leaf1_BROKEN", spec, fns);
 }
 
+// Live check specs (game/framework/live.h): `this` bytes, then bytes behind each pointer argument (0 = a value).
+LEAF_LIVE(0x00441190, OutsidePovType, CDECL, INT, 0, 0);
+LEAF_LIVE(0x00441AE0, Mover_GetTarget, THIS, PTR, 0x40);
+LEAF_LIVE(0x00444030, Mover_GetCarToFollow, THIS, PTR, 0x40);
+LEAF_LIVE(0x00444B90, Orbit_GetTarget, THIS, PTR, 0xC0);
+LEAF_LIVE(0x00444CD0, TrackCar_GetTarget, THIS, PTR, 0x440);
+LEAF_LIVE(0x0044DE70, Cubic_GetLookbackAngle, THIS, INT, 0x60);
+LEAF_LIVE(0x00445B10, Cubic_SetPovType, THIS, INT, 0x60, 0);
+LEAF_LIVE(0x0044DE60, Cubic_SetDisableLag, THIS, INT, 0x60, 0);
+LEAF_LIVE(0x00444910, Mover_FovCubicInit, THIS, INT, 0x40, 0x30);
+LEAF_LIVE(0x00444CF0, TrackCar_CalcSpringForce, THIS, PTR, 0x70, 12, 12, 12);

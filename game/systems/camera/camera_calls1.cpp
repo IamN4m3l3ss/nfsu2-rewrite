@@ -3,6 +3,7 @@
 // lookups, select-car step count, ice-camera FX gain, camera POV lookup, drag-camera eye / look keys.
 // Callees are called through their game addresses (their own rewrite, when enabled, runs for both sides).
 #include "leaf.h"
+#include "live.h"
 #include "x87.h"
 
 namespace {
@@ -264,3 +265,10 @@ NFSU2_DIFF_TEST(camera_calls1_BROKEN) {  // harness self-check: GetEye compared 
     static const std::vector<Fn> fns{Fn("GetEye_vs_GetLook", &o_DragData_GetEye, NFSU2_ENTRY(DragData_GetLook), THIS, LOW8, {'i', 8}, {'p', 1})};
     return run(ctx, "camera_calls1_BROKEN", spec, fns);
 }
+
+// Live check specs (game/framework/live.h): `this` bytes, then bytes behind each pointer argument (0 = a value).
+LEAF_LIVE(0x00443D20, LensToFov, CDECL, INT, 0, 0);
+LEAF_LIVE(0x00443D50, FovToLens, CDECL, FLT, 0, 0);
+LEAF_LIVE(0x00443D80, LensDeltaToFovDelta, CDECL, FLT, 0, 0, 0);
+LEAF_LIVE(0x004466D0, SinController_Function, THIS, FLT, 0x20, 0);
+LEAF_LIVE(0x00441140, CameraInfo_GetPov, THIS, PTR, 0x200, 0);

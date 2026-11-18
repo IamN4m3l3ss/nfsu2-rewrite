@@ -99,6 +99,7 @@ json dispatch(const std::string& method, const json& p) {
     if (method == "rewrite_list") return rewrite_list();
     if (method == "rewrite_enable") return rewrite_enable(p);
     if (method == "rewrite_reload") return rewrite_reload();
+    if (method == "capture") return capture(p);
     if (method == "diff_test") return diff_test(p);
     if (method == "schedule") return input_schedule(p);
     if (method == "schedule_status") return input_schedule_status();

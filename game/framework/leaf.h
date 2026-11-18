@@ -5,6 +5,7 @@
 // stack pops, st0 for float returns, and every block (link slots skipped, copied pointers compared by place).
 #pragma once
 #include <cstddef>
+#include <cstdlib>
 #include <cstdint>
 #include <algorithm>
 #include <cstring>
@@ -328,3 +329,107 @@ using byte = uint8_t;
 using ushort = uint16_t;
 using uint = uint32_t;
 using ulong = uint32_t;
+
+// ---- Replay of captured real calls (probe `capture`, tools/game/capture.py): work/captures/<ADDR>.cap, found
+// next to out/ (env NFSU2_GAME). Each recorded call is rebuilt twice: block 0 = the `this` snapshot, block 1+i = the
+// snapshot of pointer argument i (pointer args then point at their copy; value args as recorded). Pointers INSIDE a
+// snapshot still point into the live game (reads see live data, the same for both sides), so only use this for
+// functions that write to `this` / their argument buffers. No capture file yet: 0 iterations, no mismatch.
+namespace game::leaf {
+inline std::string capture_path(uintptr_t addr) {
+    const char* g = std::getenv("NFSU2_GAME");
+    std::string p = g ? g : "";
+    for (int up = 0; up < 2 && !p.empty(); ++up) p = p.substr(0, p.find_last_of("\\/"));  // ...\out\x.dll -> repo
+    char t[64];
+    snprintf(t, sizeof t, "\\work\\captures\\%06X.cap", static_cast<unsigned>(addr));
+    return p + t;
+}
+
+inline DiffResult run_captured(const DiffCtx& ctx, const char* test, uintptr_t addr, const Fn& f) {
+    DiffResult res;
+    res.name = test;
+    std::vector<uint8_t> file;
+    if (FILE* fp = fopen(capture_path(addr).c_str(), "rb")) {
+        uint8_t b[4096];
+        size_t n;
+        while ((n = fread(b, 1, sizeof b, fp)) > 0) file.insert(file.end(), b, b + n);
+        fclose(fp);
+    }
+    if (file.size() < 24 || std::memcmp(file.data(), "NFCP", 4) != 0) return res;  // nothing recorded yet
+    size_t at = 4;
+    auto rd = [&](void* d, size_t n) {
+        if (at + n > file.size()) return false;
+        std::memcpy(d, file.data() + at, n);
+        at += n;
+        return true;
+    };
+    uint32_t ver, faddr, nargs, this_size, count;
+    rd(&ver, 4), rd(&faddr, 4), rd(&nargs, 4), rd(&this_size, 4);
+    std::vector<uint32_t> asz(nargs);
+    for (auto& s : asz) rd(&s, 4);
+    rd(&count, 4);
+    if (!*f.orig) {
+        res.error = "original not hooked";
+        return res;
+    }
+    struct Rec {
+        uint32_t ecx, eax, edx, mask;
+        std::vector<uint32_t> args;
+        std::vector<std::vector<uint8_t>> snaps;  // [0] this, [1+i] arg i
+    };
+    std::vector<Rec> recs;
+    for (uint32_t k = 0; k < count; ++k) {
+        Rec r;
+        r.args.resize(nargs);
+        if (!rd(&r.ecx, 4) || !rd(&r.eax, 4) || !rd(&r.edx, 4) || !rd(r.args.data(), nargs * 4) || !rd(&r.mask, 4)) break;
+        r.snaps.resize(1 + nargs);
+        r.snaps[0].resize(this_size);
+        if (this_size && !rd(r.snaps[0].data(), this_size)) break;
+        for (uint32_t i = 0; i < nargs; ++i) {
+            r.snaps[1 + i].resize(asz[i]);
+            if (asz[i] && !rd(r.snaps[1 + i].data(), asz[i])) break;
+        }
+        recs.push_back(std::move(r));
+    }
+    if (recs.empty()) return res;
+    for (uint32_t it = 0; it < ctx.iterations; ++it) {
+        const Rec& r = recs[(it + ctx.seed) % recs.size()];
+        ++res.iterations;
+        Graph g[2];
+        Spec sp{static_cast<int>(1 + nargs), 0x10, {}, {}};
+        for (auto& s : r.snaps) sp.size = std::max<uint32_t>(sp.size, static_cast<uint32_t>((s.size() + 0xF) & ~0xFu));
+        for (Graph& gr : g) {
+            gr.sp = &sp;
+            gr.raw.assign(sp.blocks, {});
+            gr.blk.assign(sp.blocks, {});
+            for (int k = 0; k < sp.blocks; ++k) {
+                gr.raw[k].assign(sp.size + 2 * kGuard, 0);
+                gr.blk[k] = {gr.raw[k].data() + kGuard, sp.size};
+                std::memcpy(gr.blk[k].data(), r.snaps[k].data(), r.snaps[k].size());
+            }
+        }
+        uint32_t a0[16] = {}, a1[16] = {};
+        for (uint32_t i = 0; i < nargs && i < 16; ++i) {
+            const bool snap = asz[i] && (r.mask >> (1 + i) & 1);
+            a0[i] = snap ? u(g[0].blk[1 + i].data()) : r.args[i];
+            a1[i] = snap ? u(g[1].blk[1 + i].data()) : r.args[i];
+        }
+        const bool self = f.conv == THIS && this_size && (r.mask & 1);
+        const void* s0 = f.conv == THIS ? (self ? g[0].blk[0].data() : reinterpret_cast<void*>(r.ecx)) : nullptr;
+        const void* s1 = f.conv == THIS ? (self ? g[1].blk[0].data() : reinterpret_cast<void*>(r.ecx)) : nullptr;
+        if (f.conv == THIS && !self) continue;  // `this` was not readable: replaying would touch the live object
+        const RegOutAny x = call_any(*f.orig, s0, a0, static_cast<int>(nargs), f.ret == FLT);
+        const RegOutAny y = call_any(f.mine, s1, a1, static_cast<int>(nargs), f.ret == FLT);
+        std::string bad;
+        if (f.ret == FLT ? !same_float(x.st0, y.st0)
+                         : (x.eax != y.eax && g[0].rel(x.eax) != g[1].rel(y.eax) &&
+                            !(f.ret == LOW8 && (x.eax & 0xFF) == (y.eax & 0xFF)) &&
+                            !(f.ret == LOW16 && (x.eax & 0xFFFF) == (y.eax & 0xFFFF))))
+            bad += f.ret == FLT ? " st0" : " eax";
+        if (x.popped != y.popped) bad += " pops";
+        bad += g[0].diff(g[1]);
+        if (!bad.empty() && ++res.mismatches <= 5) res.examples.push_back(std::string(f.name) + " (captured call):" + bad);
+    }
+    return res;
+}
+}  // namespace game::leaf

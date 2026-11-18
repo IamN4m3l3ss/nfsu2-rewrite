@@ -1016,4 +1016,12 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
 
 **Verified**
 - Baseline orig vs orig: identical (720 frames). Camera rewrites (system camera) vs original: identical.
+- Argument capture (probe `capture`, rewrite.cpp): for one function at a time, the rewrite's hook is swapped for a
+  capture hook (saves all registers, records ECX/EAX/EDX, stack args, SEH-guarded snapshots of `this` and pointer
+  args, jumps to the original) and restored after. `tools/game/capture.py ADDR --nargs N --this BYTES [--args ...]
+  [--drive|--seconds S]` writes work/captures/<ADDR>.cap (gitignored: live game memory). `leaf::run_captured`
+  replays the recorded calls original vs rewrite (snapshots in guarded blocks; pointers inside snapshots still
+  read the live game). physics_leaf1_captured: SetWheelTerrain / ClutchMatched captures replayed, 4,000 cases,
+  0 mismatches. These functions are event-driven (terrain change, gear change): few calls per scripted drive;
+  recording while a person drives gives more.
 

@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+"""Record the real inputs of a game function during play, for replay in its diff test (leaf::run_captured).
+
+  capture.py ADDR [--nargs N] [--this BYTES] [--args S1,S2,...] [--count N] [--drive] [--seconds S]
+
+ADDR: function address (hex). --nargs: stack arguments; --this: bytes of `this` to snapshot (thiscall; 0 = none);
+--args: snapshot size per argument (0 = a value, else the bytes behind that pointer). Records up to --count calls
+(default 2000) while you play, or while the A/B camera drive plays (--drive; needs free roam), or for --seconds.
+The function's rewrite hook is removed while capturing and restored after. Writes work/captures/<ADDR>.cap
+(gitignored: it holds live game memory).
+"""
+import json
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tools" / "probe"))
+import drive  # noqa: E402
+import probe_client as pc  # noqa: E402
+
+
+def main(argv):
+    if not argv or argv[0].startswith("-"):
+        print(__doc__)
+        return 2
+    addr = int(argv[0], 16)
+    opt = {"nargs": 0, "this": 0, "args": "", "count": 2000, "seconds": 20.0}
+    use_drive = False
+    i = 1
+    while i < len(argv):
+        k = argv[i].lstrip("-")
+        if k == "drive":
+            use_drive, i = True, i + 1
+        elif k in opt:
+            v = argv[i + 1]
+            opt[k] = v if isinstance(opt[k], str) else (float(v) if isinstance(opt[k], float) else int(v, 0))
+            i += 2
+        else:
+            print(__doc__)
+            return 2
+    sizes = [int(x, 0) for x in opt["args"].split(",")] if opt["args"] else []
+    sizes += [0] * (opt["nargs"] - len(sizes))
+    out = ROOT / "work" / "captures"
+    out.mkdir(parents=True, exist_ok=True)
+    path = out / f"{addr:06X}.cap"
+    winpath = subprocess.run(["winepath", "-w", str(path)], capture_output=True, text=True).stdout.strip()
+    pc.call("capture", {"action": "start", "addr": hex(addr), "nargs": opt["nargs"], "this_size": opt["this"],
+                        "arg_sizes": sizes, "count": opt["count"], "path": winpath})
+    try:
+        if use_drive:
+            script = json.loads((ROOT / "tests" / "drives" / "camera_ab.script.json").read_text())
+            drive.run_events(drive.script_events(script), every=60, tail=60)
+        else:
+            end = time.monotonic() + opt["seconds"]
+            while time.monotonic() < end:
+                st = pc.call("capture", {"action": "status"})
+                if st["left"] == 0:
+                    break
+                time.sleep(0.5)
+    finally:
+        r = pc.call("capture", {"action": "stop"}, timeout=30)
+    print(f"{r['count']} calls of 0x{addr:06X} recorded -> {path.relative_to(ROOT)} ({r['bytes']:,} bytes)")
+    return 0 if r["count"] else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

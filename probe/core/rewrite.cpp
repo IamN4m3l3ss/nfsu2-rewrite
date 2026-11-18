@@ -5,7 +5,10 @@
 
 #include <algorithm>
 #include <cstring>
+#include <mutex>
 #include <set>
+#include <string>
+#include <vector>
 #include <stdexcept>
 
 #include "MinHook.h"
@@ -370,6 +373,160 @@ json diff_test(const json& p) {
     }
     if (merged.size() == 1 && name != "*") return merged[0];
     return merged;
+}
+
+}  // namespace probe
+
+// ---- Argument capture: record the real inputs a game function gets during play, for replay in diff tests.
+// One capture at a time. The function's rewrite hook (if any) is removed while capturing and recreated after. The
+// capture hook saves all registers, copies ECX/EAX/EDX, the stack arguments and snapshots of `this` and of pointer
+// arguments (SEH-guarded), then jumps to the original. File (little endian): "NFCP", version 1, addr, nargs,
+// this_size, arg_size[nargs], count; per record: ecx, eax, edx, args[nargs], valid mask (bit 0 this, bit 1+i arg i),
+// this bytes, then arg i bytes for every arg with a size.
+namespace probe {
+namespace {
+struct Capture {
+    uintptr_t addr = 0;
+    uint32_t nargs = 0, this_size = 0, left = 0, count = 0;
+    std::vector<uint32_t> arg_size;
+    std::vector<uint8_t> buf;
+    std::string path;
+    bool active = false, rewrite_hooked = false, rewrite_enabled = false;
+} g_cap;
+std::mutex g_cap_mu;
+
+bool safe_copy(void* dst, const void* src, size_t n) {
+    __try {
+        memcpy(dst, src, n);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+}  // namespace
+}  // namespace probe
+
+extern "C" {
+void* g_cap_tramp = nullptr;
+// p: [0] eflags, [1] edi, [2] esi, [3] ebp, [4] esp, [5] ebx, [6] edx, [7] ecx, [8] eax, [9] return, [10..] args
+void __cdecl capture_record(const uint32_t* p) {
+    using namespace probe;
+    std::lock_guard lk(g_cap_mu);
+    if (!g_cap.active || g_cap.left == 0) return;
+    const uint32_t regs[3] = {p[7], p[8], p[6]};
+    auto put = [](const void* d, size_t n) {
+        const auto* b = static_cast<const uint8_t*>(d);
+        g_cap.buf.insert(g_cap.buf.end(), b, b + n);
+    };
+    put(regs, sizeof regs);
+    put(p + 10, g_cap.nargs * 4);
+    const size_t mask_at = g_cap.buf.size();
+    uint32_t mask = 0;
+    put(&mask, 4);
+    std::vector<uint8_t> tmp;
+    auto snap = [&](uint32_t ptr, uint32_t n, int bit) {
+        tmp.assign(n, 0);
+        if (ptr && safe_copy(tmp.data(), reinterpret_cast<const void*>(ptr), n)) mask |= 1u << bit;
+        put(tmp.data(), n);
+    };
+    if (g_cap.this_size) snap(p[7], g_cap.this_size, 0);
+    for (uint32_t i = 0; i < g_cap.nargs; ++i)
+        if (g_cap.arg_size[i]) snap(p[10 + i], g_cap.arg_size[i], 1 + static_cast<int>(i));
+    memcpy(g_cap.buf.data() + mask_at, &mask, 4);
+    --g_cap.left;
+    ++g_cap.count;
+}
+__declspec(naked) void capture_hook() {
+    __asm {
+        pushad
+        pushfd
+        push esp
+        call capture_record
+        add esp, 4
+        popfd
+        popad
+        jmp dword ptr [g_cap_tramp]
+    }
+}
+}
+
+namespace probe {
+
+json capture(const json& p) {
+    const std::string action = p.value("action", std::string("status"));
+    if (action == "status") {
+        std::lock_guard lk(g_cap_mu);
+        return json{{"active", g_cap.active}, {"count", g_cap.count}, {"left", g_cap.left}};
+    }
+    if (action == "start") {
+        Capture c;
+        c.addr = static_cast<uintptr_t>(std::stoul(p.at("addr").get<std::string>(), nullptr, 0));
+        c.nargs = p.value("nargs", 0u);
+        c.this_size = p.value("this_size", 0u);
+        c.arg_size = p.value("arg_sizes", std::vector<uint32_t>{});
+        c.arg_size.resize(c.nargs, 0);
+        c.left = p.value("count", 1000u);
+        c.path = p.at("path").get<std::string>();
+        if (c.nargs > 16 || c.this_size > 0x4000) throw std::runtime_error("capture: at most 16 args, this_size 0x4000");
+        return run_on_main(
+            [c]() mutable {
+                if (g_cap.active) throw std::runtime_error("a capture is already running");
+                for (Entry& e : g_entries)
+                    if (e.addr == c.addr && e.hooked) {
+                        c.rewrite_hooked = true;
+                        c.rewrite_enabled = e.enabled;
+                        MH_DisableHook(reinterpret_cast<void*>(e.addr));
+                        MH_RemoveHook(reinterpret_cast<void*>(e.addr));
+                        e.hooked = e.enabled = false;
+                    }
+                MH_STATUS s = MH_CreateHook(reinterpret_cast<void*>(c.addr), reinterpret_cast<void*>(&capture_hook), &g_cap_tramp);
+                if (s == MH_OK) s = MH_EnableHook(reinterpret_cast<void*>(c.addr));
+                if (s != MH_OK) throw std::runtime_error(std::string("capture hook: ") + MH_StatusToString(s));
+                {
+                    std::lock_guard lk(g_cap_mu);
+                    g_cap = std::move(c);
+                    g_cap.active = true;
+                }
+                logf("capture: 0x%08x, %u args, this %u bytes, %u calls", unsigned(g_cap.addr), g_cap.nargs, g_cap.this_size, g_cap.left);
+                return json{{"ok", true}};
+            },
+            5000);
+    }
+    // stop: unhook, restore the rewrite's hook, write the file
+    return run_on_main(
+        [] {
+            if (!g_cap.active) throw std::runtime_error("no capture running");
+            MH_DisableHook(reinterpret_cast<void*>(g_cap.addr));
+            MH_RemoveHook(reinterpret_cast<void*>(g_cap.addr));
+            Capture c;
+            {
+                std::lock_guard lk(g_cap_mu);
+                c = std::move(g_cap);
+                g_cap = Capture{};
+            }
+            for (Entry& e : g_entries)
+                if (e.addr == c.addr && c.rewrite_hooked) {
+                    e.hooked = MH_CreateHook(reinterpret_cast<void*>(e.addr), e.replacement, e.original) == MH_OK;
+                    if (e.hooked && c.rewrite_enabled) e.enabled = MH_EnableHook(reinterpret_cast<void*>(e.addr)) == MH_OK;
+                }
+            std::vector<uint8_t> out;
+            auto put = [&out](uint32_t v) { out.insert(out.end(), reinterpret_cast<uint8_t*>(&v), reinterpret_cast<uint8_t*>(&v) + 4); };
+            out.insert(out.end(), {'N', 'F', 'C', 'P'});
+            put(1);
+            put(static_cast<uint32_t>(c.addr));
+            put(c.nargs);
+            put(c.this_size);
+            for (uint32_t s : c.arg_size) put(s);
+            put(c.count);
+            out.insert(out.end(), c.buf.begin(), c.buf.end());
+            FILE* f = fopen(c.path.c_str(), "wb");
+            if (!f) throw std::runtime_error("capture: cannot write " + c.path);
+            fwrite(out.data(), 1, out.size(), f);
+            fclose(f);
+            logf("capture: %u calls of 0x%08x -> %s", c.count, unsigned(c.addr), c.path.c_str());
+            return json{{"ok", true}, {"count", c.count}, {"bytes", out.size()}, {"path", c.path}};
+        },
+        10000);
 }
 
 }  // namespace probe

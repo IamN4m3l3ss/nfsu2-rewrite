@@ -229,3 +229,25 @@ NFSU2_DIFF_TEST(physics_leaf1_BROKEN) {  // harness self-check: SetWheelTouching
                                         THIS, INT, {'i', 4}, {'i', 3})};
     return run(ctx, "physics_leaf1_BROKEN", spec, fns);
 }
+
+// Real inputs recorded during play (tools/game/capture.py ADDR ...), replayed original vs rewrite. Without a capture
+// file a test runs 0 cases.
+NFSU2_DIFF_TEST(physics_leaf1_captured) {
+    static const std::vector<std::pair<uintptr_t, Fn>> fns{
+        {0x00592040, LEAF_FN(SetWheelTouchingGround, THIS, INT)},
+        {0x00592080, LEAF_FN(SetWheelTerrain, THIS, INT)},
+        {0x005946E0, LEAF_FN(GetShiftDownRPM, THIS, FLT)},
+        {0x00594ED0, LEAF_FN(ClutchMatched, THIS, INT)},
+    };
+    game::DiffResult all;
+    all.name = "physics_leaf1_captured";
+    for (const auto& [addr, f] : fns) {
+        const game::DiffResult r = run_captured(ctx, "physics_leaf1_captured", addr, f);
+        all.iterations += r.iterations;
+        all.mismatches += r.mismatches;
+        for (const auto& e : r.examples)
+            if (all.examples.size() < 5) all.examples.push_back(e);
+        if (!r.error.empty()) all.error = r.error;
+    }
+    return all;
+}

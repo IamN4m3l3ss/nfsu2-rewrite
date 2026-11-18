@@ -55,12 +55,14 @@ struct Link {
     uint32_t off;
     int to;
     bool nullable = false;  // null in 1 of 4 cases (code that tests the pointer)
+    uint32_t add = 0;       // points this many bytes into the target block (intrusive list heads inside objects)
 };
 struct IntField {
     int blk;
     uint32_t off;
     int size;        // 1, 2, 4
-    uint32_t range;  // value = below(range)
+    uint32_t range;  // value = base + below(range)
+    uint32_t base = 0;
 };
 struct Spec {
     int blocks;          // block 0 = this (or the first pointer argument)
@@ -70,7 +72,7 @@ struct Spec {
 };
 
 enum Conv { THIS, CDECL, STD };
-enum Ret { INT, PTR, FLT, NONE };  // NONE: EAX still compared (the caller's EAX passes through or is clobbered alike)
+enum Ret { INT, PTR, FLT, NONE, LOW16 };  // LOW16: only AX compared (upper EAX = a pointer's high half)  // NONE: EAX still compared (the caller's EAX passes through or is clobbered alike)
 struct Arg {
     char kind = 0;  // 'i' below(v), 'p' pointer to block v, 'f' random float bits, 'r' random dword
     uint32_t v = 0;
@@ -108,27 +110,30 @@ struct Graph {
             }
         }
         for (const IntField& f : s.ints) {
-            const uint32_t v = r.below(f.range);
+            const uint32_t v = f.base + r.below(f.range);
             std::memcpy(blk[f.blk].data() + f.off, &v, f.size);
         }
         for (size_t i = 0; i < s.links.size(); ++i) {
             const Link& l = s.links[i];
-            uint8_t* p = (l.nullable && (nullmask >> (i % 32) & 1)) ? nullptr : blk[l.to].data();
+            uint8_t* p = (l.nullable && (nullmask >> (i % 32) & 1)) ? nullptr : blk[l.to].data() + l.add;
             std::memcpy(blk[l.from].data() + l.off, &p, 4);
         }
     }
+    // a pointer as (block, offset): inside a block first, then up to 0x100 past its end (one-past-the-end
+    // pointers); blocks can sit back to back, so the exact pass must come first
     int64_t rel(uint32_t v) const {
-        for (size_t k = 0; k < blk.size(); ++k) {
-            const uintptr_t b = reinterpret_cast<uintptr_t>(blk[k].data());
-            if (v >= b && v < b + blk[k].size() + 0x100) return (static_cast<int64_t>(k + 1) << 32) | (v - b);
-        }
+        for (uint32_t slack : {0u, 0x100u})
+            for (size_t k = 0; k < blk.size(); ++k) {
+                const uintptr_t b = reinterpret_cast<uintptr_t>(blk[k].data());
+                if (v >= b && v < b + blk[k].size() + slack) return (static_cast<int64_t>(k + 1) << 32) | (v - b);
+            }
         return v;
     }
     std::string diff(const Graph& o) const {
         for (size_t k = 0; k < blk.size(); ++k) {
-            std::vector<uint8_t> a = blk[k], b = o.blk[k];
-            for (const Link& l : sp->links)
-                if (l.from == static_cast<int>(k)) std::memset(a.data() + l.off, 0, 4), std::memset(b.data() + l.off, 0, 4);
+            // pointer fields (links, and pointers the code wrote) compare by where they point (block + offset)
+            const std::vector<uint8_t>& a = blk[k];
+            const std::vector<uint8_t>& b = o.blk[k];
             for (size_t i = 0; i + 4 <= a.size(); i += 4) {
                 if (!std::memcmp(a.data() + i, b.data() + i, 4)) continue;
                 float x, y;
@@ -235,7 +240,7 @@ inline DiffResult run(const DiffCtx& ctx, const char* test, const Spec& spec_in,
                 snprintf(t, sizeof t, " st0 (float result: original %g, rewrite %g)", x.st0, y.st0);
                 bad += t;
             }
-        } else if (a.rel(x.eax) != b.rel(y.eax)) {
+        } else if (f.ret == LOW16 ? (x.eax & 0xFFFF) != (y.eax & 0xFFFF) : a.rel(x.eax) != b.rel(y.eax)) {
             snprintf(t, sizeof t, " eax (return value: original 0x%X, rewrite 0x%X; 0xA0A0A0A0 = the caller's EAX untouched)",
                      static_cast<unsigned>(x.eax), static_cast<unsigned>(y.eax));
             bad += t;

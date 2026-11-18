@@ -926,3 +926,27 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
 **Verified**
 - physics_leaf1: 2 x 50,000 cases, 0 mismatches; physics_leaf1_BROKEN catches a wrong function. 1,245 verified.
 
+## 2026-11-18 — zMisc leaf batch 1 (38), two harness bugs fixed
+
+**Changed**
+- `game/systems/misc/zmisc_leaf1.cpp`: tCubic1D/2D/3D (coefficients, getters, setters, evaluation), Linear,
+  Average, PidError, Graph, Timer::GetHoursMinsSeconds, bRepeat::ReadFromLocation, bFileSize, ReplayManager
+  (end of time, snapshot search, snapshot list get/delete), DemoModeReplay::Loader, GameFlowManager track
+  load/unload state, joystick event removal / plugged-in / type monitoring, build region, loading queries,
+  RealFile::DeviceDriver ctor. Core (zBWare) is done on PC: the 7 "unverified" left are knowledge-db name
+  mismatches (e.g. "bScaleAdd" 0x402000 is an AI timer getter) or a debugger stub.
+- `x87.h` **bug fix**: helpers passed their inputs to inline asm through a pointer in a register; clang could not
+  see the asm reading that memory and, inside loops, dropped the stores filling it (Average::Recalculate summed
+  nothing). Inputs now go in as named local copies. Whole suite re-run: 477/477.
+- `leaf.h`: Link `add` (pointers into the middle of a block: intrusive list heads), IntField `base`, `LOW16`
+  return kind, pointer fields compared by place instead of skipped; `rel()` checks exact block ranges before the
+  one-past-the-end slack (back-to-back allocations were attributed to the wrong block: physics_leaf1 "failed"
+  10000/10000 on a correct rewrite). `x87::cmpw` (full status word, for "void" functions that leave it in EAX).
+- Test-design lesson: functions that read raw floats/bits of `this` need a spec without pointer fields (their bits
+  differ between the two graphs).
+- Removed the unreviewed local-model draft llm_4083A0 (fails under the stricter comparison; never enabled).
+
+**Verified**
+- zmisc_leaf1 (+ _plain/_avg/_dev/_eggs/_joy): 3 seeds x 50,000 cases, 0 mismatches; _BROKEN catches. Full suite
+  477 passed, 0 failed. 1,283 verified, all on; free roam normal.
+

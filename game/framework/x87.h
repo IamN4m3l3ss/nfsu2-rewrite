@@ -43,12 +43,13 @@ inline X ild16(int16_t i) {  // fild word
     }
     return r;
 }
+// Inputs go to the asm as NAMED local copies (fld tbyte ptr [la]): the compiler then knows the asm reads them.
+// (Reading through a pointer in a register hid that, and inside loops clang dropped the stores - 2026-11-18.)
 inline float st(const X& a) {  // fstp dword (rounds to float)
     float r;
-    const uint8_t* pa = a.b;
+    X la = a;
     __asm {
-        mov eax, pa
-        fld tbyte ptr [eax]
+        fld tbyte ptr [la]
         fstp dword ptr [r]
     }
     return r;
@@ -56,11 +57,9 @@ inline float st(const X& a) {  // fstp dword (rounds to float)
 #define NFSU2_X87_BIN(name, op)                     \
     inline X name(const X& a, const X& b) {         \
         X r;                                        \
-        const uint8_t *pa = a.b, *pb = b.b;         \
-        __asm { mov eax, pa }                       \
-        __asm { mov ecx, pb }                       \
-        __asm { fld tbyte ptr [eax] }               \
-        __asm { fld tbyte ptr [ecx] }               \
+        X la = a, lb = b;                           \
+        __asm { fld tbyte ptr [la] }                \
+        __asm { fld tbyte ptr [lb] }                \
         __asm { op st(1), st }                      \
         __asm { fstp tbyte ptr [r] }                \
         return r;                                   \
@@ -72,10 +71,9 @@ NFSU2_X87_BIN(div, fdivp)  // a / b
 #undef NFSU2_X87_BIN
 inline X sqrt(const X& a) {  // fsqrt
     X r;
-    const uint8_t* pa = a.b;
+    X la = a;
     __asm {
-        mov eax, pa
-        fld tbyte ptr [eax]
+        fld tbyte ptr [la]
         fsqrt
         fstp tbyte ptr [r]
     }
@@ -83,10 +81,9 @@ inline X sqrt(const X& a) {  // fsqrt
 }
 inline int32_t ftol(const X& a) {  // _ftol2: truncate toward zero, low 32 bits
     int64_t r;
-    const uint8_t* pa = a.b;
+    X la = a;
     __asm {
-        mov eax, pa
-        fld tbyte ptr [eax]
+        fld tbyte ptr [la]
         fisttp qword ptr [r]
     }
     return static_cast<int32_t>(r);
@@ -94,17 +91,28 @@ inline int32_t ftol(const X& a) {  // _ftol2: truncate toward zero, low 32 bits
 // fcom a, b -> AH condition bits (C0 0x01, C2 0x04, C3 0x40)
 inline uint8_t cmp(const X& a, const X& b) {
     uint16_t sw;
-    const uint8_t *pa = a.b, *pb = b.b;
+    X la = a, lb = b;
     __asm {
-        mov eax, pa
-        mov ecx, pb
-        fld tbyte ptr [ecx]
-        fld tbyte ptr [eax]
+        fld tbyte ptr [lb]
+        fld tbyte ptr [la]
         fcompp
         fnstsw ax
         mov sw, ax
     }
     return static_cast<uint8_t>(sw >> 8);
+}
+// the full status word after `fcomp` (what `fnstsw ax` leaves in AX: condition codes, TOP, sticky exception flags)
+inline uint16_t cmpw(const X& a, const X& b) {
+    uint16_t sw;
+    X la = a, lb = b;
+    __asm {
+        fld tbyte ptr [lb]
+        fld tbyte ptr [la]
+        fcompp
+        fnstsw ax
+        mov sw, ax
+    }
+    return sw;
 }
 // the original's flag tests: "test ah,M; jp/jnp" use the parity of (ah & M)
 inline bool parity_even(uint8_t v) { return (__builtin_popcount(v) & 1) == 0; }

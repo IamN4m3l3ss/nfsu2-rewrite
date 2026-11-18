@@ -57,6 +57,29 @@ void time_sync_apply() {
     logf("time_sync: game clocks set (real %u, world %u, frames %u)", kReal, kWorld, kFrames);
 }
 
+// While the frame time is pinned, also hold each frame to that real duration (render thread, at Present): otherwise
+// the PC draws faster than the pinned step and the game looks fast-forward. Game time = real time again, and runs
+// stay repeatable.
+void fe_frame_limit() {
+    if (!g_fe_fixed_on) return;
+    float dt;
+    const uint32_t bits = g_fe_fixed_bits;
+    memcpy(&dt, &bits, 4);
+    static LARGE_INTEGER freq{}, next{};
+    if (!freq.QuadPart) QueryPerformanceFrequency(&freq);
+    LARGE_INTEGER now;
+    QueryPerformanceCounter(&now);
+    const LONGLONG step = static_cast<LONGLONG>(static_cast<double>(dt) * static_cast<double>(freq.QuadPart));
+    if (next.QuadPart == 0 || now.QuadPart > next.QuadPart + 4 * step) next.QuadPart = now.QuadPart;  // (re)start
+    while (now.QuadPart < next.QuadPart) {
+        const LONGLONG left_ms = (next.QuadPart - now.QuadPart) * 1000 / freq.QuadPart;
+        if (left_ms > 2) Sleep(static_cast<DWORD>(left_ms - 1));
+        else YieldProcessor();
+        QueryPerformanceCounter(&now);
+    }
+    next.QuadPart += step;
+}
+
 bool fe_fixed_dt(bool on, float dt) {  // main thread
     static bool hooked = false;
     if (on && !hooked) {

@@ -119,6 +119,7 @@ std::string rewrite_build();
 
 // ---- overlay.cpp (Dear ImGui panel, F8) ----
 void overlay_init();
+void fe_frame_limit();                  // render thread: hold frames to the pinned frame time (festate.cpp)
 void time_sync_apply();                  // main thread: same game clocks for A/B drives (festate.cpp)
 void camrec_frame(uint64_t frame);       // render thread: camera recorder (camrec.cpp)
 json cam_record(const json& p);          // {"action": "start"|"stop", "view": 1}

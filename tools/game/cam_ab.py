@@ -16,6 +16,7 @@ the camera views (bumper, hood, chase near/far) so several camera movers run.
 Recordings: work/cam_ab/<run>.json. Restarts the game 3 times; leaves it in free roam with the normal set.
 """
 import json
+import statistics
 import os
 import struct
 import subprocess
@@ -45,9 +46,9 @@ def rewrites():
     return pc.call("rewrite_list")["rewrites"]
 
 
-def run(label, enabled_names, events, tested=frozenset()):
+def run(label, enabled_names, events, tested=frozenset(), dt="1"):
     ENABLED.write_text(json.dumps(sorted(enabled_names)))
-    env = dict(os.environ, NFSU2_FIXED_DT="1", NFSU2_NO_TRAFFIC="1")  # pinned frame time, no traffic cars
+    env = dict(os.environ, NFSU2_FIXED_DT=dt, NFSU2_NO_TRAFFIC="1")  # pinned frame time, no traffic cars
     t = time.monotonic()
     r = subprocess.run([str(ROOT / "nfsu2"), "freeroam"], capture_output=True, text=True, env=env)
     if "free roam after" not in r.stdout:
@@ -98,6 +99,7 @@ def main(argv):
     OUT.mkdir(parents=True, exist_ok=True)
     script = DEFAULT_SCRIPT
     names, system, baseline_only, recording = None, None, False, None
+    dt = "1"
     i = 0
     while i < len(argv):
         if argv[i] == "--script":
@@ -119,6 +121,9 @@ def main(argv):
     if recording:
         rec = json.loads((drive.DRIVES / f"{recording}.json").read_text())
         events = rec["events"]
+        dts = [x["dt"] for x in rec.get("samples", []) if x.get("dt")]
+        if dts:  # replay at the frame time it was driven with: same speed, same path
+            dt = repr(statistics.median(dts))
         script = Path(f"{recording}.json (recorded)")
     else:
         events = drive.script_events(json.loads(script.read_text()))
@@ -134,9 +139,9 @@ def main(argv):
     names = names or set()
     print(f"{len(names)} rewrites under test; drive {script.name}, {len(events)} input events", flush=True)
     try:
-        a = run("orig_a", normal - names, events)
-        b = run("orig_b", normal - names, events)
-        t = None if baseline_only else run("rewrites", normal | names, events, frozenset(names))
+        a = run("orig_a", normal - names, events, dt=dt)
+        b = run("orig_b", normal - names, events, dt=dt)
+        t = None if baseline_only else run("rewrites", normal | names, events, frozenset(names), dt=dt)
     finally:
         ENABLED.write_text(backup)
         subprocess.run([str(ROOT / "nfsu2"), "freeroam"], capture_output=True)

@@ -1028,4 +1028,10 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   `./nfsu2 record`), traffic density slider (0 = none), fixed frame time toggle. `./nfsu2` gained record / replay /
   cam-ab / capture, `freeroam` passes options (`--no-traffic`); cam_ab.py / capture.py `--recording NAME` replay a
   recorded human drive (the blind script ran into walls); their boots use no traffic.
+- Replaying a human recording: inputs are frame-locked, so the replay only follows the route when every frame has
+  the same game time as when it was driven. A pinned frame time alone looked fast-forward (the PC draws faster than
+  the pinned step) and an unpinned recording cannot be reproduced (its frame times vary). Now: a frame limiter holds
+  each frame to the pinned time in real time (normal speed, fe_frame_limit), NFSU2_FIXED_DT takes seconds, and the
+  panel records in test mode (1/60 s pinned + limited, clocks synced at the start); `./nfsu2 replay`, cam_ab and
+  capture replay with the recording's frame time. Pinned replays are identical to each other (verified twice).
 

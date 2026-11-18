@@ -5,6 +5,7 @@ applied at Present of frame base+f and the car is sampled every N frames on the 
   drive.py state                          car_state once
   drive.py script FILE.json [--every N]   run a drive script, print checkpoints, save trace next to it
   drive.py record NAME SECONDS            record what the game reads from the keyboard (you drive), + checkpoints
+                                          (the in-game panel's Drives tab records in test mode: 60 fps locked)
   drive.py replay NAME                    replay a recording and compare against its checkpoints
 
 Drive script JSON: {"fps": 60, "steps": [{"key": "w", "from": 0.0, "to": 4.0}, {"key": "lshift", "at": 1.5}]}
@@ -106,11 +107,16 @@ def main(a: list[str]) -> int:
             print(f"saved {DRIVES / (name + '.json')}: {len(rec['events'])} events, {rec['frames']} frames")
         elif a[0] == "replay":
             rec = json.loads((DRIVES / f"{a[1]}.json").read_text())
-            res = run_events(rec["events"], rec["every"], tail=max(0, rec["frames"] - max((e["f"] for e in rec["events"]), default=0)))
+            dts = sorted(x["dt"] for x in rec.get("samples", []) if x.get("dt"))
+            if dts:  # the recording's test mode: same frame time, held in real time (normal speed)
+                pc.call("fixed_dt", {"enabled": True, "dt": dts[len(dts) // 2]})
+            res = run_events(rec["events"], rec["every"], tail=max(0, rec["frames"] - max((e["f"] for e in rec["events"]), default=0)),
+                             time_sync=True)
             errs = compare(rec["samples"], res["samples"])
             for f, e in errs:
                 print(f"f={f:5d} position error {e:7.2f} m")
             print(f"end: recorded {fmt(end_of(rec['samples']))}\n     replayed {fmt(end_of(res['samples']))}")
+            pc.call("fixed_dt", {"enabled": False})
         else:
             print(__doc__)
             return 2

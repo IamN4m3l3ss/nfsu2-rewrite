@@ -11,6 +11,7 @@ The function's rewrite hook is removed while capturing and restored after. Write
 (gitignored: it holds live game memory).
 """
 import json
+import statistics
 import subprocess
 import sys
 import time
@@ -50,7 +51,13 @@ def main(argv):
     path = out / f"{addr:06X}.cap"
     winpath = subprocess.run(["winepath", "-w", str(path)], capture_output=True, text=True).stdout.strip()
     if use_drive:  # the scripted drive only makes sense from the free-roam spawn point: fresh boot first
-        r = subprocess.run([str(ROOT / "nfsu2"), "freeroam", "--no-traffic"], capture_output=True, text=True)
+        import os
+        env = dict(os.environ)
+        if recording:  # replay at the frame time it was driven with: same speed, same path
+            dts = [x["dt"] for x in json.loads((drive.DRIVES / f"{recording}.json").read_text()).get("samples", []) if x.get("dt")]
+            if dts:
+                env["NFSU2_FIXED_DT"] = repr(statistics.median(dts))
+        r = subprocess.run([str(ROOT / "nfsu2"), "freeroam", "--no-traffic"], capture_output=True, text=True, env=env)
         if "free roam after" not in r.stdout:
             print("boot to free roam failed:\n" + (r.stdout + r.stderr)[-400:])
             return 1

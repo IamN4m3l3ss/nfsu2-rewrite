@@ -70,8 +70,13 @@ bool core_init(const LoaderApi* a, const char* state_json) {
             }
             rewrite_init(st);
             modules(true);
-            // repeatable menu timing from the first frame (A/B tests): NFSU2_FIXED_DT=1 pins RealTimeElapsed to 1/60
-            if (const char* fdt = std::getenv("NFSU2_FIXED_DT"); fdt && *fdt == '1') fe_fixed_dt(true, 1.0f / 60.0f);
+            // repeatable timing from the first frame (A/B tests): NFSU2_FIXED_DT pins RealTimeElapsed per frame:
+            // "1" = 1/60 s, or a frame time in seconds (replays use the recorded one, so they run at the speed driven)
+            if (const char* fdt = std::getenv("NFSU2_FIXED_DT"); fdt && *fdt) {
+                const float v = static_cast<float>(std::atof(fdt));
+                if (v == 1.0f) fe_fixed_dt(true, 1.0f / 60.0f);
+                else if (v > 0.0f && v < 0.5f) fe_fixed_dt(true, v);
+            }
         }
     }
     server_start(port);
@@ -79,6 +84,7 @@ bool core_init(const LoaderApi* a, const char* state_json) {
 }
 
 void core_on_frame(uint64_t frame) {
+    fe_frame_limit();
     if (g_hooks) rewrite_on_frame(frame);
     input_frame_tick(frame);
     run_tasks();

@@ -606,6 +606,7 @@ json record_start(const json& p) {
     g_rec.clear();
     g_rec_base = g_trace_base;
     g_rec_active = true;
+    if (p.value("time_sync", false)) g_sync_frame = g_rec_base;  // same game clocks as its replays get
     logf("recording real keyboard from frame %llu", static_cast<unsigned long long>(g_rec_base));
     return t;
 }

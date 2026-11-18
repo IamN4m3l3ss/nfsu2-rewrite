@@ -304,8 +304,7 @@ void tab_drives() {
     static bool recording = false;
     static double started = 0;
     static std::string status = "Start at the free-roam spawn point (./nfsu2 freeroam --no-traffic) for test drives.";
-    ImGui::TextWrapped("Record what you drive (in test mode: 60 fps locked, so replays are the exact same run): "
-                       "keyboard actions frame by frame plus car checkpoints, saved to "
+    ImGui::TextWrapped("Record what you drive: keyboard actions frame by frame plus car checkpoints, saved to "
                        "tests/drives/<name>.json - replay with ./nfsu2 replay NAME, or use it for an A/B "
                        "(./nfsu2 cam-ab --recording NAME --system camera).");
     ImGui::Separator();
@@ -317,14 +316,10 @@ void tab_drives() {
     if (!recording) {
         if (ImGui::Button("Start recording")) {
             try {
-                // test mode, so replays are the exact same run: 60 fps locked (frame time pinned to 1/60 s and
-                // held to it in real time), game clocks synced on the first frame
-                fe_fixed_dt(true, 1.0f / 60.0f);
-                record_start({{"every", 30}, {"time_sync", true}});
+                record_start({{"every", 30}});
                 recording = true;
                 started = ImGui::GetTime();
-                status = "Recording in test mode (60 fps locked) - drive now. F8 hides this panel; the game still "
-                         "gets your keys.";
+                status = "Recording - drive now (F8 hides this panel; the game still gets your keys).";
             } catch (const std::exception& e) {
                 status = std::string("could not start: ") + e.what();
             }
@@ -334,7 +329,6 @@ void tab_drives() {
         if (ImGui::Button("Stop and save")) {
             try {
                 const json r = record_stop();
-                fe_fixed_dt(false, 1.0f / 60.0f);  // back to normal frame times
                 const std::string path = repo_path("\\tests\\drives\\") + name + ".json";
                 if (FILE* f = fopen(path.c_str(), "wb")) {
                     const std::string txt = r.dump(1);

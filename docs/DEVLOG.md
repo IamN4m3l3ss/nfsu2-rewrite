@@ -1034,4 +1034,6 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   each frame to the pinned time in real time (normal speed, fe_frame_limit), NFSU2_FIXED_DT takes seconds, and the
   panel records in test mode (1/60 s pinned + limited, clocks synced at the start); `./nfsu2 replay`, cam_ab and
   capture replay with the recording's frame time. Pinned replays are identical to each other (verified twice).
-
+- Reverted the same day: the test-mode recording and the frame limiter (they slowed the user's game down). Not
+  needed: an A/B only needs orig and rewrite runs identical to EACH OTHER, which pinned replays are; following the
+  human route exactly is not a goal. Recording is plain again; replays pin the recorded frame time.

@@ -1112,3 +1112,15 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
 - Verified: 3 seeds x 30,000 per spec, 0 mismatches; suite 552 / 0 failed; in game: cycling all camera views with
   C works (hood, near / far chase, bumper). 1,345 verified.
 
+## 2026-11-19 — Camera batch 6 (10): mover constructors / destructors
+
+- `game/systems/camera/camera_movers1.cpp`: RearViewMirror / AutoPilot / TrackRouteEditor / SelectCar camera mover
+  constructors, SelectCar / TrackRouteEditor destructors, CubicCameraMover::Enable, the 9-argument setters
+  (ShowcaseCameraMover::SetShowcaseCameraParams, SelectCarCameraMover::SetDefaultOrientation), CameraMoverRestartRace.
+- Testing constructors without touching the real views: they take a view INDEX into the game's view table
+  (0x832DE0 + i * 0x70). A spec post-hook moves a test block onto a table slot (the heap is far above the table, so
+  every block has an index) and makes it a fake view; arg kind 'V' passes that index; per-graph aliases make the
+  stored index compare as the same value in both runs. Also: 9-argument entry stubs, leaf Fn up to 9 args, guard
+  window compared relative to each block, a fixture saving/restoring the restart flag.
+- Verified: 3 seeds x 30,000 per spec, 0 mismatches; suite 564 / 0 failed; in game: view changes fine. 1,355.
+

@@ -65,17 +65,19 @@ struct IntField {
     uint32_t range;  // value = base + below(range)
     uint32_t base = 0;
 };
+struct Graph;
 struct Spec {
     int blocks;          // block 0 = this (or the first pointer argument)
     uint32_t size;       // bytes per block
     std::vector<Link> links;
     std::vector<IntField> ints;
+    void (*post)(Graph&) = nullptr;  // runs after the fill (e.g. move a block onto a game table slot)
 };
 
 enum Conv { THIS, CDECL, STD };
 enum Ret { INT, PTR, FLT, NONE, LOW16, LOW8 };  // LOW8: only AL (bools whose upper EAX is leftover pointer bits)  // LOW16: only AX compared (upper EAX = a pointer's high half)  // NONE: EAX still compared (the caller's EAX passes through or is clobbered alike)
 struct Arg {
-    // 'i' below(v), 'j' signed: below(2v) - v, 'k' the constant v, 'p' pointer to block v, 'q' pointer into block (v & 0xFF) at offset
+    // 'i' below(v), 'j' signed: below(2v) - v, 'k' the constant v, 'V' view index of block v, 'p' pointer to block v, 'q' pointer into block (v & 0xFF) at offset
     // ((v >> 8) & 0xFFF) + stride (v >> 20) * below(8), 'f' random float bits, 'r' random dword
     char kind = 0;
     uint32_t v = 0;
@@ -88,9 +90,9 @@ struct Fn {
     Ret ret;
     std::vector<Arg> args;
     Fn(const char* n, void** o, const void* m, Conv c, Ret r, Arg a0 = {}, Arg a1 = {}, Arg a2 = {}, Arg a3 = {},
-       Arg a4 = {}, Arg a5 = {}, Arg a6 = {}, Arg a7 = {})
+       Arg a4 = {}, Arg a5 = {}, Arg a6 = {}, Arg a7 = {}, Arg a8 = {})
         : name(n), orig(o), mine(m), conv(c), ret(r) {
-        for (const Arg& a : {a0, a1, a2, a3, a4, a5, a6, a7})
+        for (const Arg& a : {a0, a1, a2, a3, a4, a5, a6, a7, a8})
             if (a.kind) args.push_back(a);
     }
 };
@@ -110,6 +112,7 @@ struct Graph {
     const Spec* sp;
     std::vector<std::vector<uint8_t>> raw;
     std::vector<Blk> blk;
+    std::vector<std::pair<uint32_t, int64_t>> alias;  // per-graph values with the same meaning (e.g. 'V' indices)
     void fill(const Spec& s, Rng& r, uint32_t nullmask) {
         sp = &s;
         raw.assign(s.blocks, {});
@@ -136,11 +139,14 @@ struct Graph {
             uint8_t* p = (l.nullable && (nullmask >> (i % 32) & 1)) ? nullptr : blk[l.to].data() + l.add;
             std::memcpy(blk[l.from].data() + l.off, &p, 4);
         }
+        if (s.post) s.post(*this);
     }
     // a pointer as (block, offset): inside a block first, then up to 0x100 before its start or past its end
     // (one-before / one-past-the-end pointers the code computes); blocks can sit back to back, so the exact pass
     // must come first
     int64_t rel(uint32_t v) const {
+        for (const auto& [val, token] : alias)
+            if (v == val) return token;
         for (uint32_t slack : {0u, 0x100u})
             for (size_t k = 0; k < blk.size(); ++k) {
                 const uintptr_t b = reinterpret_cast<uintptr_t>(blk[k].data());
@@ -152,22 +158,23 @@ struct Graph {
     std::string diff(const Graph& o) const {
         for (size_t k = 0; k < blk.size(); ++k) {
             // pointer fields (links, and pointers the code wrote) compare by where they point (block + offset);
-            // the guard gaps are compared too
-            const std::vector<uint8_t>& a = raw[k];
-            const std::vector<uint8_t>& b = o.raw[k];
-            for (size_t i = 0; i + 4 <= a.size(); i += 4) {
-                if (!std::memcmp(a.data() + i, b.data() + i, 4)) continue;
+            // 0x100 bytes of guard on each side are compared too (a block may sit up to 0x100 into its guard)
+            const uint8_t* a = blk[k].data() - 0x100;
+            const uint8_t* b = o.blk[k].data() - 0x100;
+            const size_t n = blk[k].size() + 0x200;
+            for (size_t i = 0; i + 4 <= n; i += 4) {
+                if (!std::memcmp(a + i, b + i, 4)) continue;
                 float x, y;
-                std::memcpy(&x, a.data() + i, 4);
-                std::memcpy(&y, b.data() + i, 4);
+                std::memcpy(&x, a + i, 4);
+                std::memcpy(&y, b + i, 4);
                 if (x != x && y != y) continue;  // NaN payloads may differ (CLAUDE.md NaN contract)
                 uint32_t ux, uy;
                 std::memcpy(&ux, &x, 4);
                 std::memcpy(&uy, &y, 4);
-                if (rel(ux) == o.rel(uy) && rel(ux) > 0xFFFFFFFFll) continue;  // a copied pointer, same place
+                if (rel(ux) == o.rel(uy) && (rel(ux) > 0xFFFFFFFFll || rel(ux) < 0)) continue;  // same place / alias
                 char t[64];
                 snprintf(t, sizeof t, " mem[%d+0x%X] %08X/%08X", static_cast<int>(k),
-                         static_cast<unsigned>(i - kGuard), ux, uy);
+                         static_cast<unsigned>(i - 0x100), ux, uy);
                 return t;
             }
         }
@@ -241,7 +248,7 @@ inline DiffResult run(const DiffCtx& ctx, const char* test, const Spec& spec_in,
         Rng r2 = r;
         a.fill(spec, r, nullmask);
         b.fill(spec, r2, nullmask);
-        uint32_t aa[8] = {}, ab[8] = {};
+        uint32_t aa[9] = {}, ab[9] = {};
         const int n = static_cast<int>(f.args.size());
         for (int i = 0; i < n; ++i) {
             const Arg& g = f.args[i];
@@ -250,6 +257,11 @@ inline DiffResult run(const DiffCtx& ctx, const char* test, const Spec& spec_in,
                 case 'i': aa[i] = ab[i] = g.v ? r.below(g.v) : r.next(); break;
                 case 'j': aa[i] = ab[i] = r.below(2 * g.v) - g.v; break;
                 case 'k': aa[i] = ab[i] = g.v; break;  // a constant
+                case 'V':  // the eView index whose table slot (0x832DE0 + index * 0x70) is block v (see a spec's post)
+                    aa[i] = (u(a.blk[g.v].data()) - 0x00832DE0u) / 0x70u, ab[i] = (u(b.blk[g.v].data()) - 0x00832DE0u) / 0x70u;
+                    a.alias.push_back({aa[i], -1 - static_cast<int64_t>(g.v)});  // stored copies compare as "the same index"
+                    b.alias.push_back({ab[i], -1 - static_cast<int64_t>(g.v)});
+                    break;
                 case 'q': {
                     const uint32_t off = ((g.v >> 8) & 0xFFF) + (g.v >> 20) * r.below(8);
                     aa[i] = u(a.blk[g.v & 0xFF].data()) + off, ab[i] = u(b.blk[g.v & 0xFF].data()) + off;

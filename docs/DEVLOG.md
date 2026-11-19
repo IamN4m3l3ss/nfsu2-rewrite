@@ -1148,3 +1148,13 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
 - Verified: 4 seeds x 30,000 per spec, 0 mismatches; suite 588 / 0 failed; in game the cubic updates run on
   (~1,500 calls/s) with views correct. 1,374.
 
+## 2026-11-19 — Camera batch 9 (12): look-at matrix and users
+
+- `game/systems/camera/camera_lookat.cpp`: eCreateLookAtMatrix 0x5BA9A0 (incl. the original's products with the 0.0
+  constant, which decide NaN / inf), CameraMover::IsoProjectionMatrix / ComputeBankedUpVector,
+  TrackRouteEditorCameraMover::Update (its input 0x50D510 is a stub returning 0 on PC), the select-car wrappers
+  (MoveToDefault, MoveToNewDefaultOrientation, StopLookingAtParts, SetDesiredPartLookAtOrientation: 12 args, stubs
+  and leaf now go to 12), CubicCameraMover::SetLookBack / MinDistToWall, FlushAccumulationBuffer,
+  Player::UseBirdsEye. Note: LEAF_STD bodies are __cdecl (the stub pops) - a __stdcall body crashed the test.
+- Verified: 3 seeds x 30,000 per spec, 0 mismatches; suite 0 failed.
+

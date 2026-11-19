@@ -115,6 +115,7 @@ extern "C" volatile long nfsu2_inflight;
     __asm push dword ptr [esp + 44] __asm push dword ptr [esp + 44] __asm push dword ptr [esp + 44]
 #define NFSU2_PUSH_ARGS_10 __asm push dword ptr [esp + 48] __asm push dword ptr [esp + 48] __asm push dword ptr [esp + 48] __asm push dword ptr [esp + 48] __asm push dword ptr [esp + 48] __asm push dword ptr [esp + 48] __asm push dword ptr [esp + 48] __asm push dword ptr [esp + 48] __asm push dword ptr [esp + 48] __asm push dword ptr [esp + 48]
 #define NFSU2_PUSH_ARGS_11 __asm push dword ptr [esp + 52] __asm push dword ptr [esp + 52] __asm push dword ptr [esp + 52] __asm push dword ptr [esp + 52] __asm push dword ptr [esp + 52] __asm push dword ptr [esp + 52] __asm push dword ptr [esp + 52] __asm push dword ptr [esp + 52] __asm push dword ptr [esp + 52] __asm push dword ptr [esp + 52] __asm push dword ptr [esp + 52]
+#define NFSU2_PUSH_ARGS_12 __asm push dword ptr [esp + 56] __asm push dword ptr [esp + 56] __asm push dword ptr [esp + 56] __asm push dword ptr [esp + 56] __asm push dword ptr [esp + 56] __asm push dword ptr [esp + 56] __asm push dword ptr [esp + 56] __asm push dword ptr [esp + 56] __asm push dword ptr [esp + 56] __asm push dword ptr [esp + 56] __asm push dword ptr [esp + 56] __asm push dword ptr [esp + 56]
 
 #define NFSU2_REWRITE_N(addr, fn, nargs, sig, original)                                     \
     static void* const g_impl_##fn = reinterpret_cast<void*>(&fn);                          \

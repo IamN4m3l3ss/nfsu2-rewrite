@@ -112,6 +112,11 @@ inline X absx(const X& a) {  // fabs (clears the sign, NaN too)
     r.b[9] &= 0x7F;
     return r;
 }
+inline X negx(const X& a) {  // fchs
+    X r = a;
+    r.b[9] ^= 0x80;
+    return r;
+}
 // a status word from cmpw() as the original's fnstsw saw it with `depth` values still on its x87 stack (TOP field)
 inline uint16_t with_depth(uint16_t sw, int depth) {
     const uint16_t top = static_cast<uint16_t>((((sw >> 11) & 7) - depth) & 7);

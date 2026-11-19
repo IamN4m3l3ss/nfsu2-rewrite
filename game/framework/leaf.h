@@ -90,9 +90,9 @@ struct Fn {
     Ret ret;
     std::vector<Arg> args;
     Fn(const char* n, void** o, const void* m, Conv c, Ret r, Arg a0 = {}, Arg a1 = {}, Arg a2 = {}, Arg a3 = {},
-       Arg a4 = {}, Arg a5 = {}, Arg a6 = {}, Arg a7 = {}, Arg a8 = {}, Arg a9 = {}, Arg a10 = {})
+       Arg a4 = {}, Arg a5 = {}, Arg a6 = {}, Arg a7 = {}, Arg a8 = {}, Arg a9 = {}, Arg a10 = {}, Arg a11 = {})
         : name(n), orig(o), mine(m), conv(c), ret(r) {
-        for (const Arg& a : {a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10})
+        for (const Arg& a : {a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11})
             if (a.kind) args.push_back(a);
     }
 };
@@ -248,7 +248,7 @@ inline DiffResult run(const DiffCtx& ctx, const char* test, const Spec& spec_in,
         Rng r2 = r;
         a.fill(spec, r, nullmask);
         b.fill(spec, r2, nullmask);
-        uint32_t aa[11] = {}, ab[11] = {};
+        uint32_t aa[12] = {}, ab[12] = {};
         const int n = static_cast<int>(f.args.size());
         for (int i = 0; i < n; ++i) {
             const Arg& g = f.args[i];

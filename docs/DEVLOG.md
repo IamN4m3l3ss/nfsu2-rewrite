@@ -1102,3 +1102,13 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
 - Verified: 3 seeds x 30,000 per spec, 0 mismatches; full suite 540 / 0 failed; live: OutsidePOV 7,218 calls,
   0 mismatches (the ice camera does not run in free roam). 1,340 verified.
 
+## 2026-11-19 — Camera batch 5 (5): view attach / detach, mover enable / disable / ctor
+
+- `game/systems/camera/camera_attach.cpp`: eView::AttachCameraMover / UnattachCameraMover (doubly linked list,
+  head at view +0x44, mover link at +4; each change calls eUpdateViewMode 0x5C2120), CameraMover::Enable / Disable,
+  CameraMover::CameraMover. These unblock most camera mover constructors / destructors.
+- Tests only use fake views; the constructor test fixes the view to -1 (new leaf arg kind 'k' = constant), since any
+  other index links the test object into a live game view. No live spec (they write through pointers).
+- Verified: 3 seeds x 30,000 per spec, 0 mismatches; suite 552 / 0 failed; in game: cycling all camera views with
+  C works (hood, near / far chase, bumper). 1,345 verified.
+

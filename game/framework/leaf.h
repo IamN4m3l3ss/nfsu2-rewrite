@@ -75,7 +75,7 @@ struct Spec {
 enum Conv { THIS, CDECL, STD };
 enum Ret { INT, PTR, FLT, NONE, LOW16, LOW8 };  // LOW8: only AL (bools whose upper EAX is leftover pointer bits)  // LOW16: only AX compared (upper EAX = a pointer's high half)  // NONE: EAX still compared (the caller's EAX passes through or is clobbered alike)
 struct Arg {
-    // 'i' below(v), 'j' signed: below(2v) - v, 'p' pointer to block v, 'q' pointer into block (v & 0xFF) at offset
+    // 'i' below(v), 'j' signed: below(2v) - v, 'k' the constant v, 'p' pointer to block v, 'q' pointer into block (v & 0xFF) at offset
     // ((v >> 8) & 0xFFF) + stride (v >> 20) * below(8), 'f' random float bits, 'r' random dword
     char kind = 0;
     uint32_t v = 0;
@@ -249,6 +249,7 @@ inline DiffResult run(const DiffCtx& ctx, const char* test, const Spec& spec_in,
                 case 'p': aa[i] = u(a.blk[g.v].data()), ab[i] = u(b.blk[g.v].data()); break;
                 case 'i': aa[i] = ab[i] = g.v ? r.below(g.v) : r.next(); break;
                 case 'j': aa[i] = ab[i] = r.below(2 * g.v) - g.v; break;
+                case 'k': aa[i] = ab[i] = g.v; break;  // a constant
                 case 'q': {
                     const uint32_t off = ((g.v >> 8) & 0xFFF) + (g.v >> 20) * r.below(8);
                     aa[i] = u(a.blk[g.v & 0xFF].data()) + off, ab[i] = u(b.blk[g.v & 0xFF].data()) + off;

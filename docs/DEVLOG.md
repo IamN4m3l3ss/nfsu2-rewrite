@@ -1135,3 +1135,16 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
 - Verified: 3-5 seeds x 30,000 per spec, 0 mismatches (NaN payloads in EAX included); suite 576 / 0 failed; Live
   check while changing views: Transform4 162k, Invert 5k, SetValDesired 7.7k calls, 0 mismatches. 1,365.
 
+## 2026-11-19 — Camera batch 8 (9): cubic update, axis rotation, select-car animation
+
+- `game/systems/camera/camera_cubic2.cpp`: tCubic1D::Update + ClampFirstDerivative (0x5748C0) +
+  ClampSecondDerivative, tCubic3D::Update (KB name "bClamp" is wrong), eCreateAxisRotationMatrix,
+  CameraMover::SetEyeLook, CubicCameraMover::MaybePullBackToSeeChaseCar, SelectCarCameraMover::FindAnimationTime /
+  SetDesiredOrientation (11 args: stubs and leaf Fn now go to 11).
+- EAX: the cubic functions end in `fnstsw ax` and never set the high half, so it is the caller's and gets chained
+  (Update -> clamps, tCubic3D -> 3x Update); calls pass the exact EAX via small asm helpers. x87.h: absx, and
+  with_depth() for the TOP field when the original still has values on its x87 stack at fnstsw. A missed
+  `mov eax,[ecx]` in Update showed up only as a wrong EAX high half: the test caught it.
+- Verified: 4 seeds x 30,000 per spec, 0 mismatches; suite 588 / 0 failed; in game the cubic updates run on
+  (~1,500 calls/s) with views correct. 1,374.
+

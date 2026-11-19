@@ -107,6 +107,16 @@ inline int32_t ftol(const X& a) {  // _ftol2: truncate toward zero, low 32 bits
     }
     return static_cast<int32_t>(r);
 }
+inline X absx(const X& a) {  // fabs (clears the sign, NaN too)
+    X r = a;
+    r.b[9] &= 0x7F;
+    return r;
+}
+// a status word from cmpw() as the original's fnstsw saw it with `depth` values still on its x87 stack (TOP field)
+inline uint16_t with_depth(uint16_t sw, int depth) {
+    const uint16_t top = static_cast<uint16_t>((((sw >> 11) & 7) - depth) & 7);
+    return static_cast<uint16_t>((sw & ~0x3800) | (top << 11));
+}
 // fcom a, b -> AH condition bits (C0 0x01, C2 0x04, C3 0x40)
 inline uint8_t cmp(const X& a, const X& b) {
     uint16_t sw;

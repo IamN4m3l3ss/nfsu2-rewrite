@@ -1170,3 +1170,8 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   functions in link-free specs (RouteSpan reads +0x38 / +0x3C).
 - Verified: 3 seeds x 30,000 per spec, 0 mismatches; suite 0 failed.
 
+## 2026-11-19 — Camera deps batch 3 (7)
+
+- `game/systems/camera/camera_deps3.cpp`: eRotateX / eRotateY / eTranslate, Car::MakeFlatMatrix, the tCubic3D
+  initialisers 0x4419A0 / 0x441A20, the point-set copy 0x444C60. 3 seeds x 30,000, 0 mismatches; suite 0 failed.
+

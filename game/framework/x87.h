@@ -69,6 +69,25 @@ NFSU2_X87_BIN(sub, fsubp)  // a - b
 NFSU2_X87_BIN(mul, fmulp)
 NFSU2_X87_BIN(div, fdivp)  // a / b
 #undef NFSU2_X87_BIN
+// `op dword ptr [mem]`: a float memory operand as the original used it. Unlike ld() + op, a signalling NaN in
+// memory reaches the instruction unquieted, which decides which NaN payload comes out. Takes the float's bits.
+#define NFSU2_X87_MEM(name, op)                     \
+    inline X name(const X& a, uint32_t bits) {      \
+        X r;                                        \
+        X la = a;                                   \
+        uint32_t lb = bits;                         \
+        __asm { fld tbyte ptr [la] }                \
+        __asm { op dword ptr [lb] }                 \
+        __asm { fstp tbyte ptr [r] }                \
+        return r;                                   \
+    }
+NFSU2_X87_MEM(addm, fadd)
+NFSU2_X87_MEM(subm, fsub)    // a - mem
+NFSU2_X87_MEM(subrm, fsubr)  // mem - a
+NFSU2_X87_MEM(mulm, fmul)
+NFSU2_X87_MEM(divm, fdiv)    // a / mem
+NFSU2_X87_MEM(divrm, fdivr)  // mem / a
+#undef NFSU2_X87_MEM
 inline X sqrt(const X& a) {  // fsqrt
     X r;
     X la = a;

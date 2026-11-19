@@ -83,7 +83,6 @@ Everything goes through one script in the project folder (`./nfsu2` alone lists 
 In the game, **F8** opens the panel: switch each rewritten function on/off and test it, **Live check** (play
 normally while every real call of the ticked functions also runs original and rewrite on copies and compares them),
 **Drives** (record a drive, traffic on/off), live car telemetry, probe info and the log.
-info and the log.
 
 ## Folders
 

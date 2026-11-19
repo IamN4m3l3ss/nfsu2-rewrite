@@ -1124,3 +1124,14 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   window compared relative to each block, a fixture saving/restoring the restart flag.
 - Verified: 3 seeds x 30,000 per spec, 0 mismatches; suite 564 / 0 failed; in game: view changes fine. 1,355.
 
+## 2026-11-19 — Camera batch 7 (10): cubic setters, 4D transform, matrix invert, eye/look cubic init
+
+- `game/systems/camera/camera_cubic1.cpp`: tCubic3D SetdVal / SetValDesired (per-axis and vector forms), the 4D
+  vector transform 0x486F50, eInvertTransformationMatrix (translate(-pos) * rotation^T through the D3DX multiply the
+  exe dispatches via 0x803E74, stdcall), CameraMover::EyeCubicInit / LookCubicInit, the thunks 0x43C9B0 / 0x43C9C0.
+- x87.h: memory-operand ops (addm/subm/subrm/mulm/divm/divrm). `fmul dword [mem]` sees a signalling NaN unquieted,
+  ld()+mul quiets it first, so the NaN that comes out differed; EyeCubicInit returns the last vector's z high half in
+  EAX, which exposed it. Also a value that the original round-trips through fstp is quieted the same way.
+- Verified: 3-5 seeds x 30,000 per spec, 0 mismatches (NaN payloads in EAX included); suite 576 / 0 failed; Live
+  check while changing views: Transform4 162k, Invert 5k, SetValDesired 7.7k calls, 0 mismatches. 1,365.
+

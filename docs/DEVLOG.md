@@ -1092,3 +1092,13 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   stray bytes are ASCII now. The test also reports the script it was running in a crash.
 - Full suite: 526 passed, then 525 passed, 0 failed.
 
+## 2026-11-19 — Camera batch 4 (8)
+
+- `game/systems/camera/camera_calls2.cpp`: CubicCameraMover::OutsidePOV, IceCameraMover GetFOV / GetFxTint /
+  GetLook / GetEye (blend of a 3D cubic's value and desired value via bScaleAdd 0x43D0C0 - the knowledge db calls
+  it emTriggerEventsInSection), AutoPilotCameraMover::Update, GenericPowerSlideScore, ConvertApertureNumberToFStop.
+  0x75BED4 is the MSVC runtime's _ftol2 (truncating float -> int64), not game code.
+- Test data note: a car always has POV 0 (the original falls back to it and reads through null otherwise).
+- Verified: 3 seeds x 30,000 per spec, 0 mismatches; full suite 540 / 0 failed; live: OutsidePOV 7,218 calls,
+  0 mismatches (the ice camera does not run in free roam). 1,340 verified.
+

@@ -1158,3 +1158,15 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   Player::UseBirdsEye. Note: LEAF_STD bodies are __cdecl (the stub pops) - a __stdcall body crashed the test.
 - Verified: 3 seeds x 30,000 per spec, 0 mismatches; suite 0 failed.
 
+## 2026-11-19 — Camera deps batch 2 (24): car / player / matrix helpers
+
+- `game/systems/camera/camera_deps2.cpp`: Car::AreHydraulicsBouncing / Extended (AL result, AH the last compare's
+  status, EAX high half the caller's or 0), GetLocalMiddle, GetCarSpaceBoundingBox, GetRoute (+ the tail-jump
+  wrapper 0x5EC0A0), Player::GetCameraTargetCar / GetPovType (its jump table read from the exe) / 0x5EB400,
+  eCreateRotationZ, eRotateZ, the D3DX dispatch thunks 0x63CEDB / 0x63D12C and 0x5BAF80, vector subtract (two
+  forms), float max, orientation copy 0x444D70, small getters, CarMover::DoSnapshot (empty), and the jump thunks
+  0x575620 / 0x575630 (KB names MEM_allocz / __builtin_vec_delete; they jump to the CRT's operator new / delete).
+- Test note: a float field that is also a spec link reads as different "floats" in the two graphs - keep such
+  functions in link-free specs (RouteSpan reads +0x38 / +0x3C).
+- Verified: 3 seeds x 30,000 per spec, 0 mismatches; suite 0 failed.
+

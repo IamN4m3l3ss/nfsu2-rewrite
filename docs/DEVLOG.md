@@ -1080,3 +1080,15 @@ Wait 53 calls per boot, heap clean, no errors. 87 verified.
   overflows the original's stack frame; time-sliced seeds now reach new cases). To investigate next session
   (suspect: a zPhysics1 function reading a game global another thread changes).
 
+## 2026-11-19 — The two intermittent suite failures, fixed
+
+- zPhysics1 / zPhysics2: their own (older) test graphs attributed pointers with 0x400 bytes of slack past each
+  region in one pass, so when two regions happened to be allocated back to back a returned pointer was taken for
+  "past the end" of the other in one of the two runs (EAX mismatches on SetState / GetState style functions, only
+  sometimes). Same fix as leaf.h: exact ranges first, slack second, identical EAX bits always equal.
+- SpeedScript: the original's parser crashed (EIP 0x30303030, its stack overwritten with "0000") only late in a
+  full suite run: the generator put stray bytes >= 0x80 into scripts, a negative signed char in the original's
+  parser; the result depended on stack garbage earlier tests left. The game's script files are plain ASCII, so the
+  stray bytes are ASCII now. The test also reports the script it was running in a crash.
+- Full suite: 526 passed, then 525 passed, 0 failed.
+

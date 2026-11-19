@@ -198,10 +198,13 @@ struct Graph {
     // a value the function returned, as (region, offset) when it points into this graph
     int64_t rel(uint32_t v) const {
         const std::vector<uint8_t>* regions[] = {&obj, &body, &s60, &s148, &io};
-        for (int k = 0; k < 5; ++k) {
-            const uintptr_t b = reinterpret_cast<uintptr_t>(regions[k]->data());
-            if (v >= b && v < b + regions[k]->size() + 0x400) return (static_cast<int64_t>(k + 1) << 32) | (v - b);
-        }
+        // inside a region first, then the slack past its end: regions can sit back to back in memory, and a pointer
+        // to the start of one must not be taken for "just past" the other (made this test fail intermittently)
+        for (uint32_t slack : {0u, 0x400u})
+            for (int k = 0; k < 5; ++k) {
+                const uintptr_t b = reinterpret_cast<uintptr_t>(regions[k]->data());
+                if (v >= b && v < b + regions[k]->size() + slack) return (static_cast<int64_t>(k + 1) << 32) | (v - b);
+            }
         return v;
     }
     bool operator==(const Graph& o) const {
@@ -287,7 +290,7 @@ NFSU2_DIFF_TEST(zPhysics1) {
         } else {
             const game::RegOutThis ra = game::call_regs_this(f.orig, a.obj.data(), args, f.nargs);
             const game::RegOutThis rb = game::call_regs_this(f.mine, b.obj.data(), argsb, f.nargs);
-            if (f.eax && a.rel(ra.eax) != b.rel(rb.eax)) bad += " eax";
+            if (f.eax && ra.eax != rb.eax && a.rel(ra.eax) != b.rel(rb.eax)) bad += " eax";
             if (ra.popped != rb.popped) bad += " pops";
             if (ra.edx == game::kSentEDX && rb.edx != game::kSentEDX) bad += " edx";
         }

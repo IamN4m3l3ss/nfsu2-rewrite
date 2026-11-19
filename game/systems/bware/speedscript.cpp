@@ -396,7 +396,10 @@ std::string make_script(game::Rng& r) {
             t += kWords[r.below(23)];
         }
         t += kSeps[r.below(12)];
-        if (r.below(20) == 0) t += static_cast<char>(1 + r.below(255));  // stray bytes
+        // stray bytes: ASCII only. The game's script files are plain text; a byte >= 0x80 is a negative signed char in
+        // the original's parser and once made it overflow its stack (crash at 0x30303030, only after other tests had
+        // left stack garbage behind)
+        if (r.below(20) == 0) t += static_cast<char>(1 + r.below(127));
     }
     if (r.below(10) == 0) t.insert(r.below(static_cast<uint32_t>(t.size()) + 1), 1, '\0');  // NUL inside
     if (r.below(10) == 0) t += "\"unterminated";
@@ -434,6 +437,9 @@ int64_t rel(Script* s, const char* p) {
 NFSU2_DIFF_TEST(SpeedScript) {
     return game::run_diff(ctx, "SpeedScript", o_ScriptInit, [](game::Rng& r) -> game::Case {
         const std::string text = make_script(r);
+        static std::string step;  // shown in a crash report
+        step = text.substr(0, 200);
+        game::g_test_step = step.c_str();
         Pair p;
         std::memset(p.a, 0x5A, sizeof p.a);
         std::memset(p.b, 0x5A, sizeof p.b);

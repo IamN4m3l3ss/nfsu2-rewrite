@@ -196,10 +196,11 @@ struct Graph {
         at<uint32_t>(blk[P60].data(), 8) = at<uint32_t>(blk[P60].data(), 8) & 1;  // pointer-or-null flag
     }
     int64_t rel(uint32_t v) const {
-        for (int k = 0; k < N; ++k) {
-            const uintptr_t b = reinterpret_cast<uintptr_t>(blk[k].data());
-            if (v >= b && v < b + blk[k].size() + 0x400) return (static_cast<int64_t>(k + 1) << 32) | (v - b);
-        }
+        for (uint32_t slack : {0u, 0x400u})  // exact first: blocks can sit back to back (see trivial1.cpp)
+            for (int k = 0; k < N; ++k) {
+                const uintptr_t b = reinterpret_cast<uintptr_t>(blk[k].data());
+                if (v >= b && v < b + blk[k].size() + slack) return (static_cast<int64_t>(k + 1) << 32) | (v - b);
+            }
         return v;
     }
     bool same_as(const Graph& o) const {
@@ -273,7 +274,7 @@ NFSU2_DIFF_TEST(zPhysics2) {
         } else {
             const game::RegOutThis ra = game::call_regs_this(f.orig, oa, args, f.nargs);
             const game::RegOutThis rb = game::call_regs_this(f.mine, ob, argsb, f.nargs);
-            if (f.eax && a.rel(ra.eax) != b.rel(rb.eax)) bad += " eax";
+            if (f.eax && ra.eax != rb.eax && a.rel(ra.eax) != b.rel(rb.eax)) bad += " eax";
             if (ra.popped != rb.popped) bad += " pops";
             if (ra.edx == game::kSentEDX && rb.edx != game::kSentEDX) bad += " edx";
         }
